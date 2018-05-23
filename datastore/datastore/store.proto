@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "store";
+option java_outer_classname = "DataStore";
+
+package datastore;
+
+service DataStore {
+  rpc PutObjectMD(PutObjMDRequest) returns (PutObjMDReply) {}
+  rpc GetObjectMD(GetObjMDRequest) returns (GetObjMDReply) {}
+  rpc GetOperations(SubscribeRequest) returns (stream Operation) {}
+  rpc GetSnapshot(SubscribeRequest) returns (stream ObjectMD) {}
+  rpc Subscribe(SubscribeRequest) returns (stream StreamMsg) {}
+}
+
+message ObjectMD {
+  string key = 1;
+  map<string, string> state = 2;
+  int64 timestamp = 3;
+}
+
+message Operation {
+  string key = 1;
+  string mdKey = 2;
+  string mdValue = 3;
+  string mdOldValue = 4;
+  int64 timestamp = 5;
+}
+
+message PutObjMDRequest {
+  string key = 1;
+  string mdKey = 2;
+  string mdValue = 3;
+}
+
+message GetObjMDRequest {
+  string key = 1;
+  int64 timestamp = 2;
+}
+
+message SubscribeRequest {
+  int64 timestamp = 1;
+}
+
+message PutObjMDReply {
+  string message = 1;
+  int64 timestamp = 2;
+}
+
+message GetObjMDReply {
+  string message = 1;
+  ObjectMD object = 2;
+}
+
+message StreamMsg {
+  string type = 1;
+  ObjectMD state = 2;
+  Operation operation = 3;
+}
