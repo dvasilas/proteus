@@ -69,13 +69,15 @@ var readPastPuts = []struct {
 	},
 }
 
+var s server
+
 func TestMain(m *testing.M) {
+	s = newDSServer(":50051")
 	returnCode := m.Run()
 	os.Exit(returnCode)
 }
 
 func TestPutObjectMDArgs(t *testing.T) {
-	s := newDSServer(":50051")
 	for _, tt := range putTests {
 		req := &pb.PutObjMDRequest{Key: tt.key, Attributes: tt.attributes}
 		resp, err := s.PutObjectMD(context.Background(), req)

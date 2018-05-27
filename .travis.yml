@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - 1.10.x
+
+install:
+  - go get google.golang.org/grpc
+  - go get github.com/hpcloud/tail
+  - go get github.com/stretchr/testify
+
+notifications:
+  email: false

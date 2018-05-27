@@ -6,25 +6,28 @@ import (
 	"log"
 	"time"
 
-	pb "modqp/data_store/datastore"
+	pb "github.com/dimitriosvasilas/modqp/dataStore/datastore"
 
 	"google.golang.org/grpc"
 )
 
+// Client ...
 type Client struct {
 	dsClient pb.DataStoreClient
 }
 
-func (c *Client) PutObjectMD(key string, mdKey string, mdVal string) (string, int64, error) {
+// PutObjectMD ...
+func (c *Client) PutObjectMD(key string, attributes map[string]string) (string, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.dsClient.PutObjectMD(ctx, &pb.PutObjMDRequest{Key: key, MdKey: mdKey, MdValue: mdVal})
+	r, err := c.dsClient.PutObjectMD(ctx, &pb.PutObjMDRequest{Key: key, Attributes: attributes})
 	if err != nil {
 		log.Fatalf("failed: %v", err)
 	}
 	return r.Message, r.Timestamp, nil
 }
 
+// GetObjectMD ...
 func (c *Client) GetObjectMD(key string, ts int64) (string, *pb.ObjectMD, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -35,25 +38,7 @@ func (c *Client) GetObjectMD(key string, ts int64) (string, *pb.ObjectMD, error)
 	return r.Message, r.Object, nil
 }
 
-func (c *Client) GetOperations(ts int64) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	stream, err := c.dsClient.GetOperations(ctx, &pb.SubscribeRequest{Timestamp: ts})
-	if err != nil {
-		log.Fatalf("getOperations failed %v", err)
-	}
-	for {
-		getObjReply, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatalf("stream.Recv failed %v", err)
-		}
-		log.Println(getObjReply)
-	}
-}
-
+// GetSnapshot ...
 func (c *Client) GetSnapshot(ts int64) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,26 +58,28 @@ func (c *Client) GetSnapshot(ts int64) {
 	}
 }
 
-func (c *Client) Subscribe(ts int64) error {
+// SubscribeOps ...
+func (c *Client) SubscribeOps(ts int64, msg chan *pb.StreamMsg, done chan bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.dsClient.Subscribe(ctx, &pb.SubscribeRequest{Timestamp: ts})
+	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubscribeRequest{Timestamp: ts})
 	if err != nil {
 		log.Fatalf("subscribe failed %v", err)
 	}
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
-			break
+			done <- true
 		}
 		if err != nil {
 			log.Fatalf("stream.Recv failed %v", err)
 		}
-		log.Println(streamMsg)
+		done <- false
+		msg <- streamMsg
 	}
-	return nil
 }
 
+// NewDSClient ...
 func NewDSClient(address string) (Client, *grpc.ClientConn) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
