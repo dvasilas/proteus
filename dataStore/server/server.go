@@ -30,8 +30,9 @@ type server struct {
 }
 
 func newDSServer(port string) server {
+	os.Mkdir("../data", 0744)
 	datapath, _ := filepath.Abs("../data")
-	f, err := os.OpenFile(datapath+"/log.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	f, err := os.OpenFile(datapath+"/log.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0744)
 	if err != nil {
 		log.Fatalf("failed to create file: %v", err)
 	}

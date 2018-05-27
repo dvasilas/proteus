@@ -9,9 +9,8 @@ package datastore;
 service DataStore {
   rpc PutObjectMD(PutObjMDRequest) returns (PutObjMDReply) {}
   rpc GetObjectMD(GetObjMDRequest) returns (GetObjMDReply) {}
-  rpc GetOperations(SubscribeRequest) returns (stream Operation) {}
   rpc GetSnapshot(SubscribeRequest) returns (stream ObjectMD) {}
-  rpc Subscribe(SubscribeRequest) returns (stream StreamMsg) {}
+  rpc SubscribeOps(SubscribeRequest) returns (stream StreamMsg) {}
 }
 
 message ObjectMD {
@@ -30,8 +29,7 @@ message Operation {
 
 message PutObjMDRequest {
   string key = 1;
-  string mdKey = 2;
-  string mdValue = 3;
+  map<string, string> attributes = 2;
 }
 
 message GetObjMDRequest {
