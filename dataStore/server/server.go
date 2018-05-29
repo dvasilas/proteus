@@ -56,12 +56,12 @@ func (s *server) writeToLog(in *pb.PutObjMDRequest, ts string) error {
 	return nil
 }
 
-func inTimestampRange(timestampStr string, inpuTts int64, fn func(int64, int64) bool) (int64, bool, error) {
+func inTimestampRange(timestampStr string, inpuTs int64, fn func(int64, int64) bool) (int64, bool, error) {
 	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
 	if err != nil {
 		return 0, false, err
 	}
-	return timestamp, fn(timestamp, inpuTts), nil
+	return timestamp, fn(timestamp, inpuTs), nil
 }
 
 func (s *server) store(in *pb.PutObjMDRequest, ts string) error {
@@ -117,7 +117,8 @@ func (s *server) snapshotProducer(ts int64, msg chan *pb.ObjectMD) {
 	}
 	for _, f := range files {
 		if f.Name() != "log.log" {
-			object, _ := s.materialize(f.Name(), ts)
+			key := strings.Split(f.Name(), ".")
+			object, _ := s.materialize(key[0], ts)
 			msg <- object
 		}
 	}
@@ -145,7 +146,7 @@ func (s *server) GetSnapshot(in *pb.SubscribeRequest, stream pb.DataStore_GetSna
 	for {
 		if object := <-msg; object == nil {
 			break
-		} else if err := stream.Send(object); err != nil {
+		} else if err := stream.Send(&pb.StateStream{State: object}); err != nil {
 			return err
 		}
 	}
@@ -158,7 +159,7 @@ func (s *server) SubscribeOps(in *pb.SubscribeRequest, stream pb.DataStore_Subsc
 	for {
 		if object := <-msg; object == nil {
 			break
-		} else if err := stream.Send(&pb.StreamMsg{Type: "state", State: object}); err != nil {
+		} else if err := stream.Send(&pb.OpStream{Type: "state", State: object}); err != nil {
 			return err
 		}
 	}
@@ -174,7 +175,7 @@ func (s *server) SubscribeOps(in *pb.SubscribeRequest, stream pb.DataStore_Subsc
 			if len(opLine) > 2 {
 				op = &pb.Operation{Key: opLine[1], MdKey: opLine[2], MdValue: opLine[3], Timestamp: operationTs}
 			}
-			if err := stream.Send(&pb.StreamMsg{Type: "operation", Operation: op}); err != nil {
+			if err := stream.Send(&pb.OpStream{Type: "operation", Operation: op}); err != nil {
 				return err
 			}
 		}
