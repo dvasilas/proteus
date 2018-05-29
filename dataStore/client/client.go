@@ -48,8 +48,8 @@ func (c *Client) GetObjectMD(key string, ts int64) (string, *pb.ObjectMD, error)
 	return r.Message, r.Object, nil
 }
 
-// GetSnapshot ...
-func (c *Client) GetSnapshot(ts int64) {
+// SubscribeStates ...
+func (c *Client) SubscribeStates(ts int64, msg chan *pb.StateStream, done chan bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubscribeRequest{Timestamp: ts})
@@ -59,17 +59,19 @@ func (c *Client) GetSnapshot(ts int64) {
 	for {
 		getObjReply, err := stream.Recv()
 		if err == io.EOF {
+			done <- true
 			break
 		}
 		if err != nil {
 			log.Fatalf("stream.Recv failed %v", err)
 		}
-		log.Println(getObjReply)
+		done <- false
+		msg <- getObjReply
 	}
 }
 
 // SubscribeOps ...
-func (c *Client) SubscribeOps(ts int64, msg chan *pb.StreamMsg, done chan bool) {
+func (c *Client) SubscribeOps(ts int64, msg chan *pb.OpStream, done chan bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubscribeRequest{Timestamp: ts})
