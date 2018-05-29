@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"time"
@@ -18,9 +19,18 @@ type Client struct {
 
 // PutObjectMD ...
 func (c *Client) PutObjectMD(key string, attributes map[string]string) (string, int64, error) {
+	if key == "" {
+		return "", -1, errors.New("Key is empty")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.dsClient.PutObjectMD(ctx, &pb.PutObjMDRequest{Key: key, Attributes: attributes})
+	var err error
+	var r *pb.PutObjMDReply
+	if len(attributes) == 0 {
+		r, err = c.dsClient.PutObjectMD(ctx, &pb.PutObjMDRequest{Key: key})
+	} else {
+		r, err = c.dsClient.PutObjectMD(ctx, &pb.PutObjMDRequest{Key: key, Attributes: attributes})
+	}
 	if err != nil {
 		log.Fatalf("failed: %v", err)
 	}
