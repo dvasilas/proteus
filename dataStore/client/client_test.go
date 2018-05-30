@@ -17,7 +17,7 @@ func TestPutNormalUse(t *testing.T) {
 	mockDSClient := dsmock.NewMockDataStoreClient(ctrl)
 	c := Client{dsClient: mockDSClient}
 
-	attrs := map[string]string{"test": "attr"}
+	attrs := map[string]int64{"test": 10}
 
 	mockDSClient.EXPECT().PutObjectMD(
 		gomock.Any(),
@@ -42,7 +42,7 @@ func TestPutEmptyAttrs(t *testing.T) {
 		&pb.PutObjMDRequest{Key: "obj1"},
 	).Return(&pb.PutObjMDReply{Message: "OK"}, nil).Times(1)
 
-	resp, _, err := c.PutObjectMD("obj1", make(map[string]string))
+	resp, _, err := c.PutObjectMD("obj1", make(map[string]int64))
 	if assert.Nil(t, err) {
 		assert.Equal(t, resp, "OK", "")
 	}
@@ -55,7 +55,7 @@ func TestPutEmptyKey(t *testing.T) {
 	mockDSClient := dsmock.NewMockDataStoreClient(ctrl)
 	c := Client{dsClient: mockDSClient}
 
-	_, _, err := c.PutObjectMD("", make(map[string]string))
+	_, _, err := c.PutObjectMD("", make(map[string]int64))
 	if assert.NotNil(t, err) {
 		assert.Equal(t, err, errors.New("Key is empty"), "")
 	}

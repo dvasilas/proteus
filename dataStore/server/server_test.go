@@ -11,17 +11,17 @@ import (
 
 var putTests = []struct {
 	key         string
-	attributes  map[string]string
+	attributes  map[string]int64
 	msgExpected string
 }{
 	{
 		key:         "key1",
-		attributes:  map[string]string{"size": "1024"},
+		attributes:  map[string]int64{"size": 1024},
 		msgExpected: "OK",
 	},
 	{
 		key:         "key2",
-		attributes:  map[string]string{},
+		attributes:  map[string]int64{},
 		msgExpected: "OK",
 	},
 	{
@@ -38,34 +38,34 @@ var putTests = []struct {
 }
 var getTests = []struct {
 	key        string
-	attributes map[string]string
+	attributes map[string]int64
 }{
 	{
 		key:        "key1",
-		attributes: map[string]string{"size": "1024", "type": "json"},
+		attributes: map[string]int64{"size": 1024, "type": 2},
 	},
 }
 
 var readPastPuts = []struct {
 	key         string
-	attributes  map[string]string
+	attributes  map[string]int64
 	msgExpected string
 }{
 	{
 		key:        "key",
-		attributes: map[string]string{},
+		attributes: map[string]int64{},
 	},
 	{
 		key:        "key",
-		attributes: map[string]string{"size": "256"},
+		attributes: map[string]int64{"size": 256},
 	},
 	{
 		key:        "key",
-		attributes: map[string]string{"size": "512"},
+		attributes: map[string]int64{"size": 512},
 	},
 	{
 		key:        "key",
-		attributes: map[string]string{"size": "1024"},
+		attributes: map[string]int64{"size": 1024},
 	},
 }
 
