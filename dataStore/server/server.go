@@ -42,7 +42,7 @@ func newDSServer(port string) server {
 func createLogEntry(in *pb.PutObjMDRequest, ts string) string {
 	logOp := ts + " " + in.Key
 	for attr := range in.Attributes {
-		logOp += " " + attr + " " + in.Attributes[attr]
+		logOp += " " + attr + " " + strconv.Itoa(int(in.Attributes[attr]))
 	}
 	return logOp + "\n"
 }
@@ -79,7 +79,7 @@ func (s *server) store(in *pb.PutObjMDRequest, ts string) error {
 }
 
 func (s *server) materialize(key string, ts int64) (*pb.ObjectMD, error) {
-	state := make(map[string]string)
+	state := make(map[string]int64)
 	f, err := os.OpenFile(s.datadir+"/"+key+".log", os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
@@ -99,11 +99,12 @@ func (s *server) materialize(key string, ts int64) (*pb.ObjectMD, error) {
 				attrs := line[2:]
 				for i := 0; i < len(attrs); i++ {
 					if i%2 == 0 {
-						state[attrs[i]] = attrs[i+1]
+						val, _ := strconv.ParseInt(attrs[i+1], 10, 64)
+						state[attrs[i]] = val
 					}
 				}
 			} else {
-				state = make(map[string]string)
+				state = make(map[string]int64)
 			}
 		}
 	}

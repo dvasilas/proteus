@@ -18,7 +18,7 @@ type Client struct {
 }
 
 // PutObjectMD ...
-func (c *Client) PutObjectMD(key string, attributes map[string]string) (string, int64, error) {
+func (c *Client) PutObjectMD(key string, attributes map[string]int64) (string, int64, error) {
 	if key == "" {
 		return "", -1, errors.New("Key is empty")
 	}
