@@ -7,8 +7,10 @@ option java_outer_classname = "DataStoreQPU";
 package datastoreqpu;
 
 service DataStoreQPU {
-  rpc SubscribeOps(QueryRequest) returns (stream OpStream) {}
-  rpc SubscribeStates(QueryRequest) returns (stream StateStream) {}
+  rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
+  rpc SubscribeStates(SubRequest) returns (stream StateStream) {}
+  rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
+  rpc Query(QueryRequest) returns (stream StateStream) {}
 }
 
 message ObjectMD {
@@ -25,8 +27,19 @@ message Operation {
   int64 timestamp = 5;
 }
 
+message SubRequest {
+  int64 timestamp = 1;
+}
+
 message QueryRequest {
   int64 timestamp = 1;
+  repeated Predicate predicate = 2;
+}
+
+message Predicate {
+  string attribute = 1;
+  int64 lbound = 2;
+  int64 ubound = 3;
 }
 
 message OpStream {

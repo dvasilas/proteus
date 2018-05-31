@@ -9,8 +9,8 @@ package datastore;
 service DataStore {
   rpc PutObjectMD(PutObjMDRequest) returns (PutObjMDReply) {}
   rpc GetObjectMD(GetObjMDRequest) returns (GetObjMDReply) {}
-  rpc GetSnapshot(SubscribeRequest) returns (stream StateStream) {}
-  rpc SubscribeOps(SubscribeRequest) returns (stream OpStream) {}
+  rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
+  rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
 }
 
 message ObjectMD {
@@ -37,7 +37,7 @@ message GetObjMDRequest {
   int64 timestamp = 2;
 }
 
-message SubscribeRequest {
+message SubRequest {
   int64 timestamp = 1;
 }
 

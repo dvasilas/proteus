@@ -12,6 +12,8 @@ install:
   - go get google.golang.org/grpc
   - go get github.com/hpcloud/tail
   - go get github.com/stretchr/testify
+  - go get github.com/fatih/color
+  - go get github.com/abiosoft/ishell
 
 env:
   - PATH=$HOME/protoc/bin:$PATH

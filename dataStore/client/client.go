@@ -48,11 +48,11 @@ func (c *Client) GetObjectMD(key string, ts int64) (string, *pb.ObjectMD, error)
 	return r.Message, r.Object, nil
 }
 
-// SubscribeStates ...
-func (c *Client) SubscribeStates(ts int64, msg chan *pb.StateStream, done chan bool) {
+// GetSnapshot ...
+func (c *Client) GetSnapshot(ts int64, msg chan *pb.StateStream, done chan bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubscribeRequest{Timestamp: ts})
+	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
 		log.Fatalf("getOperations failed %v", err)
 	}
@@ -74,7 +74,7 @@ func (c *Client) SubscribeStates(ts int64, msg chan *pb.StateStream, done chan b
 func (c *Client) SubscribeOps(ts int64, msg chan *pb.OpStream, done chan bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubscribeRequest{Timestamp: ts})
+	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
 		log.Fatalf("subscribe failed %v", err)
 	}

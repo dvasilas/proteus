@@ -141,7 +141,7 @@ func (s *server) GetObjectMD(ctx context.Context, in *pb.GetObjMDRequest) (*pb.G
 	return &pb.GetObjMDReply{Message: "OK", Object: state}, nil
 }
 
-func (s *server) GetSnapshot(in *pb.SubscribeRequest, stream pb.DataStore_GetSnapshotServer) error {
+func (s *server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotServer) error {
 	msg := make(chan *pb.ObjectMD)
 	go s.snapshotProducer(in.Timestamp, msg)
 	for {
@@ -154,7 +154,7 @@ func (s *server) GetSnapshot(in *pb.SubscribeRequest, stream pb.DataStore_GetSna
 	return nil
 }
 
-func (s *server) SubscribeOps(in *pb.SubscribeRequest, stream pb.DataStore_SubscribeOpsServer) error {
+func (s *server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsServer) error {
 	msg := make(chan *pb.ObjectMD)
 	go s.snapshotProducer(in.Timestamp, msg)
 	for {
