@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -11,7 +12,8 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/dimitriosvasilas/modqp/dataStore/datastore"
+	pb "github.com/dimitriosvasilas/modqp/dataStore/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos"
 
 	"github.com/hpcloud/tail"
 	"golang.org/x/net/context"
@@ -78,7 +80,7 @@ func (s *server) store(in *pb.PutObjMDRequest, ts string) error {
 	return nil
 }
 
-func (s *server) materialize(key string, ts int64) (*pb.ObjectMD, error) {
+func (s *server) materialize(key string, ts int64) (*pbQPU.Object, error) {
 	state := make(map[string]int64)
 	f, err := os.OpenFile(s.datadir+"/"+key+".log", os.O_RDONLY, 0644)
 	if err != nil {
@@ -108,10 +110,10 @@ func (s *server) materialize(key string, ts int64) (*pb.ObjectMD, error) {
 			}
 		}
 	}
-	return &pb.ObjectMD{Key: key, State: state, Timestamp: latestTs}, nil
+	return &pbQPU.Object{Key: key, Attributes: state, Timestamp: latestTs}, nil
 }
 
-func (s *server) snapshotProducer(ts int64, msg chan *pb.ObjectMD) {
+func (s *server) snapshotProducer(ts int64, msg chan *pbQPU.Object) {
 	files, err := ioutil.ReadDir(s.datadir)
 	if err != nil {
 		log.Fatalf("failed to read dir: %v", err)
@@ -142,20 +144,26 @@ func (s *server) GetObjectMD(ctx context.Context, in *pb.GetObjMDRequest) (*pb.G
 }
 
 func (s *server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotServer) error {
-	msg := make(chan *pb.ObjectMD)
+	msg := make(chan *pbQPU.Object)
 	go s.snapshotProducer(in.Timestamp, msg)
 	for {
 		if object := <-msg; object == nil {
 			break
-		} else if err := stream.Send(&pb.StateStream{State: object}); err != nil {
-			return err
+		} else {
+			if err := stream.Send(&pb.StateStream{Object: object}); err != nil {
+				return err
+			}
+			//demo
+			fmt.Printf("[GetSnapshot] stream.send: { %v }\n", object)
+			time.Sleep(time.Second / 4)
+			//demo
 		}
 	}
 	return nil
 }
 
 func (s *server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsServer) error {
-	msg := make(chan *pb.ObjectMD)
+	msg := make(chan *pbQPU.Object)
 	go s.snapshotProducer(in.Timestamp, msg)
 	for {
 		if object := <-msg; object == nil {
@@ -172,9 +180,9 @@ func (s *server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOp
 			return err
 		}
 		if inRange {
-			op := &pb.Operation{Key: opLine[1], Timestamp: operationTs}
+			op := &pbQPU.Operation{Key: opLine[1], Timestamp: operationTs}
 			if len(opLine) > 2 {
-				op = &pb.Operation{Key: opLine[1], MdKey: opLine[2], MdValue: opLine[3], Timestamp: operationTs}
+				op = &pbQPU.Operation{Key: opLine[1], MdKey: opLine[2], MdValue: opLine[3], Timestamp: operationTs}
 			}
 			if err := stream.Send(&pb.OpStream{Type: "operation", Operation: op}); err != nil {
 				return err

@@ -1,30 +1,16 @@
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "store";
-option java_outer_classname = "DataStore";
 
 package datastore;
+option go_package = "github.com/dimitriosvasilas/modqp/dataStore/protos";
+
+import "qpu.proto";
 
 service DataStore {
   rpc PutObjectMD(PutObjMDRequest) returns (PutObjMDReply) {}
   rpc GetObjectMD(GetObjMDRequest) returns (GetObjMDReply) {}
   rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
   rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
-}
-
-message ObjectMD {
-  string key = 1;
-  map<string, int64> state = 2;
-  int64 timestamp = 3;
-}
-
-message Operation {
-  string key = 1;
-  string mdKey = 2;
-  string mdValue = 3;
-  string mdOldValue = 4;
-  int64 timestamp = 5;
 }
 
 message PutObjMDRequest {
@@ -48,15 +34,15 @@ message PutObjMDReply {
 
 message GetObjMDReply {
   string message = 1;
-  ObjectMD object = 2;
+  qpu.Object object = 2;
 }
 
 message OpStream {
   string type = 1;
-  ObjectMD state = 2;
-  Operation operation = 3;
+  qpu.Object state = 2;
+  qpu.Operation operation = 3;
 }
 
 message StateStream {
-  ObjectMD state = 1;
+  qpu.Object object = 1;
 }

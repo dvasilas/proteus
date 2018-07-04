@@ -1,4 +1,3 @@
-//go:generate protoc -I ./datastore ./datastore/store.proto --go_out=plugins=grpc:./datastore
-//go:generate mockgen -destination=mocks/ds_mock.go github.com/dimitriosvasilas/modqp/dataStore/datastore DataStoreClient
+//go:generate protoc --proto_path=./protos --proto_path=../protos --go_out=plugins=grpc:$GOPATH/src ./protos/store.proto
 
 package gen

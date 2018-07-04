@@ -1,3 +1,3 @@
-//go:generate protoc -I ./dsqpu ./dsqpu/dsqpu.proto --go_out=plugins=grpc:./dsqpu
+//go:generate protoc --proto_path=./protos --proto_path=../protos --go_out=plugins=grpc:$GOPATH/src ./protos/dsqpu.proto
 
 package gen
