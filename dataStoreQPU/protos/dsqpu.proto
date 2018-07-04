@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package datastoreqpu;
+option go_package = "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos";
+
+import "qpu.proto";
+
+service DataStoreQPU {
+  rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
+  rpc SubscribeStates(SubRequest) returns (stream StateStream) {}
+  rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
+}
+
+message SubRequest {
+  int64 timestamp = 1;
+}
+
+message OpStream {
+  string type = 1;
+  qpu.Object state = 2;
+  qpu.Operation operation = 3;
+}
+
+message StateStream {
+  qpu.Object object = 1;
+}

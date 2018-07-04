@@ -7,7 +7,8 @@ import (
 	"log"
 	"time"
 
-	pb "github.com/dimitriosvasilas/modqp/dataStore/datastore"
+	pb "github.com/dimitriosvasilas/modqp/dataStore/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos"
 
 	"google.golang.org/grpc"
 )
@@ -38,7 +39,7 @@ func (c *Client) PutObjectMD(key string, attributes map[string]int64) (string, i
 }
 
 // GetObjectMD ...
-func (c *Client) GetObjectMD(key string, ts int64) (string, *pb.ObjectMD, error) {
+func (c *Client) GetObjectMD(key string, ts int64) (string, *pbQPU.Object, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	r, err := c.dsClient.GetObjectMD(ctx, &pb.GetObjMDRequest{Key: key, Timestamp: ts})
@@ -92,13 +93,10 @@ func (c *Client) SubscribeOps(ts int64, msg chan *pb.OpStream, done chan bool) {
 }
 
 // NewDSClient ...
-func NewDSClient(address string) (Client, *grpc.ClientConn) {
+func NewClient(address string) (Client, *grpc.ClientConn) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	return Client{pb.NewDataStoreClient(conn)}, conn
-}
-
-func init() {
 }

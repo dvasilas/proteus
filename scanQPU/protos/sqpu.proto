@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package scanqpu;
+option go_package = "github.com/dimitriosvasilas/modqp/scanQPU/protos";
+
+import "qpu.proto";
+
+service scanQPU {
+    rpc Find(FindRequest) returns (stream QueryResultStream) {}
+}
+
+message FindRequest {
+    int64 timestamp = 1;
+    repeated qpu.Predicate predicate = 2;
+}
+
+message QueryResultStream {
+    qpu.Object object = 1;
+}
