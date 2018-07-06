@@ -4,40 +4,53 @@ import (
 	"log"
 	"net"
 
-	dScli "github.com/dimitriosvasilas/modqp/dataStore/client"
-	pbDS "github.com/dimitriosvasilas/modqp/dataStore/protos"
+	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-const (
-	port      = ":50052"
-	dSAddress = "localhost:50051"
-)
+type dataStore interface {
+	GetSnapshot(msg chan *pbQPU.Object, done chan bool) error
+}
 
 type server struct {
-	port             string
-	dataStoreAddress string
-	conn             dScli.Client
+	ds dataStore
 }
 
-func newDSQPUServer(port string) server {
-	c, _ := dScli.NewClient(dSAddress)
-	return server{port: port, dataStoreAddress: dSAddress, conn: c}
+func newServer() server {
+	return server{ds: fS.FSDataStore{}}
 }
 
-func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbDS.StateStream, done chan bool, exit chan bool, fn func(*pbQPU.Object) bool) {
+type config struct {
+	hostname string
+	port     string
+}
+
+func getConfig() (config, error) {
+	var conf config
+
+	viper.SetConfigName("config")
+	viper.AddConfigPath("../")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Couldn't read configuration file: %v", err)
+	}
+
+	conf.hostname = viper.GetString("hostname")
+	conf.port = viper.GetString("port")
+
+	return conf, nil
+}
+func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, exit chan bool) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			exit <- true
 			return
 		}
-		StateStreamMsg := <-msg
-		if fn(StateStreamMsg.Object) {
-			stream.Send(&pb.StateStream{Object: &pbQPU.Object{Key: StateStreamMsg.Object.Key, Attributes: StateStreamMsg.Object.Attributes, Timestamp: StateStreamMsg.Object.Timestamp}})
-		}
+		Obj := <-msg
+		stream.Send(&pb.StateStream{Object: Obj})
 	}
 }
 
@@ -50,25 +63,30 @@ func (s *server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_Subscrib
 }
 
 func (s *server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapshotServer) error {
-	msg := make(chan *pbDS.StateStream)
+	msg := make(chan *pbQPU.Object)
 	done := make(chan bool)
 	exit := make(chan bool)
 
-	go getSnapshotConsumer(stream, msg, done, exit, func(obj *pbQPU.Object) bool { return true })
-	go s.conn.GetSnapshot(in.Timestamp, msg, done)
+	go getSnapshotConsumer(stream, msg, done, exit)
+	go s.ds.GetSnapshot(msg, done)
 	<-exit
 
 	return nil
 }
 
 func main() {
-	lis, err := net.Listen("tcp", port)
+	conf, err := getConfig()
+	if err != nil {
+		log.Fatalf("failed read configuration: %v", err)
+	}
+
+	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	s := grpc.NewServer()
-	server := newDSQPUServer(port)
+	server := newServer()
 	pb.RegisterDataStoreQPUServer(s, &server)
 
 	reflection.Register(s)
