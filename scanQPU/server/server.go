@@ -18,14 +18,14 @@ const (
 )
 
 type server struct {
-	port     string
-	connAddr string
-	conn     dSQPUcli.Client
+	port        string
+	connAddr    string
+	dSQPUClient dSQPUcli.Client
 }
 
 func newServer(port string) server {
 	c, _ := dSQPUcli.NewClient(connAddr)
-	return server{port: port, connAddr: connAddr, conn: c}
+	return server{port: port, connAddr: connAddr, dSQPUClient: c}
 }
 
 func snapshotConsumer(stream pb.ScanQPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, fn func(*pbQPU.Object) bool) {
@@ -52,7 +52,7 @@ func (s *server) Find(in *pb.FindRequest, stream pb.ScanQPU_FindServer) error {
 	}
 
 	go snapshotConsumer(stream, msg, done, exit, filter)
-	go s.conn.GetSnapshot(in.Timestamp, msg, done)
+	go s.dSQPUClient.GetSnapshot(in.Timestamp, msg, done)
 	<-exit
 
 	return nil
