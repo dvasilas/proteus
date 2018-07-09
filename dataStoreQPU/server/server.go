@@ -16,17 +16,36 @@ type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object, done chan bool) error
 }
 
-type server struct {
-	ds dataStore
-}
-
-func newServer() server {
-	return server{ds: fS.FSDataStore{}}
-}
-
 type config struct {
 	hostname string
 	port     string
+}
+
+//Server ...
+type Server struct {
+	ds dataStore
+}
+
+//ΝewServer ...
+func ΝewServer() Server {
+	server := Server{ds: fS.FSDataStore{}}
+	conf, err := getConfig()
+
+	if err != nil {
+		log.Fatalf("failed read configuration: %v", err)
+	}
+	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	s := grpc.NewServer()
+
+	pb.RegisterDataStoreQPUServer(s, &server)
+	reflection.Register(s)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+	return server
 }
 
 func getConfig() (config, error) {
@@ -54,15 +73,18 @@ func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan 
 	}
 }
 
-func (s *server) SubscribeStates(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeStatesServer) error {
+//SubscribeStates ...
+func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeStatesServer) error {
 	return nil
 }
 
-func (s *server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeOpsServer) error {
+//SubscribeOps ...
+func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeOpsServer) error {
 	return nil
 }
 
-func (s *server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapshotServer) error {
+//GetSnapshot ...
+func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapshotServer) error {
 	msg := make(chan *pbQPU.Object)
 	done := make(chan bool)
 	exit := make(chan bool)
@@ -75,22 +97,5 @@ func (s *server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapsh
 }
 
 func main() {
-	conf, err := getConfig()
-	if err != nil {
-		log.Fatalf("failed read configuration: %v", err)
-	}
-
-	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	s := grpc.NewServer()
-	server := newServer()
-	pb.RegisterDataStoreQPUServer(s, &server)
-
-	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	ΝewServer()
 }
