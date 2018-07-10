@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )

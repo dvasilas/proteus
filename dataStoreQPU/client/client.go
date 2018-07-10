@@ -6,13 +6,9 @@ import (
 	"io"
 	"log"
 
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"google.golang.org/grpc"
-)
-
-const (
-	address = "localhost:50052"
 )
 
 //Client ...
@@ -21,12 +17,13 @@ type Client struct {
 }
 
 //SubscribeStates ...
-func (c *Client) SubscribeStates(ts int64) {
+func (c *Client) SubscribeStates(ts int64) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	stream, err := c.dsClient.SubscribeStates(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
-		log.Fatalf("getOperations failed %v", err)
+		return err
 	}
 	for {
 		getObjReply, err := stream.Recv()
@@ -34,19 +31,21 @@ func (c *Client) SubscribeStates(ts int64) {
 			break
 		}
 		if err != nil {
-			log.Fatalf("stream.Recv failed %v", err)
+			return err
 		}
 		fmt.Println("SubscribeOps: ", getObjReply)
 	}
+	return nil
 }
 
 // SubscribeOps ...
 func (c *Client) SubscribeOps(ts int64) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
-		log.Fatalf("subscribe failed %v", err)
+		return err
 	}
 	for {
 		streamMsg, err := stream.Recv()
@@ -54,7 +53,7 @@ func (c *Client) SubscribeOps(ts int64) error {
 			break
 		}
 		if err != nil {
-			log.Fatalf("stream.Recv failed %v", err)
+			return err
 		}
 		log.Println("SubscribeOps: ", streamMsg)
 	}
@@ -68,7 +67,7 @@ func (c *Client) GetSnapshot(ts int64, msg chan *pbQPU.Object, done chan bool) e
 
 	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
-		log.Fatalf("Query failed %v", err)
+		return err
 	}
 	for {
 		streamMsg, err := stream.Recv()
@@ -77,7 +76,7 @@ func (c *Client) GetSnapshot(ts int64, msg chan *pbQPU.Object, done chan bool) e
 			break
 		}
 		if err != nil {
-			log.Fatalf("stream.Recv failed %v", err)
+			return err
 		}
 		done <- false
 		msg <- streamMsg.Object
@@ -86,10 +85,10 @@ func (c *Client) GetSnapshot(ts int64, msg chan *pbQPU.Object, done chan bool) e
 }
 
 //NewClient ...
-func NewClient(address string) (Client, *grpc.ClientConn) {
+func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		return Client{}, nil, err
 	}
-	return Client{pb.NewDataStoreQPUClient(conn)}, conn
+	return Client{pb.NewDataStoreQPUClient(conn)}, conn, nil
 }

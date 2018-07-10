@@ -4,16 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
-	pb "github.com/dimitriosvasilas/modqp/scanQPU/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
+	pb "github.com/dimitriosvasilas/modqp/scanQPU/sqpupb"
 
 	"google.golang.org/grpc"
-)
-
-const (
-	addr = "localhost:50053"
 )
 
 //Client ...
@@ -49,7 +44,7 @@ func (c *Client) Find(ts int64, predicate map[string][2]int64, msg chan *pbQPU.O
 	stream, err := c.sQPUClient.Find(ctx, req)
 
 	if err != nil {
-		log.Fatalf("Query failed %v", err)
+		return err
 	}
 	for {
 		streamMsg, err := stream.Recv()
@@ -58,7 +53,7 @@ func (c *Client) Find(ts int64, predicate map[string][2]int64, msg chan *pbQPU.O
 			break
 		}
 		if err != nil {
-			log.Fatalf("stream.Recv failed %v", err)
+			return err
 		}
 		done <- false
 		msg <- streamMsg.Object
@@ -67,10 +62,10 @@ func (c *Client) Find(ts int64, predicate map[string][2]int64, msg chan *pbQPU.O
 }
 
 //NewClient ...
-func NewClient(address string) (Client, *grpc.ClientConn) {
+func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		return Client{}, nil, err
 	}
-	return Client{pb.NewScanQPUClient(conn)}, conn
+	return Client{pb.NewScanQPUClient(conn)}, conn, nil
 }

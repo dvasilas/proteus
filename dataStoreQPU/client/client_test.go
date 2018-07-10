@@ -6,8 +6,8 @@ import (
 	"time"
 
 	mock "github.com/dimitriosvasilas/modqp/dataStoreQPU/client/mocks"
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

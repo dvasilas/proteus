@@ -4,9 +4,9 @@ import (
 	"log"
 	"net"
 
+	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/protos"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -26,42 +26,42 @@ type Server struct {
 	ds dataStore
 }
 
-//ΝewServer ...
-func ΝewServer() Server {
-	server := Server{ds: fS.FSDataStore{}}
-	conf, err := getConfig()
-
-	if err != nil {
-		log.Fatalf("failed read configuration: %v", err)
-	}
-	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-
-	pb.RegisterDataStoreQPUServer(s, &server)
-	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
-	return server
-}
-
 func getConfig() (config, error) {
 	var conf config
 
 	viper.SetConfigName("config")
 	viper.AddConfigPath("../")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Couldn't read configuration file: %v", err)
+		return conf, err
 	}
-
 	conf.hostname = viper.GetString("hostname")
 	conf.port = viper.GetString("port")
 
 	return conf, nil
 }
+
+//ΝewServer ...
+func ΝewServer() error {
+	conf, err := getConfig()
+	if err != nil {
+		return err
+	}
+	server := Server{ds: fS.FSDataStore{}}
+
+	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
+	if err != nil {
+		return err
+	}
+	s := grpc.NewServer()
+
+	pb.RegisterDataStoreQPUServer(s, &server)
+	reflection.Register(s)
+	if err := s.Serve(lis); err != nil {
+		return err
+	}
+	return nil
+}
+
 func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, exit chan bool) {
 	for {
 		if doneMsg := <-done; doneMsg {
@@ -97,5 +97,8 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapsh
 }
 
 func main() {
-	ΝewServer()
+	err := ΝewServer()
+	if err != nil {
+		log.Fatalf("dataStoreQPU server failed %v", err)
+	}
 }
