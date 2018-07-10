@@ -3,7 +3,7 @@ package filter
 import (
 	"fmt"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"github.com/fatih/color"
 )
 

@@ -1,10 +1,9 @@
 package store
 
 import (
-	"log"
 	"os"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"github.com/spf13/viper"
 )
 
@@ -17,11 +16,11 @@ func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool) error 
 
 	f, err := os.Open(path)
 	if err != nil {
-		log.Fatalf("failed to open dir: %v", err)
+		return err
 	}
 	files, err := f.Readdir(-1)
 	if err != nil {
-		log.Fatalf("failed to read dir: %v", err)
+		return err
 	}
 	for _, file := range files {
 		done <- false

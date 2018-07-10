@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package scanqpu;
-option go_package = "github.com/dimitriosvasilas/modqp/scanQPU/protos";
+option go_package = "github.com/dimitriosvasilas/modqp/scanQPU/sqpupb";
 
 import "qpu.proto";
 

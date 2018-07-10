@@ -5,27 +5,66 @@ import (
 	"net"
 
 	dSQPUcli "github.com/dimitriosvasilas/modqp/dataStoreQPU/client"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	"github.com/dimitriosvasilas/modqp/scanQPU/filter"
-	pb "github.com/dimitriosvasilas/modqp/scanQPU/protos"
+	pb "github.com/dimitriosvasilas/modqp/scanQPU/sqpupb"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-const (
-	port     = ":50053"
-	connAddr = "localhost:50052"
-)
-
-type server struct {
-	port        string
-	connAddr    string
-	dSQPUClient dSQPUcli.Client
+type config struct {
+	hostname string
+	port     string
+	conn     struct {
+		hostname string
+		port     string
+	}
 }
 
-func newServer(port string) server {
-	c, _ := dSQPUcli.NewClient(connAddr)
-	return server{port: port, connAddr: connAddr, dSQPUClient: c}
+//Server ...
+type Server struct {
+	connClient dSQPUcli.Client
+}
+
+func getConfig() (config, error) {
+	var conf config
+
+	viper.SetConfigName("config")
+	viper.AddConfigPath("../")
+	if err := viper.ReadInConfig(); err != nil {
+		return conf, err
+	}
+	conf.hostname = viper.GetString("hostname")
+	conf.port = viper.GetString("port")
+
+	conf.conn.hostname = viper.GetString("conn.hostname")
+	conf.conn.port = viper.GetString("conn.port")
+
+	return conf, nil
+}
+
+//NewServer ...
+func NewServer() error {
+	conf, err := getConfig()
+
+	c, _, err := dSQPUcli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
+	if err != nil {
+		return err
+	}
+	server := Server{connClient: c}
+	s := grpc.NewServer()
+	pb.RegisterScanQPUServer(s, &server)
+	reflection.Register(s)
+
+	lis, err := net.Listen("tcp", ":"+conf.port)
+	if err != nil {
+		return err
+	}
+	if err := s.Serve(lis); err != nil {
+		return err
+	}
+	return nil
 }
 
 func snapshotConsumer(stream pb.ScanQPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, fn func(*pbQPU.Object) bool) {
@@ -41,7 +80,8 @@ func snapshotConsumer(stream pb.ScanQPU_FindServer, msg chan *pbQPU.Object, done
 	}
 }
 
-func (s *server) Find(in *pb.FindRequest, stream pb.ScanQPU_FindServer) error {
+//Find ...
+func (s *Server) Find(in *pb.FindRequest, stream pb.ScanQPU_FindServer) error {
 	msg := make(chan *pbQPU.Object)
 	done := make(chan bool)
 	exit := make(chan bool)
@@ -52,24 +92,15 @@ func (s *server) Find(in *pb.FindRequest, stream pb.ScanQPU_FindServer) error {
 	}
 
 	go snapshotConsumer(stream, msg, done, exit, filter)
-	go s.dSQPUClient.GetSnapshot(in.Timestamp, msg, done)
+	go s.connClient.GetSnapshot(in.Timestamp, msg, done)
 	<-exit
 
 	return nil
 }
 
 func main() {
-	lis, err := net.Listen("tcp", port)
+	err := NewServer()
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	s := grpc.NewServer()
-	server := newServer(port)
-	pb.RegisterScanQPUServer(s, &server)
-
-	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("Scan QPU server failed: %v", err)
 	}
 }

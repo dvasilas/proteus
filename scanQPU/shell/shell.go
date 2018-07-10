@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"github.com/abiosoft/ishell"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
 	cli "github.com/dimitriosvasilas/modqp/scanQPU/client"
 )
 
@@ -24,10 +25,13 @@ func queryConsumer(msg chan *pbQPU.Object, done chan bool) {
 func main() {
 	shell := ishell.New()
 
-	c, conn := cli.NewClient("localhost:50053")
+	c, conn, err := cli.NewClient("localhost:50053")
 	defer conn.Close()
+	if err != nil {
+		log.Fatalf("failed to create Client %v", err)
+	}
 
-	shell.Println("Data Store QPU Shell")
+	shell.Println("Scan Store QPU Shell")
 
 	shell.AddCmd(&ishell.Cmd{
 		Name: "find",
