@@ -1,3 +1,3 @@
-//go:generate protoc --go_out=plugins=grpc:$GOPATH/src/ ./qpupb/qpu.proto
+//go:generate protoc --go_out=plugins=grpc:$GOPATH/src/ ./qpuUtilspb/qpuUtils.proto
 
 package gen

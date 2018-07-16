@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package qpu;
+option go_package = "github.com/dimitriosvasilas/modqp/qpu/qpupb";
+
+import "qpuUtils.proto";
+
+service QPU {
+    rpc Find(FindRequest) returns (stream QueryResultStream) {}
+}
+
+message FindRequest {
+    int64 timestamp = 1;
+    repeated qpuUtils.Predicate predicate = 2;
+}
+
+message QueryResultStream {
+    qpuUtils.Object object = 1;
+}

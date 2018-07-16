@@ -3,7 +3,7 @@ package store
 import (
 	"os"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/spf13/viper"
 )
 

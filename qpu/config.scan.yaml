@@ -1,0 +1,6 @@
+qpuType: scan
+hostname: localhost
+port: 50053
+conn:
+  hostname: localhost
+  port: 50052
