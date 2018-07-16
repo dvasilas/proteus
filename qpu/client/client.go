@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"io"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
-	pb "github.com/dimitriosvasilas/modqp/scanQPU/sqpupb"
+	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 
 	"google.golang.org/grpc"
 )
 
 //Client ...
 type Client struct {
-	sQPUClient pb.ScanQPUClient
+	sQPUClient pb.QPUClient
 }
 
 func queryresultConsumer(msg chan *pbQPU.Object, done chan bool) {
@@ -67,5 +67,5 @@ func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	if err != nil {
 		return Client{}, nil, err
 	}
-	return Client{pb.NewScanQPUClient(conn)}, conn, nil
+	return Client{pb.NewQPUClient(conn)}, conn, nil
 }

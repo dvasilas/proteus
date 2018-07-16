@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package qpu;
-option go_package = "github.com/dimitriosvasilas/modqp/qpupb";
+package qpuUtils;
+option go_package = "github.com/dimitriosvasilas/modqp/qpuUtilspb";
 
 message Object {
     string key = 1;

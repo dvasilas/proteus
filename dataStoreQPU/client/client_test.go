@@ -7,7 +7,7 @@ import (
 
 	mock "github.com/dimitriosvasilas/modqp/dataStoreQPU/client/mocks"
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

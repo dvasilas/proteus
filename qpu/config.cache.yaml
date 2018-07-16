@@ -1,5 +1,6 @@
+qpuType: cache
 hostname: localhost
-port: 50053
+port: 50054
 conn:
   hostname: localhost
-  port: 50052
+  port: 50053

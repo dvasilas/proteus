@@ -6,7 +6,7 @@ import (
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

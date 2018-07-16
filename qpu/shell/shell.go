@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/abiosoft/ishell"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
-	cli "github.com/dimitriosvasilas/modqp/scanQPU/client"
+	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
 func queryConsumer(msg chan *pbQPU.Object, done chan bool) {
@@ -17,15 +17,15 @@ func queryConsumer(msg chan *pbQPU.Object, done chan bool) {
 		if doneMsg := <-done; doneMsg {
 			return
 		}
-		result := <-msg
-		fmt.Println(result)
+		res := <-msg
+		fmt.Println(res.Key, "size:", res.Attributes["size"])
 	}
 }
 
 func main() {
 	shell := ishell.New()
 
-	c, conn, err := cli.NewClient("localhost:50053")
+	c, conn, err := cli.NewClient("localhost:50054")
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("failed to create Client %v", err)

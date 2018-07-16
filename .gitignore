@@ -4,5 +4,4 @@
 # ignore files genrated by mockgen
 *mock.go
 
-# ignore log files
-data/
+vendor/

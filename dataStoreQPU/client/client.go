@@ -7,7 +7,7 @@ import (
 	"log"
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpupb"
+	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"google.golang.org/grpc"
 )
 
