@@ -14,6 +14,7 @@ import (
 
 type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object, done chan bool) error
+	SubscribeOps(msg chan *pbQPU.Operation, done chan bool) error
 }
 
 type config struct {
@@ -29,6 +30,8 @@ type Server struct {
 func getConfig() (config, error) {
 	var conf config
 
+	viper.AutomaticEnv()
+	viper.BindEnv("HOME")
 	viper.SetConfigName("config")
 	viper.AddConfigPath("../")
 	if err := viper.ReadInConfig(); err != nil {
@@ -68,8 +71,19 @@ func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan 
 			exit <- true
 			return
 		}
-		Obj := <-msg
-		stream.Send(&pb.StateStream{Object: Obj})
+		obj := <-msg
+		stream.Send(&pb.StateStream{Object: obj})
+	}
+}
+
+func subscribeOpsConsumer(stream pb.DataStoreQPU_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, exit chan bool) {
+	for {
+		if doneMsg := <-done; doneMsg {
+			exit <- true
+			return
+		}
+		op := <-msg
+		stream.Send(&pb.OpStream{Operation: op})
 	}
 }
 
@@ -80,6 +94,14 @@ func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStoreQPU_Subsc
 
 //SubscribeOps ...
 func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeOpsServer) error {
+	msg := make(chan *pbQPU.Operation)
+	done := make(chan bool)
+	exit := make(chan bool)
+
+	go subscribeOpsConsumer(stream, msg, done, exit)
+	go s.ds.SubscribeOps(msg, done)
+	<-exit
+
 	return nil
 }
 
