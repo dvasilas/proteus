@@ -4,16 +4,20 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"google.golang.org/grpc"
 )
 
+type activeStreams struct {
+	opSubStreams map[int64]context.CancelFunc
+}
+
 //Client ...
 type Client struct {
-	dsClient pb.DataStoreQPUClient
+	dsClient      pb.DataStoreQPUClient
+	activeStreams activeStreams
 }
 
 //SubscribeStates ...
@@ -33,31 +37,44 @@ func (c *Client) SubscribeStates(ts int64) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("SubscribeOps: ", getObjReply)
+		fmt.Println("SubscribeStates: ", getObjReply)
 	}
 	return nil
 }
 
 // SubscribeOps ...
-func (c *Client) SubscribeOps(ts int64) error {
+func (c *Client) SubscribeOps(ts int64, msg chan *pbQPU.Operation, done chan bool) (int64, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
 	if err != nil {
-		return err
+		cancel()
+		return 0, err
 	}
-	for {
-		streamMsg, err := stream.Recv()
-		if err == io.EOF {
-			break
+	c.activeStreams.opSubStreams[ts] = cancel
+	go func() {
+		for {
+			streamMsg, err := stream.Recv()
+			fmt.Println(streamMsg, err)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return
+			}
+			done <- false
+			msg <- streamMsg.Operation
 		}
-		if err != nil {
-			return err
-		}
-		log.Println("SubscribeOps: ", streamMsg)
-	}
-	return nil
+	}()
+	return ts, nil
+}
+
+//StopOpsSubscription ...
+func (c *Client) StopOpsSubscription(subID int64) {
+	fmt.Println("StopOpsSubscription")
+	cancel := c.activeStreams.opSubStreams[subID]
+	cancel()
+	return
 }
 
 //GetSnapshot ...
@@ -90,5 +107,6 @@ func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	if err != nil {
 		return Client{}, nil, err
 	}
-	return Client{pb.NewDataStoreQPUClient(conn)}, conn, nil
+	activeStrMap := make(map[int64]context.CancelFunc)
+	return Client{pb.NewDataStoreQPUClient(conn), activeStreams{activeStrMap}}, conn, nil
 }

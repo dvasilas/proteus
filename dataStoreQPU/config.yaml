@@ -2,4 +2,4 @@ hostname: localhost
 port: 50052
 datastore:
   fs:
-    dataDir: ../
+    dataDir: /

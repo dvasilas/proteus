@@ -11,9 +11,7 @@ message Object {
 
 message Operation {
     string key = 1;
-    string mdKey = 2;
-    string mdValue = 3;
-    string mdOldValue = 4;
+    string op = 2;
     int64 timestamp = 5;
 }
 
