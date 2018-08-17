@@ -31,14 +31,14 @@ func New(maxEntries int) *Cache {
 }
 
 //Put ...
-func (c *Cache) Put(p []*pbQPU.Predicate, value pbQPU.Object) error {
+func (c *Cache) Put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
 	//test if cache == nil - return error
-	key := c.predicateToKey(p)
+	key := PredicateToKey(query)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
-		item.Value.(*entry).value = append(item.Value.(*entry).value, value)
+		item.Value.(*entry).value = append(item.Value.(*entry).value, obj)
 	} else {
-		item := c.ll.PushFront(&entry{p, []pbQPU.Object{value}})
+		item := c.ll.PushFront(&entry{query, []pbQPU.Object{obj}})
 		c.items[key] = item
 		if c.ll.Len() > c.MaxEntries {
 			c.Evict()
@@ -54,7 +54,7 @@ func (c *Cache) Evict() error {
 	if item != nil {
 		c.ll.Remove(item)
 		ee := item.Value.(*entry)
-		key := c.predicateToKey(ee.key)
+		key := PredicateToKey(ee.key)
 		delete(c.items, key)
 		if c.OnEvict != nil {
 			c.OnEvict(ee.key, ee.value)
@@ -66,7 +66,7 @@ func (c *Cache) Evict() error {
 //Get ...
 func (c *Cache) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
 	//test if cache == nil - return error
-	key := c.predicateToKey(p)
+	key := PredicateToKey(p)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
 		return item.Value.(*entry).value, true, nil
@@ -81,7 +81,8 @@ func (c *Cache) Print() {
 	}
 }
 
-func (c *Cache) predicateToKey(p []*pbQPU.Predicate) string {
+//PredicateToKey ...
+func PredicateToKey(p []*pbQPU.Predicate) string {
 	entryKey := ""
 	for i, pp := range p {
 		entryKey += pp.Attribute + "/" + strconv.FormatInt(pp.Lbound, 10) + "/" + strconv.FormatInt(pp.Ubound, 10)

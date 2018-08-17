@@ -12,7 +12,8 @@ message Object {
 message Operation {
     string key = 1;
     string op = 2;
-    int64 timestamp = 5;
+    Object object = 3;
+    int64 timestamp = 4;
 }
 
 message FindRequest {

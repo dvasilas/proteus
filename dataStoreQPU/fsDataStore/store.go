@@ -10,13 +10,25 @@ import (
 )
 
 //FSDataStore ...
-type FSDataStore struct{}
+type FSDataStore struct {
+	path string
+}
+
+//New ...
+func New() FSDataStore {
+	return FSDataStore{
+		path: viper.Get("HOME").(string) + viper.GetString("datastore.fs.dataDir"),
+	}
+}
+
+//GetPath ...
+func (ds FSDataStore) GetPath() string {
+	return ds.path
+}
 
 //GetSnapshot ...
 func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool) error {
-	path := viper.Get("HOME").(string) + viper.GetString("datastore.fs.dataDir")
-
-	f, err := os.Open(path)
+	f, err := os.Open(ds.path)
 	if err != nil {
 		return err
 	}
@@ -35,12 +47,24 @@ func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool) error 
 	return nil
 }
 
-func watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, done chan bool, stopped chan bool) {
+func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, done chan bool, stopped chan bool) {
 	for {
 		select {
 		case event := <-w.Events:
 			done <- false
-			msg <- &pbQPU.Operation{Key: event.Name, Op: event.Op.String()}
+			f, err := os.Stat(event.Name)
+			if err != nil {
+				log.Fatalf("%v", err)
+			}
+			msg <- &pbQPU.Operation{
+				Key: event.Name,
+				Op:  event.Op.String(),
+				Object: &pbQPU.Object{
+					Key:        f.Name(),
+					Attributes: map[string]int64{"size": f.Size(), "mode": int64(f.Mode()), "modTime": f.ModTime().UnixNano()},
+				},
+			}
+
 		case err := <-w.Errors:
 			stopped <- true
 			log.Fatalf("fsnotify error: %v", err)
@@ -50,8 +74,6 @@ func watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, done chan bool, sto
 
 //SubscribeOps ...
 func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool) error {
-	path := viper.Get("HOME").(string) + viper.GetString("datastore.fs.dataDir")
-
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -60,9 +82,9 @@ func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool) er
 
 	stopped := make(chan bool)
 
-	go watchFS(watcher, msg, done, stopped)
+	go ds.watchFS(watcher, msg, done, stopped)
 
-	err = watcher.Add(path)
+	err = watcher.Add(ds.path)
 	if err != nil {
 		log.Fatal(err)
 	}
