@@ -47,8 +47,7 @@ func TestMain(m *testing.M) {
 
 func TestPredicateToString(t *testing.T) {
 	for _, tt := range keyTests {
-		cache := New(1)
-		assert.Equal(t, cache.predicateToKey(tt.query), tt.expectedKey, "")
+		assert.Equal(t, PredicateToKey(tt.query), tt.expectedKey, "")
 	}
 }
 

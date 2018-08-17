@@ -25,13 +25,13 @@ func queryConsumer(msg chan *pbQPU.Object, done chan bool) {
 func main() {
 	shell := ishell.New()
 
-	c, conn, err := cli.NewClient("localhost:50054")
+	c, conn, err := cli.NewClient("localhost:50055")
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("failed to create Client %v", err)
 	}
 
-	shell.Println("Scan Store QPU Shell")
+	shell.Println("QPU Shell")
 
 	shell.AddCmd(&ishell.Cmd{
 		Name: "find",

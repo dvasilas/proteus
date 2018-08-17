@@ -5,19 +5,19 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	dSQPUcli "github.com/dimitriosvasilas/modqp/dataStoreQPU/client"
 	"github.com/dimitriosvasilas/modqp/qpu/cache"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	"github.com/dimitriosvasilas/modqp/qpu/filter"
+	"github.com/dimitriosvasilas/modqp/qpu/index"
 	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
-
-const n = 10
 
 type config struct {
 	qpuType  string
@@ -31,10 +31,10 @@ type config struct {
 
 //Server ...
 type Server struct {
-	config     config
-	connClient dSQPUcli.Client
-	client     cli.Client
-	cache      *cache.Cache
+	config config
+	client interface{}
+	cache  *cache.Cache
+	index  *index.Index
 }
 
 func getConfig(confFile string) (config, error) {
@@ -64,13 +64,25 @@ func NewServer(confFile string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, connClient: c}
+		server = Server{config: conf, client: c}
 	} else if conf.qpuType == "cache" {
 		c, _, err := cli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
 		if err != nil {
 			return err
 		}
 		server = Server{config: conf, client: c, cache: cache.New(10)}
+	} else if conf.qpuType == "index" {
+		c, _, err := dSQPUcli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
+		if err != nil {
+			return err
+		}
+		msg := make(chan *pbQPU.Operation)
+		done := make(chan bool)
+
+		server = Server{config: conf, client: c, index: index.New("size", 0, 2048)}
+
+		go server.opConsumer(msg, done)
+		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
 	}
 
 	s := grpc.NewServer()
@@ -88,7 +100,7 @@ func NewServer(confFile string) error {
 	return nil
 }
 
-func snapshotConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, fn func(*pbQPU.Object, []*pbQPU.Predicate) bool) {
+func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, fn func(*pbQPU.Object, []*pbQPU.Predicate) bool) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			exit <- true
@@ -98,6 +110,22 @@ func snapshotConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg cha
 		if fn(streamMsg, pred) {
 			stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: streamMsg.Key, Attributes: streamMsg.Attributes, Timestamp: streamMsg.Timestamp}})
 		}
+	}
+}
+
+func (s *Server) opConsumer(msg chan *pbQPU.Operation, done chan bool) {
+	for {
+		if doneMsg := <-done; doneMsg {
+			return
+		}
+		op := <-msg
+		s.updateIndex(op)
+	}
+}
+
+func (s *Server) updateIndex(op *pbQPU.Operation) {
+	if s.index.FilterIndexable(op) {
+		s.index.Put(op)
 	}
 }
 
@@ -120,8 +148,8 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			f, _ := filter.Filter(obj, pred)
 			return f
 		}
-		go snapshotConsumer(in.Predicate, stream, msg, done, exit, filter)
-		go s.connClient.GetSnapshot(in.Timestamp, msg, done)
+		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, filter)
+		go s.client.(*dSQPUcli.Client).GetSnapshot(in.Timestamp, msg, done)
 		<-exit
 	} else if s.config.qpuType == "cache" {
 		cachedResult, hit, err := s.cache.Get(in.Predicate)
@@ -135,11 +163,18 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			}
 		} else {
 			fmt.Println("cache miss")
-			go snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
+			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
 
 			pred := map[string][2]int64{in.Predicate[0].Attribute: [2]int64{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
-			go s.client.Find(in.Timestamp, pred, msg, done)
+			go s.client.(*cli.Client).Find(in.Timestamp, pred, msg, done)
 			<-exit
+		}
+	} else if s.config.qpuType == "index" {
+		indexResult, found, _ := s.index.Get(in.Predicate)
+		if found {
+			for _, item := range indexResult {
+				stream.Send(&pb.QueryResultStream{Object: &item})
+			}
 		}
 	}
 	return nil

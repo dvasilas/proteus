@@ -15,6 +15,7 @@ import (
 type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object, done chan bool) error
 	SubscribeOps(msg chan *pbQPU.Operation, done chan bool) error
+	GetPath() string
 }
 
 type config struct {
@@ -49,7 +50,7 @@ func ΝewServer() error {
 	if err != nil {
 		return err
 	}
-	server := Server{ds: fS.FSDataStore{}}
+	server := Server{ds: fS.New()}
 
 	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
 	if err != nil {
