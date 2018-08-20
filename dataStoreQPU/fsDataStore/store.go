@@ -7,7 +7,6 @@ import (
 	utils "github.com/dimitriosvasilas/modqp"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
 )
 
 //FSDataStore ...
@@ -16,9 +15,9 @@ type FSDataStore struct {
 }
 
 //New ...
-func New() FSDataStore {
+func New(path string) FSDataStore {
 	return FSDataStore{
-		path: viper.Get("HOME").(string) + viper.GetString("datastore.fs.dataDir"),
+		path: path,
 	}
 }
 

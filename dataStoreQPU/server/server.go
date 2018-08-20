@@ -18,9 +18,14 @@ type dataStore interface {
 	GetPath() string
 }
 
-type config struct {
-	hostname string
-	port     string
+//Config ...
+type Config struct {
+	Hostname  string
+	Port      string
+	DataStore struct {
+		Type    string
+		DataDir string
+	}
 }
 
 //Server ...
@@ -28,19 +33,19 @@ type Server struct {
 	ds dataStore
 }
 
-func getConfig() (config, error) {
-	var conf config
-
+func getConfig() (Config, error) {
 	viper.AutomaticEnv()
 	viper.BindEnv("HOME")
-	viper.SetConfigName("config")
-	viper.AddConfigPath("../")
+	viper.SetConfigName("dataStore")
+	viper.AddConfigPath("../../conf")
+	viper.SetConfigType("json")
+	var conf Config
 	if err := viper.ReadInConfig(); err != nil {
 		return conf, err
 	}
-	conf.hostname = viper.GetString("hostname")
-	conf.port = viper.GetString("port")
-
+	if err := viper.Unmarshal(&conf); err != nil {
+		return conf, err
+	}
 	return conf, nil
 }
 
@@ -50,9 +55,9 @@ func ΝewServer() error {
 	if err != nil {
 		return err
 	}
-	server := Server{ds: fS.New()}
+	server := Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
 
-	lis, err := net.Listen("tcp", conf.hostname+":"+conf.port)
+	lis, err := net.Listen("tcp", conf.Hostname+":"+conf.Port)
 	if err != nil {
 		return err
 	}

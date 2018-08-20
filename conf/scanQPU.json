@@ -1,0 +1,11 @@
+{
+    "qpuType": "scan",
+    "hostname": "localhost",
+    "port": "50053",
+    "conns": [
+        {
+            "hostname": "localhost",
+            "port": "50052"
+        }
+    ]
+}
