@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	utils "github.com/dimitriosvasilas/modqp"
 	mock "github.com/dimitriosvasilas/modqp/dataStoreQPU/client/mocks"
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
@@ -14,10 +15,10 @@ import (
 
 var streamMessages = []pb.StateStream{
 	{
-		Object: &pbQPU.Object{Key: "obj1", Attributes: map[string]int64{"size": 1}},
+		Object: &pbQPU.Object{Key: "obj1", Attributes: map[string]*pbQPU.Value{"size": utils.ValInt(1)}},
 	},
 	{
-		Object: &pbQPU.Object{Key: "key", Attributes: map[string]int64{"size": 2}},
+		Object: &pbQPU.Object{Key: "key", Attributes: map[string]*pbQPU.Value{"size": utils.ValInt(2)}},
 	},
 }
 
@@ -46,7 +47,7 @@ func TestGetSnapshot(t *testing.T) {
 			return
 		}
 		res := <-msg
-		assert.NotEmpty(t, res, "GetSnapshot return empty result")
+		assert.NotEmpty(t, res, "GetSnapshot returned empty result")
 		assert.NotNil(t, res.Key, "")
 	}
 }

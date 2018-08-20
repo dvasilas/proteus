@@ -5,8 +5,15 @@ option go_package = "github.com/dimitriosvasilas/modqp/qpuUtilspb";
 
 message Object {
     string key = 1;
-    map<string, int64> attributes = 2;
+    map<string, Value> attributes = 2;
     int64 timestamp = 3;
+}
+
+message Value {
+    oneof val {
+        string name = 1;
+        int64 int = 2;
+    }
 }
 
 message Operation {
@@ -23,8 +30,8 @@ message FindRequest {
 
 message Predicate {
     string attribute = 1;
-    int64 lbound = 2;
-    int64 ubound = 3;
+    Value lbound = 2;
+    Value ubound = 3;
 }
 
 message QueryResultStream {
