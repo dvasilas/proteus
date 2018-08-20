@@ -85,7 +85,12 @@ func (c *Cache) Print() {
 func PredicateToKey(p []*pbQPU.Predicate) string {
 	entryKey := ""
 	for i, pp := range p {
-		entryKey += pp.Attribute + "/" + strconv.FormatInt(pp.Lbound, 10) + "/" + strconv.FormatInt(pp.Ubound, 10)
+		switch pp.Lbound.Val.(type) {
+		case *pbQPU.Value_Int:
+			entryKey += pp.Attribute + "/" + strconv.FormatInt(pp.Lbound.GetInt(), 10) + "/" + strconv.FormatInt(pp.Ubound.GetInt(), 10)
+		case *pbQPU.Value_Name:
+			entryKey += pp.Attribute + "/" + pp.Lbound.GetName() + "/" + pp.Ubound.GetName()
+		}
 		if i < len(p)-1 {
 			entryKey += "&"
 		}

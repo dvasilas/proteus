@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -31,10 +30,11 @@ type config struct {
 
 //Server ...
 type Server struct {
-	config config
-	client interface{}
-	cache  *cache.Cache
-	index  *index.Index
+	config    config
+	dsClient  dSQPUcli.Client
+	qpuClient cli.Client
+	cache     *cache.Cache
+	index     index.Index
 }
 
 func getConfig(confFile string) (config, error) {
@@ -64,13 +64,13 @@ func NewServer(confFile string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, client: c}
+		server = Server{config: conf, dsClient: c}
 	} else if conf.qpuType == "cache" {
 		c, _, err := cli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, client: c, cache: cache.New(10)}
+		server = Server{config: conf, qpuClient: c, cache: cache.New(10)}
 	} else if conf.qpuType == "index" {
 		c, _, err := dSQPUcli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
 		if err != nil {
@@ -79,7 +79,7 @@ func NewServer(confFile string) error {
 		msg := make(chan *pbQPU.Operation)
 		done := make(chan bool)
 
-		server = Server{config: conf, client: c, index: index.New("size", 0, 2048)}
+		server = Server{config: conf, dsClient: c, index: index.New("size", 0, 2048)}
 
 		go server.opConsumer(msg, done)
 		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
@@ -131,9 +131,6 @@ func (s *Server) updateIndex(op *pbQPU.Operation) {
 
 func (s *Server) storeInCache(obj *pbQPU.Object, in []*pbQPU.Predicate) bool {
 	s.cache.Put(in, *obj)
-	//
-	s.cache.Print()
-	//
 	return true
 }
 
@@ -149,7 +146,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			return f
 		}
 		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, filter)
-		go s.client.(*dSQPUcli.Client).GetSnapshot(in.Timestamp, msg, done)
+		go s.dsClient.GetSnapshot(in.Timestamp, msg, done)
 		<-exit
 	} else if s.config.qpuType == "cache" {
 		cachedResult, hit, err := s.cache.Get(in.Predicate)
@@ -157,16 +154,14 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			return err
 		}
 		if hit {
-			fmt.Println("cache hit")
 			for _, item := range cachedResult {
 				stream.Send(&pb.QueryResultStream{Object: &item})
 			}
 		} else {
-			fmt.Println("cache miss")
 			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
 
-			pred := map[string][2]int64{in.Predicate[0].Attribute: [2]int64{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
-			go s.client.(*cli.Client).Find(in.Timestamp, pred, msg, done)
+			pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
+			go s.qpuClient.Find(in.Timestamp, pred, msg, done)
 			<-exit
 		}
 	} else if s.config.qpuType == "index" {

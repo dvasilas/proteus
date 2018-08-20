@@ -27,7 +27,7 @@ func queryresultConsumer(msg chan *pbQPU.Object, done chan bool) {
 }
 
 //Find ...
-func (c *Client) Find(ts int64, predicate map[string][2]int64, msg chan *pbQPU.Object, done chan bool) error {
+func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *pbQPU.Object, done chan bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
