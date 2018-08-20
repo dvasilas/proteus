@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )
@@ -34,8 +35,8 @@ func (m *DataStoreQPUSubscribeOpsServer) Send(op *pb.OpStream) error {
 }
 
 func TestMain(m *testing.M) {
-	getConfig()
-	s = Server{ds: fS.New()}
+	conf, _ := getConfig()
+	s = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
 	returnCode := m.Run()
 	os.Exit(returnCode)
 }

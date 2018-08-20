@@ -1,0 +1,8 @@
+{
+    "hostname": "localhost",
+    "port": "50052",
+    "dataStore": {
+        "type": "fs",
+        "dataDir": "/"
+    }
+}

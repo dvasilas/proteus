@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -18,39 +19,38 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type config struct {
-	qpuType  string
-	hostname string
-	port     string
-	conn     struct {
-		hostname string
-		port     string
+//Config ...
+type Config struct {
+	QpuType  string
+	Hostname string
+	Port     string
+	Conns    []struct {
+		Hostname string
+		Port     string
 	}
 }
 
 //Server ...
 type Server struct {
-	config    config
+	config    Config
 	dsClient  dSQPUcli.Client
 	qpuClient cli.Client
 	cache     *cache.Cache
 	index     index.Index
 }
 
-func getConfig(confFile string) (config, error) {
-	var conf config
+func getConfig(confFile string) (Config, error) {
+	fmt.Println("getConfig")
 	viper.SetConfigName(confFile)
-	viper.AddConfigPath("../")
+	viper.AddConfigPath("../../conf")
+	viper.SetConfigType("json")
+	var conf Config
 	if err := viper.ReadInConfig(); err != nil {
 		return conf, err
 	}
-	conf.qpuType = viper.GetString("qpuType")
-	conf.hostname = viper.GetString("hostname")
-	conf.port = viper.GetString("port")
-
-	conf.conn.hostname = viper.GetString("conn.hostname")
-	conf.conn.port = viper.GetString("conn.port")
-
+	if err := viper.Unmarshal(&conf); err != nil {
+		return conf, err
+	}
 	return conf, nil
 }
 
@@ -59,20 +59,20 @@ func NewServer(confFile string) error {
 	conf, err := getConfig(confFile)
 
 	var server Server
-	if conf.qpuType == "scan" {
-		c, _, err := dSQPUcli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
+	if conf.QpuType == "scan" {
+		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
 		if err != nil {
 			return err
 		}
 		server = Server{config: conf, dsClient: c}
-	} else if conf.qpuType == "cache" {
-		c, _, err := cli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
+	} else if conf.QpuType == "cache" {
+		c, _, err := cli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
 		if err != nil {
 			return err
 		}
 		server = Server{config: conf, qpuClient: c, cache: cache.New(10)}
-	} else if conf.qpuType == "index" {
-		c, _, err := dSQPUcli.NewClient(conf.conn.hostname + ":" + conf.conn.port)
+	} else if conf.QpuType == "index" {
+		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
 		if err != nil {
 			return err
 		}
@@ -83,13 +83,15 @@ func NewServer(confFile string) error {
 
 		go server.opConsumer(msg, done)
 		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
+	} else if conf.QpuType == "dispatch" {
+
 	}
 
 	s := grpc.NewServer()
 	pb.RegisterQPUServer(s, &server)
 	reflection.Register(s)
 
-	lis, err := net.Listen("tcp", ":"+conf.port)
+	lis, err := net.Listen("tcp", ":"+conf.Port)
 	if err != nil {
 		return err
 	}
@@ -140,7 +142,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 	done := make(chan bool)
 	exit := make(chan bool)
 
-	if s.config.qpuType == "scan" {
+	if s.config.QpuType == "scan" {
 		filter := func(obj *pbQPU.Object, pred []*pbQPU.Predicate) bool {
 			f, _ := filter.Filter(obj, pred)
 			return f
@@ -148,7 +150,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, filter)
 		go s.dsClient.GetSnapshot(in.Timestamp, msg, done)
 		<-exit
-	} else if s.config.qpuType == "cache" {
+	} else if s.config.QpuType == "cache" {
 		cachedResult, hit, err := s.cache.Get(in.Predicate)
 		if err != nil {
 			return err
@@ -164,7 +166,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			go s.qpuClient.Find(in.Timestamp, pred, msg, done)
 			<-exit
 		}
-	} else if s.config.qpuType == "index" {
+	} else if s.config.QpuType == "index" {
 		indexResult, found, _ := s.index.Get(in.Predicate)
 		if found {
 			for _, item := range indexResult {
