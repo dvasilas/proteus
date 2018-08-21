@@ -3,8 +3,71 @@
 package utils
 
 import (
+	"strconv"
+
+	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
+
+//DownwardConn ...
+type DownwardConn struct {
+	Client    cli.Client
+	QpuType   string
+	Attribute string
+	Lbound    *pbQPU.Value
+	Ubound    *pbQPU.Value
+}
+
+//QPUConfig ...
+type QPUConfig struct {
+	QpuType  string
+	Hostname string
+	Port     string
+	Conns    []struct {
+		Hostname string
+		Port     string
+		QpuType  string
+		Config   struct {
+			Attribute string
+			Datatype  string
+			Ubound    string
+			Lbound    string
+		}
+	}
+}
+
+//NewDConn ...
+func NewDConn(conf QPUConfig) ([]DownwardConn, error) {
+	var clients []DownwardConn
+	for _, conn := range conf.Conns {
+		c, _, err := cli.NewClient(conn.Hostname + ":" + conn.Port)
+		if err != nil {
+			return []DownwardConn{}, err
+		}
+		dConn := DownwardConn{
+			Client:    c,
+			QpuType:   conn.QpuType,
+			Attribute: conn.Config.Attribute,
+		}
+		switch conn.Config.Datatype {
+		case "any":
+			dConn.Lbound = ValStr("any")
+			dConn.Ubound = ValStr("any")
+		case "int":
+			lb, _ := strconv.ParseInt(conn.Config.Lbound, 10, 64)
+			dConn.Lbound = ValInt(lb)
+			ub, _ := strconv.ParseInt(conn.Config.Ubound, 10, 64)
+			dConn.Ubound = ValInt(ub)
+		}
+		clients = append(clients, dConn)
+	}
+	return clients, nil
+}
+
+//NewDConnClient ...
+func NewDConnClient(c cli.Client) []DownwardConn {
+	return []DownwardConn{DownwardConn{Client: c}}
+}
 
 //ValInt ...
 func ValInt(i int64) *pbQPU.Value {
