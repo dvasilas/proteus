@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -34,13 +33,12 @@ type Config struct {
 type Server struct {
 	config    Config
 	dsClient  dSQPUcli.Client
-	qpuClient cli.Client
+	qpuClient []cli.Client
 	cache     *cache.Cache
 	index     index.Index
 }
 
 func getConfig(confFile string) (Config, error) {
-	fmt.Println("getConfig")
 	viper.SetConfigName(confFile)
 	viper.AddConfigPath("../../conf")
 	viper.SetConfigType("json")
@@ -70,7 +68,7 @@ func NewServer(confFile string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, qpuClient: c, cache: cache.New(10)}
+		server = Server{config: conf, qpuClient: []cli.Client{c}, cache: cache.New(10)}
 	} else if conf.QpuType == "index" {
 		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
 		if err != nil {
@@ -84,7 +82,15 @@ func NewServer(confFile string) error {
 		go server.opConsumer(msg, done)
 		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
 	} else if conf.QpuType == "dispatch" {
-
+		var clients []cli.Client
+		for _, conn := range conf.Conns {
+			c, _, err := cli.NewClient(conn.Hostname + ":" + conn.Port)
+			if err != nil {
+				return err
+			}
+			clients = append(clients, c)
+		}
+		server = Server{config: conf, qpuClient: clients}
 	}
 
 	s := grpc.NewServer()
@@ -95,7 +101,6 @@ func NewServer(confFile string) error {
 	if err != nil {
 		return err
 	}
-
 	if err := s.Serve(lis); err != nil {
 		return err
 	}
@@ -163,7 +168,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
 
 			pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
-			go s.qpuClient.Find(in.Timestamp, pred, msg, done)
+			go s.qpuClient[0].Find(in.Timestamp, pred, msg, done)
 			<-exit
 		}
 	} else if s.config.QpuType == "index" {
@@ -173,6 +178,12 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 				stream.Send(&pb.QueryResultStream{Object: &item})
 			}
 		}
+	} else if s.config.QpuType == "dispatch" {
+		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, func(obj *pbQPU.Object, pred []*pbQPU.Predicate) bool { return true })
+
+		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
+		go s.qpuClient[0].Find(in.Timestamp, pred, msg, done)
+		<-exit
 	}
 	return nil
 }

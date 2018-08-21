@@ -1,0 +1,14 @@
+{
+    "qpuType": "dispatch",
+    "hostname": "localhost",
+    "port": "50056",
+    "conns": [{
+        "hostname": "localhost",
+        "port": "50053"
+    },
+    {
+        "hostname": "localhost",
+        "port": "50054"
+    }
+    ]
+}
