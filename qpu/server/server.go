@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
+	utils "github.com/dimitriosvasilas/modqp"
 	dSQPUcli "github.com/dimitriosvasilas/modqp/dataStoreQPU/client"
 	"github.com/dimitriosvasilas/modqp/qpu/cache"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	"github.com/dimitriosvasilas/modqp/qpu/dispatch"
 	"github.com/dimitriosvasilas/modqp/qpu/filter"
 	"github.com/dimitriosvasilas/modqp/qpu/index"
 	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
@@ -18,31 +20,20 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-//Config ...
-type Config struct {
-	QpuType  string
-	Hostname string
-	Port     string
-	Conns    []struct {
-		Hostname string
-		Port     string
-	}
-}
-
 //Server ...
 type Server struct {
-	config    Config
-	dsClient  dSQPUcli.Client
-	qpuClient []cli.Client
-	cache     *cache.Cache
-	index     index.Index
+	config   utils.QPUConfig
+	dConn    []utils.DownwardConn
+	dsClient dSQPUcli.Client
+	cache    *cache.Cache
+	index    index.Index
 }
 
-func getConfig(confFile string) (Config, error) {
+func getConfig(confFile string) (utils.QPUConfig, error) {
 	viper.SetConfigName(confFile)
 	viper.AddConfigPath("../../conf")
 	viper.SetConfigType("json")
-	var conf Config
+	var conf utils.QPUConfig
 	if err := viper.ReadInConfig(); err != nil {
 		return conf, err
 	}
@@ -68,7 +59,7 @@ func NewServer(confFile string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, qpuClient: []cli.Client{c}, cache: cache.New(10)}
+		server = Server{config: conf, dConn: utils.NewDConnClient(c), cache: cache.New(10)}
 	} else if conf.QpuType == "index" {
 		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
 		if err != nil {
@@ -82,15 +73,11 @@ func NewServer(confFile string) error {
 		go server.opConsumer(msg, done)
 		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
 	} else if conf.QpuType == "dispatch" {
-		var clients []cli.Client
-		for _, conn := range conf.Conns {
-			c, _, err := cli.NewClient(conn.Hostname + ":" + conn.Port)
-			if err != nil {
-				return err
-			}
-			clients = append(clients, c)
+		downwardsConns, err := utils.NewDConn(conf)
+		if err != nil {
+			return err
 		}
-		server = Server{config: conf, qpuClient: clients}
+		server = Server{config: conf, dConn: downwardsConns}
 	}
 
 	s := grpc.NewServer()
@@ -168,7 +155,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
 
 			pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
-			go s.qpuClient[0].Find(in.Timestamp, pred, msg, done)
+			go s.dConn[0].Client.Find(in.Timestamp, pred, msg, done)
 			<-exit
 		}
 	} else if s.config.QpuType == "index" {
@@ -182,8 +169,13 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, func(obj *pbQPU.Object, pred []*pbQPU.Predicate) bool { return true })
 
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
-		go s.qpuClient[0].Find(in.Timestamp, pred, msg, done)
+		client, err := dispatch.ForwardQuery(s.dConn, *in.Predicate[0])
+		if err != nil {
+			return err
+		}
+		go client.Find(in.Timestamp, pred, msg, done)
 		<-exit
+		return nil
 	}
 	return nil
 }

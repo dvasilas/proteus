@@ -4,11 +4,25 @@
     "port": "50056",
     "conns": [{
         "hostname": "localhost",
-        "port": "50053"
+        "port": "50053",
+        "qpuType": "scan",
+        "config": {
+            "attribute": "any",
+            "datatype": "any",
+            "lbound": "any",
+            "ubound": "any"
+        }
     },
     {
         "hostname": "localhost",
-        "port": "50054"
+        "port": "50055",
+        "qpuType": "index",
+        "config": {
+            "attribute": "size",
+            "datatype": "int",
+            "lbound": "0",
+            "ubound": "2048"
+        }
     }
     ]
 }
