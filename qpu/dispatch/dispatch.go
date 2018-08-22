@@ -9,7 +9,7 @@ import (
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
-//Forward ...
+//ForwardResponse ...
 func ForwardResponse(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
 	stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
 	return nil

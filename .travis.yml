@@ -16,6 +16,7 @@ install:
   - go get github.com/abiosoft/ishell
   - go get github.com/spf13/viper
   - go get github.com/fsnotify/fsnotify
+  - go get github.com/google/btree
 
 env:
   - PATH=$HOME/protoc/bin:$PATH

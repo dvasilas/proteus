@@ -1,10 +1,20 @@
 package index
 
 import (
-	"strconv"
-
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	"github.com/google/btree"
 )
+
+//Entry ...
+type Entry struct {
+	Value    int64
+	Postings []pbQPU.Object
+}
+
+//Less ...
+func (x Entry) Less(than btree.Item) bool {
+	return x.Value < than.(Entry).Value
+}
 
 //Index ...
 type Index interface {
@@ -13,26 +23,35 @@ type Index interface {
 	Update(op *pbQPU.Operation)
 }
 
-//IntHashIndex ...
-type IntHashIndex struct {
+//BTreeIndex ...
+type BTreeIndex struct {
 	attribute string
 	lbound    int64
 	ubound    int64
-	entries   map[string][]pbQPU.Object
+	entries   *btree.BTree
 }
 
 //New ...
-func New(attr string, lb int64, ub int64) *IntHashIndex {
-	return &IntHashIndex{
+func New(attr string, lb int64, ub int64) *BTreeIndex {
+	return &BTreeIndex{
 		attribute: attr,
 		lbound:    lb,
 		ubound:    ub,
-		entries:   make(map[string][]pbQPU.Object),
+		entries:   btree.New(2),
 	}
 }
 
+//opToIndexKey ...
+func (i *BTreeIndex) opToEntry(op *pbQPU.Operation) Entry {
+	return Entry{Value: op.Object.Attributes[i.attribute].GetInt()}
+}
+
+func (i *BTreeIndex) boundToEntry(b *pbQPU.Value) Entry {
+	return Entry{Value: b.GetInt()}
+}
+
 //FilterIndexable ...
-func (i *IntHashIndex) filterIndexable(op *pbQPU.Operation) bool {
+func (i *BTreeIndex) filterIndexable(op *pbQPU.Operation) bool {
 	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
 		if attrValue.GetInt() > i.lbound && attrValue.GetInt() <= i.ubound {
 			return true
@@ -41,43 +60,46 @@ func (i *IntHashIndex) filterIndexable(op *pbQPU.Operation) bool {
 	return false
 }
 
-func (i *IntHashIndex) indexTermKey(op *pbQPU.Operation) string {
-	key := i.attribute + "/"
-	key += strconv.FormatInt(op.Object.Attributes[i.attribute].GetInt(), 10)
-	return key
-}
-
-//PredicateToKey ...
-func (i *IntHashIndex) predicateToKey(p *pbQPU.Predicate) string {
-	if p.Lbound.GetInt() == p.Ubound.GetInt() {
-		return p.Attribute + "/" + strconv.FormatInt(p.Lbound.GetInt(), 10)
-	}
-	return ""
-}
-
 //Update ...
-func (i *IntHashIndex) Update(op *pbQPU.Operation) {
+func (i *BTreeIndex) Update(op *pbQPU.Operation) {
 	if i.filterIndexable(op) {
 		i.put(op)
 	}
 }
 
 //Put ...
-func (i *IntHashIndex) put(op *pbQPU.Operation) error {
-	key := i.indexTermKey(op)
-	if indEntry, ok := i.entries[key]; ok {
-		i.entries[key] = append(indEntry, *op.Object)
+func (i *BTreeIndex) put(op *pbQPU.Operation) error {
+	entry := i.opToEntry(op)
+	if i.entries.Has(entry) {
+		item := i.entries.Get(entry)
+		newPostings := append(item.(Entry).Postings, *op.Object)
+		entry.Postings = newPostings
+		i.entries.ReplaceOrInsert(entry)
 	} else {
-		i.entries[key] = append(indEntry, *op.Object)
+		entry.Postings = append([]pbQPU.Object{}, *op.Object)
+		i.entries.ReplaceOrInsert(entry)
 	}
 	return nil
 }
 
 //Get ...
-func (i *IntHashIndex) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
-	key := i.predicateToKey(p[0])
-	if indEntry, ok := i.entries[key]; ok {
-		return indEntry, true, nil
+func (i *BTreeIndex) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
+	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
+		entry := i.boundToEntry(p[0].Lbound)
+		if i.entries.Has(entry) {
+			item := i.entries.Get(entry)
+			return item.(Entry).Postings, true, nil
+		}
+	} else {
+		res := []pbQPU.Object{}
+		it := func(item btree.Item) bool {
+			for _, o := range item.(Entry).Postings {
+				res = append(res, o)
+			}
+			return true
+		}
+		i.entries.AscendRange(i.boundToEntry(p[0].Lbound), i.boundToEntry(p[0].Ubound), it)
+		return res, true, nil
 	}
 	return nil, false, nil
 }
