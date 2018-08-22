@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
@@ -30,8 +31,17 @@ func New(maxEntries int) *Cache {
 	}
 }
 
+//StoreInCache ...
+func (c *Cache) StoreInCache(obj *pbQPU.Object, in []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+	if err := c.put(in, *obj); err != nil {
+		return err
+	}
+	stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+	return nil
+}
+
 //Put ...
-func (c *Cache) Put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
+func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
 	//test if cache == nil - return error
 	key := PredicateToKey(query)
 	if item, ok := c.items[key]; ok {

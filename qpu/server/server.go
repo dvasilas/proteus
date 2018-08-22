@@ -72,6 +72,8 @@ func NewServer(confFile string) error {
 
 		go server.opConsumer(msg, done)
 		_, _ = c.SubscribeOps(time.Now().UnixNano(), msg, done)
+
+		server.indexCatchUp()
 	} else if conf.QpuType == "dispatch" {
 		downwardsConns, err := utils.NewDConn(conf)
 		if err != nil {
@@ -94,15 +96,17 @@ func NewServer(confFile string) error {
 	return nil
 }
 
-func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, fn func(*pbQPU.Object, []*pbQPU.Predicate) bool) {
+func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, exit chan bool, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) error {
 	for {
 		if doneMsg := <-done; doneMsg {
 			exit <- true
-			return
+			return nil
 		}
 		streamMsg := <-msg
-		if fn(streamMsg, pred) {
-			stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: streamMsg.Key, Attributes: streamMsg.Attributes, Timestamp: streamMsg.Timestamp}})
+		err := process(streamMsg, pred, stream)
+		if err != nil {
+			exit <- true
+			return err
 		}
 	}
 }
@@ -113,19 +117,34 @@ func (s *Server) opConsumer(msg chan *pbQPU.Operation, done chan bool) {
 			return
 		}
 		op := <-msg
-		s.updateIndex(op)
+		s.index.Update(op)
 	}
 }
 
-func (s *Server) updateIndex(op *pbQPU.Operation) {
-	if s.index.FilterIndexable(op) {
-		s.index.Put(op)
+func (s *Server) catchUpConsumer(msg chan *pbQPU.Object, done chan bool, exit chan bool) {
+	for {
+		if doneMsg := <-done; doneMsg {
+			exit <- true
+			return
+		}
+		obj := <-msg
+		op := &pbQPU.Operation{
+			Key:    obj.Key,
+			Op:     "catchUp",
+			Object: obj,
+		}
+		s.index.Update(op)
 	}
 }
 
-func (s *Server) storeInCache(obj *pbQPU.Object, in []*pbQPU.Predicate) bool {
-	s.cache.Put(in, *obj)
-	return true
+func (s *Server) indexCatchUp() {
+	msg := make(chan *pbQPU.Object)
+	done := make(chan bool)
+	exit := make(chan bool)
+
+	go s.catchUpConsumer(msg, done, exit)
+	go s.dsClient.GetSnapshot(time.Now().UnixNano(), msg, done)
+	<-exit
 }
 
 //Find ...
@@ -135,11 +154,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 	exit := make(chan bool)
 
 	if s.config.QpuType == "scan" {
-		filter := func(obj *pbQPU.Object, pred []*pbQPU.Predicate) bool {
-			f, _ := filter.Filter(obj, pred)
-			return f
-		}
-		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, filter)
+		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, filter.Forward)
 		go s.dsClient.GetSnapshot(in.Timestamp, msg, done)
 		<-exit
 	} else if s.config.QpuType == "cache" {
@@ -152,7 +167,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 				stream.Send(&pb.QueryResultStream{Object: &item})
 			}
 		} else {
-			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.storeInCache)
+			go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, s.cache.StoreInCache)
 
 			pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 			go s.dConn[0].Client.Find(in.Timestamp, pred, msg, done)
@@ -166,7 +181,7 @@ func (s *Server) Find(in *pb.FindRequest, stream pb.QPU_FindServer) error {
 			}
 		}
 	} else if s.config.QpuType == "dispatch" {
-		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, func(obj *pbQPU.Object, pred []*pbQPU.Predicate) bool { return true })
+		go s.snapshotConsumer(in.Predicate, stream, msg, done, exit, dispatch.ForwardResponse)
 
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 		client, err := dispatch.ForwardQuery(s.dConn, *in.Predicate[0])

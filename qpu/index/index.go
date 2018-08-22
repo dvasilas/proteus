@@ -1,7 +1,6 @@
 package index
 
 import (
-	"fmt"
 	"strconv"
 
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
@@ -9,9 +8,9 @@ import (
 
 //Index ...
 type Index interface {
-	FilterIndexable(op *pbQPU.Operation) bool
-	Put(op *pbQPU.Operation) error
+	put(op *pbQPU.Operation) error
 	Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error)
+	Update(op *pbQPU.Operation)
 }
 
 //IntHashIndex ...
@@ -33,7 +32,7 @@ func New(attr string, lb int64, ub int64) *IntHashIndex {
 }
 
 //FilterIndexable ...
-func (i *IntHashIndex) FilterIndexable(op *pbQPU.Operation) bool {
+func (i *IntHashIndex) filterIndexable(op *pbQPU.Operation) bool {
 	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
 		if attrValue.GetInt() > i.lbound && attrValue.GetInt() <= i.ubound {
 			return true
@@ -56,12 +55,15 @@ func (i *IntHashIndex) predicateToKey(p *pbQPU.Predicate) string {
 	return ""
 }
 
-func (i *IntHashIndex) print() {
-	fmt.Println(i.entries)
+//Update ...
+func (i *IntHashIndex) Update(op *pbQPU.Operation) {
+	if i.filterIndexable(op) {
+		i.put(op)
+	}
 }
 
 //Put ...
-func (i *IntHashIndex) Put(op *pbQPU.Operation) error {
+func (i *IntHashIndex) put(op *pbQPU.Operation) error {
 	key := i.indexTermKey(op)
 	if indEntry, ok := i.entries[key]; ok {
 		i.entries[key] = append(indEntry, *op.Object)
