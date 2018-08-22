@@ -5,8 +5,15 @@ import (
 
 	utils "github.com/dimitriosvasilas/modqp"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
+
+//Forward ...
+func ForwardResponse(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+	stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+	return nil
+}
 
 //ForwardQuery ...
 func ForwardQuery(conns []utils.DownwardConn, pred pbQPU.Predicate) (cli.Client, error) {

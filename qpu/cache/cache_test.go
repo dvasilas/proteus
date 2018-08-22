@@ -55,7 +55,7 @@ func TestPredicateToString(t *testing.T) {
 func TestGet(t *testing.T) {
 	for _, tt := range getTests {
 		cache := New(1)
-		cache.Put(tt.toAdd, pbQPU.Object{})
+		cache.put(tt.toAdd, pbQPU.Object{})
 		_, hit, err := cache.Get(tt.toGet)
 		assert.Nil(t, err)
 		assert.Equal(t, hit, tt.expectedHit, "")
@@ -70,7 +70,7 @@ func TestEvict(t *testing.T) {
 	cache := New(10)
 	cache.OnEvict = onEvictF
 	for i := 0; i < 12; i++ {
-		cache.Put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
+		cache.put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
 	}
 	assert.Equal(t, evicted[0][0].Attribute, "attr0", "")
 	assert.Equal(t, evicted[1][0].Attribute, "attr1", "")
@@ -84,12 +84,12 @@ func TestEvictLRU(t *testing.T) {
 	cache := New(10)
 	cache.OnEvict = onEvictF
 	for i := 0; i < 5; i++ {
-		cache.Put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
+		cache.put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
 	}
 	_, _, _ = cache.Get([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr0", Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}})
 	_, _, _ = cache.Get([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr1", Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}})
 	for i := 5; i < 12; i++ {
-		cache.Put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
+		cache.put([]*pbQPU.Predicate{&pbQPU.Predicate{Attribute: "attr" + strconv.Itoa(i), Lbound: utils.ValInt(0), Ubound: utils.ValInt(0)}}, pbQPU.Object{})
 	}
 	assert.Equal(t, evicted[0][0].Attribute, "attr2", "")
 	assert.Equal(t, evicted[1][0].Attribute, "attr3", "")

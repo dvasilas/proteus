@@ -3,6 +3,7 @@ package filter
 import (
 	"fmt"
 
+	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"github.com/fatih/color"
 )
@@ -23,6 +24,18 @@ func noMatch(obj *pbQPU.Object) (bool, error) {
 	fmt.Println(obj)
 	//
 	return false, nil
+}
+
+//Forward ...
+func Forward(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+	f, err := Filter(obj, pred)
+	if err != nil {
+		return nil
+	}
+	if f {
+		stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+	}
+	return nil
 }
 
 //Filter ...
