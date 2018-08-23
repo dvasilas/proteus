@@ -1,0 +1,10 @@
+version: '2'
+services:
+  datastore:
+    build:
+      context: .
+      dockerfile: dataStoreQPU/server/Dockerfile
+    ports:
+      - "127.0.0.1:50052:50052"
+    command: go run server.go
+    
