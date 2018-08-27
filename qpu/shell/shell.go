@@ -40,9 +40,9 @@ func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
 			errs <- errors.New("Upper bound is not int")
 			return
 		}
-		query = map[string][2]*pbQPU.Value{attr: [2]*pbQPU.Value{utils.ValInt(lbound), utils.ValInt(ubound)}}
+		query = map[string][2]*pbQPU.Value{attr: {utils.ValInt(lbound), utils.ValInt(ubound)}}
 	} else if attr == "key" {
-		query = map[string][2]*pbQPU.Value{attr: [2]*pbQPU.Value{utils.ValStr(lb), utils.ValStr(ub)}}
+		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
 	}
 	errs <- sendQuery(query, c)
 }

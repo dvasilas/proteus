@@ -119,10 +119,7 @@ func NewServer() error {
 		"port": conf.Port,
 	}).Info("listening")
 
-	if err := s.Serve(lis); err != nil {
-		return err
-	}
-	return nil
+	return s.Serve(lis)
 }
 
 func (s *Server) findResultConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
@@ -238,7 +235,7 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 			return nil
 		}
 		errs1 := make(chan error)
-		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
+		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
 		go s.findResultConsumer(in.Predicate, streamTo, msg, done, errs1, errs, s.cache.StoreAndRespond)
 		go s.dConn[0].Client.Find(in.Timestamp, pred, msg, done, errs1)
@@ -264,7 +261,7 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 			return err
 		}
 		errs1 := make(chan error)
-		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: [2]*pbQPU.Value{in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
+		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
 		go s.findResultConsumer(in.Predicate, streamTo, msg, done, errs1, errs, dispatch.ForwardResponse)
 		go client.Find(in.Timestamp, pred, msg, done, errs1)

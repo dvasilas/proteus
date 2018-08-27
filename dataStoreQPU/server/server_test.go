@@ -63,7 +63,7 @@ func TestSubscribeOps(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	_, err = f.WriteString("testing...\n")
+	_, _ = f.WriteString("testing...\n")
 	f.Sync()
 	f.Close()
 

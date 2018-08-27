@@ -81,10 +81,7 @@ func ΝewServer() error {
 
 	pb.RegisterDataStoreQPUServer(s, &server)
 	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		return err
-	}
-	return nil
+	return s.Serve(lis)
 }
 
 func snapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
