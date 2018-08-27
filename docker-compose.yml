@@ -7,4 +7,26 @@ services:
     ports:
       - "127.0.0.1:50052:50052"
     command: go run server.go
-    
+    networks:
+      mynetwork:
+        aliases:
+          - ds.qpu.com
+  sqpu:
+    build:
+      context: .
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50053-50056:50053-50056"
+    environment:
+      - QPU_CONFIG_FILE=scanQPU
+    command: go run server.go
+    depends_on:
+      - datastore
+    networks:
+      mynetwork:
+        aliases:
+          - scan.qpu.com
+
+networks:
+  mynetwork:
+    driver: bridge

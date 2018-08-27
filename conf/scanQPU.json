@@ -4,7 +4,7 @@
     "port": "50053",
     "conns": [
         {
-            "hostname": "localhost",
+            "hostname": "ds.qpu.com",
             "port": "50052"
         }
     ]
