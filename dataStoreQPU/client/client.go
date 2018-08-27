@@ -2,11 +2,8 @@ package client
 
 import (
 	"context"
-	"fmt"
-	"io"
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	"google.golang.org/grpc"
 )
 
@@ -21,84 +18,36 @@ type Client struct {
 }
 
 //SubscribeStates ...
-func (c *Client) SubscribeStates(ts int64) error {
+func (c *Client) SubscribeStates(ts int64) (pb.DataStoreQPU_SubscribeStatesClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	stream, err := c.dsClient.SubscribeStates(ctx, &pb.SubRequest{Timestamp: ts})
-	if err != nil {
-		return err
-	}
-	for {
-		getObjReply, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		fmt.Println("SubscribeStates: ", getObjReply)
-	}
-	return nil
+	return stream, cancel, err
 }
 
 // SubscribeOps ...
-func (c *Client) SubscribeOps(ts int64, msg chan *pbQPU.Operation, done chan bool) (int64, error) {
+func (c *Client) SubscribeOps(ts int64) (pb.DataStoreQPU_SubscribeOpsClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
-	if err != nil {
-		cancel()
-		return 0, err
-	}
 	c.activeStreams.opSubStreams[ts] = cancel
-	go func() {
-		for {
-			streamMsg, err := stream.Recv()
-			fmt.Println(streamMsg, err)
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return
-			}
-			done <- false
-			msg <- streamMsg.Operation
-		}
-	}()
-	return ts, nil
+	return stream, cancel, err
 }
 
 //StopOpsSubscription ...
 func (c *Client) StopOpsSubscription(subID int64) {
-	fmt.Println("StopOpsSubscription")
 	cancel := c.activeStreams.opSubStreams[subID]
 	cancel()
 	return
 }
 
 //GetSnapshot ...
-func (c *Client) GetSnapshot(ts int64, msg chan *pbQPU.Object, done chan bool) error {
+func (c *Client) GetSnapshot(ts int64) (pb.DataStoreQPU_GetSnapshotClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
-	if err != nil {
-		return err
-	}
-	for {
-		streamMsg, err := stream.Recv()
-		if err == io.EOF {
-			done <- true
-			break
-		}
-		if err != nil {
-			return err
-		}
-		done <- false
-		msg <- streamMsg.Object
-	}
-	return nil
+	return stream, cancel, err
 }
 
 //NewClient ...

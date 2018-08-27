@@ -2,8 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"time"
@@ -12,66 +10,106 @@ import (
 	utils "github.com/dimitriosvasilas/modqp"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	log "github.com/sirupsen/logrus"
 )
 
-func queryConsumer(msg chan *pbQPU.Object, done chan bool) {
+func queryConsumer(msg chan *pbQPU.Object, done chan bool, errs chan error) error {
 	for {
 		if doneMsg := <-done; doneMsg {
-			return
+			err := <-errs
+			return err
 		}
 		res := <-msg
-		fmt.Println(res.Key, "size:", res.Attributes["size"].GetInt())
+		log.WithFields(log.Fields{
+			"key":  res.Key,
+			"size": res.Attributes["size"].GetInt(),
+		}).Infof("result")
 	}
 }
 
-func main() {
-	shell := ishell.New()
+func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
+	var query map[string][2]*pbQPU.Value
+	if attr == "size" {
+		lbound, err := strconv.ParseInt(lb, 10, 64)
+		if err != nil {
+			errs <- errors.New("Lower bound is not int")
+			return
+		}
+		ubound, err := strconv.ParseInt(ub, 10, 64)
+		if err != nil {
+			errs <- errors.New("Upper bound is not int")
+			return
+		}
+		query = map[string][2]*pbQPU.Value{attr: [2]*pbQPU.Value{utils.ValInt(lbound), utils.ValInt(ubound)}}
+	} else if attr == "key" {
+		query = map[string][2]*pbQPU.Value{attr: [2]*pbQPU.Value{utils.ValStr(lb), utils.ValStr(ub)}}
+	}
+	errs <- sendQuery(query, c)
+}
 
-	c, conn, err := cli.NewClient("localhost:" + os.Args[1])
+func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
+	msg := make(chan *pbQPU.Object)
+	done := make(chan bool)
+	errs := make(chan error)
+
+	go c.Find(time.Now().UnixNano(), query, msg, done, errs)
+	return queryConsumer(msg, done, errs)
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		log.Fatalf("No port provided")
+		return
+	}
+	var port = os.Args[1]
+	errs := make(chan error)
+
+	c, conn, err := cli.NewClient("localhost:" + port)
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("failed to create Client %v", err)
 	}
 
-	shell.Println("QPU Shell")
+	if len(os.Args) > 2 {
+		if len(os.Args) == 4 {
+			os.Args = append(os.Args, os.Args[3])
+		}
 
-	shell.AddCmd(&ishell.Cmd{
-		Name: "find",
-		Help: "Perform a query on object attribute",
-		Func: func(ctx *ishell.Context) {
-			if len(ctx.Args) < 2 {
-				ctx.Err(errors.New("missing argument(s)"))
-				return
-			}
-			var query map[string][2]*pbQPU.Value
-			if ctx.Args[0] == "size" {
-				lbound, err := strconv.ParseInt(ctx.Args[1], 10, 64)
-				if err != nil {
-					ctx.Err(errors.New("find lower bound is not int"))
+		go find(os.Args[2], os.Args[3], os.Args[4], c, errs)
+		err := <-errs
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Fatalf("Find failed")
+		}
+	} else {
+		shell := ishell.New()
+		shell.Println("QPU Shell")
+
+		shell.AddCmd(&ishell.Cmd{
+			Name: "find",
+			Help: "Perform a query on object attribute",
+			Func: func(ctx *ishell.Context) {
+				if len(ctx.Args) < 2 {
+					ctx.Err(errors.New("missing argument(s)"))
 					return
 				}
-				ubound, err := strconv.ParseInt(ctx.Args[2], 10, 64)
+				ctx.ProgressBar().Indeterminate(true)
+				ctx.ProgressBar().Start()
+
+				if len(ctx.Args) == 2 {
+					ctx.Args = append(ctx.Args, ctx.Args[1])
+				}
+				go find(ctx.Args[0], ctx.Args[1], ctx.Args[2], c, errs)
+				err := <-errs
 				if err != nil {
-					ctx.Err(errors.New("find upper bound is not int"))
+					ctx.Err(err)
 					return
 				}
-				query = map[string][2]*pbQPU.Value{ctx.Args[0]: [2]*pbQPU.Value{utils.ValInt(lbound), utils.ValInt(ubound)}}
-			} else if ctx.Args[0] == "key" {
-				query = map[string][2]*pbQPU.Value{ctx.Args[0]: [2]*pbQPU.Value{utils.ValStr(ctx.Args[1]), utils.ValStr(ctx.Args[1])}}
-			}
 
-			msg := make(chan *pbQPU.Object)
-			done := make(chan bool)
-
-			ctx.ProgressBar().Indeterminate(true)
-			ctx.ProgressBar().Start()
-
-			go c.Find(time.Now().UnixNano(), query, msg, done)
-			queryConsumer(msg, done)
-
-			ctx.ProgressBar().Stop()
-		},
-	})
-
-	shell.Run()
+				ctx.ProgressBar().Stop()
+			},
+		})
+		shell.Run()
+	}
 }
