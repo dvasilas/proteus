@@ -1,7 +1,6 @@
 package store
 
 import (
-	"log"
 	"os"
 
 	utils "github.com/dimitriosvasilas/modqp"
@@ -27,14 +26,18 @@ func (ds FSDataStore) GetPath() string {
 }
 
 //GetSnapshot ...
-func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool) error {
+func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error) {
 	f, err := os.Open(ds.path)
 	if err != nil {
-		return err
+		done <- true
+		errs <- err
+		return
 	}
 	files, err := f.Readdir(-1)
 	if err != nil {
-		return err
+		done <- true
+		errs <- err
+		return
 	}
 	for _, file := range files {
 		done <- false
@@ -48,18 +51,20 @@ func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool) error 
 		}
 	}
 	done <- true
-	return nil
+	errs <- nil
 }
 
-func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, done chan bool, stopped chan bool) {
+func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, done chan bool, errs chan error) {
 	for {
 		select {
 		case event := <-w.Events:
-			done <- false
 			f, err := os.Stat(event.Name)
 			if err != nil {
-				log.Fatalf("%v", err)
+				done <- true
+				errs <- err
+				break
 			}
+			done <- false
 			msg <- &pbQPU.Operation{
 				Key: event.Name,
 				Op:  event.Op.String(),
@@ -72,31 +77,27 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, do
 					},
 				},
 			}
-
 		case err := <-w.Errors:
-			stopped <- true
-			log.Fatalf("fsnotify error: %v", err)
+			done <- true
+			errs <- err
+			break
 		}
 	}
 }
 
 //SubscribeOps ...
-func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool) error {
+func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return err
+		errs <- err
 	}
 	defer watcher.Close()
 
-	stopped := make(chan bool)
-
-	go ds.watchFS(watcher, msg, done, stopped)
+	go ds.watchFS(watcher, msg, done, errs)
 
 	err = watcher.Add(ds.path)
 	if err != nil {
-		log.Fatal(err)
+		errs <- err
 	}
-	<-stopped
-	done <- true
-	return nil
+	<-errs
 }

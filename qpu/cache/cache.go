@@ -22,7 +22,8 @@ type entry struct {
 	value []pbQPU.Object
 }
 
-//New ...
+//New initializes a new Cache struct.
+//It returns a pointer to the Cache struct.
 func New(maxEntries int) *Cache {
 	return &Cache{
 		MaxEntries: maxEntries,
@@ -31,19 +32,21 @@ func New(maxEntries int) *Cache {
 	}
 }
 
-//StoreInCache ...
-func (c *Cache) StoreInCache(obj *pbQPU.Object, in []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+//StoreAndRespond stores an entry in the cache and forwards then this object through the given stream.
+//It returns any error encountered.
+func (c *Cache) StoreAndRespond(obj *pbQPU.Object, in []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
 	if err := c.put(in, *obj); err != nil {
 		return err
 	}
-	stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
-	return nil
+	return stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
 }
 
-//Put ...
 func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
-	//test if cache == nil - return error
-	key := PredicateToKey(query)
+	if c.items == nil {
+		c.ll = list.New()
+		c.items = make(map[string]*list.Element)
+	}
+	key := predicateToKey(query)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
 		item.Value.(*entry).value = append(item.Value.(*entry).value, obj)
@@ -51,20 +54,21 @@ func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
 		item := c.ll.PushFront(&entry{query, []pbQPU.Object{obj}})
 		c.items[key] = item
 		if c.ll.Len() > c.MaxEntries {
-			c.Evict()
+			c.evict()
 		}
 	}
 	return nil
 }
 
-//Evict ...
-func (c *Cache) Evict() error {
-	//check nil
+func (c *Cache) evict() error {
+	if c.items == nil {
+		return nil
+	}
 	item := c.ll.Back()
 	if item != nil {
 		c.ll.Remove(item)
 		ee := item.Value.(*entry)
-		key := PredicateToKey(ee.key)
+		key := predicateToKey(ee.key)
 		delete(c.items, key)
 		if c.OnEvict != nil {
 			c.OnEvict(ee.key, ee.value)
@@ -73,26 +77,27 @@ func (c *Cache) Evict() error {
 	return nil
 }
 
-//Get ...
-func (c *Cache) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
-	//test if cache == nil - return error
-	key := PredicateToKey(p)
+//Get retrieves a cached entry based on the given query predicate.
+//It returns the cached objects stored in that entry.
+func (c *Cache) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool) {
+	if c.items == nil {
+		return nil, false
+	}
+	key := predicateToKey(p)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
-		return item.Value.(*entry).value, true, nil
+		return item.Value.(*entry).value, true
 	}
-	return nil, false, nil
+	return nil, false
 }
 
-//Print ...
-func (c *Cache) Print() {
+func (c *Cache) print() {
 	for e := c.ll.Front(); e != nil; e = e.Next() {
 		fmt.Println(e.Value)
 	}
 }
 
-//PredicateToKey ...
-func PredicateToKey(p []*pbQPU.Predicate) string {
+func predicateToKey(p []*pbQPU.Predicate) string {
 	entryKey := ""
 	for i, pp := range p {
 		switch pp.Lbound.Val.(type) {

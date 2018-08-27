@@ -20,7 +20,7 @@ func (x Entry) Less(than btree.Item) bool {
 type Index interface {
 	put(op *pbQPU.Operation) error
 	Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error)
-	Update(op *pbQPU.Operation)
+	Update(op *pbQPU.Operation) error
 }
 
 //BTreeIndex ...
@@ -31,7 +31,8 @@ type BTreeIndex struct {
 	entries   *btree.BTree
 }
 
-//New ...
+//New initializes a new BTreeIndex struct.
+//It returns a pointer to the BTreeIndex struct.
 func New(attr string, lb int64, ub int64) *BTreeIndex {
 	return &BTreeIndex{
 		attribute: attr,
@@ -41,7 +42,6 @@ func New(attr string, lb int64, ub int64) *BTreeIndex {
 	}
 }
 
-//opToIndexKey ...
 func (i *BTreeIndex) opToEntry(op *pbQPU.Operation) Entry {
 	return Entry{Value: op.Object.Attributes[i.attribute].GetInt()}
 }
@@ -50,7 +50,6 @@ func (i *BTreeIndex) boundToEntry(b *pbQPU.Value) Entry {
 	return Entry{Value: b.GetInt()}
 }
 
-//FilterIndexable ...
 func (i *BTreeIndex) filterIndexable(op *pbQPU.Operation) bool {
 	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
 		if attrValue.GetInt() > i.lbound && attrValue.GetInt() <= i.ubound {
@@ -60,14 +59,17 @@ func (i *BTreeIndex) filterIndexable(op *pbQPU.Operation) bool {
 	return false
 }
 
-//Update ...
-func (i *BTreeIndex) Update(op *pbQPU.Operation) {
+//Update updates the index based on a given datastore operation.
+//It returns any error encountered.
+func (i *BTreeIndex) Update(op *pbQPU.Operation) error {
 	if i.filterIndexable(op) {
-		i.put(op)
+		if err := i.put(op); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-//Put ...
 func (i *BTreeIndex) put(op *pbQPU.Operation) error {
 	entry := i.opToEntry(op)
 	if i.entries.Has(entry) {
@@ -82,7 +84,8 @@ func (i *BTreeIndex) put(op *pbQPU.Operation) error {
 	return nil
 }
 
-//Get ...
+//Get performs and index lookup based on a given query predicate.
+//It returns the retrieved objects and any error encountered.
 func (i *BTreeIndex) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
 	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
 		entry := i.boundToEntry(p[0].Lbound)

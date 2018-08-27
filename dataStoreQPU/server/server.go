@@ -1,20 +1,21 @@
 package main
 
 import (
-	"log"
+	"encoding/json"
 	"net"
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 type dataStore interface {
-	GetSnapshot(msg chan *pbQPU.Object, done chan bool) error
-	SubscribeOps(msg chan *pbQPU.Operation, done chan bool) error
+	GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error)
+	SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error)
 	GetPath() string
 }
 
@@ -34,18 +35,29 @@ type Server struct {
 }
 
 func getConfig() (Config, error) {
+	var conf Config
 	viper.AutomaticEnv()
-	viper.BindEnv("HOME")
+	err := viper.BindEnv("HOME")
+	if err != nil {
+		return conf, err
+	}
 	viper.SetConfigName("dataStore")
 	viper.AddConfigPath("../../conf")
 	viper.SetConfigType("json")
-	var conf Config
-	if err := viper.ReadInConfig(); err != nil {
+	if err = viper.ReadInConfig(); err != nil {
 		return conf, err
 	}
-	if err := viper.Unmarshal(&conf); err != nil {
+	if err = viper.Unmarshal(&conf); err != nil {
 		return conf, err
 	}
+
+	confJSON, err := json.Marshal(conf)
+	if err != nil {
+		return conf, err
+	}
+	log.WithFields(log.Fields{
+		"configuration": string(confJSON),
+	}).Info("read configuration")
 	return conf, nil
 }
 
@@ -61,6 +73,10 @@ func ΝewServer() error {
 	if err != nil {
 		return err
 	}
+	log.WithFields(log.Fields{
+		"port": conf.Port,
+	}).Info("listening")
+
 	s := grpc.NewServer()
 
 	pb.RegisterDataStoreQPUServer(s, &server)
@@ -71,25 +87,33 @@ func ΝewServer() error {
 	return nil
 }
 
-func getSnapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, exit chan bool) {
+func snapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
-			exit <- true
+			err := <-errsFrom
+			errs <- err
 			return
 		}
 		obj := <-msg
-		stream.Send(&pb.StateStream{Object: obj})
+		if err := stream.Send(&pb.StateStream{Object: obj}); err != nil {
+			errs <- err
+			return
+		}
 	}
 }
 
-func subscribeOpsConsumer(stream pb.DataStoreQPU_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, exit chan bool) {
+func opsConsumer(stream pb.DataStoreQPU_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
-			exit <- true
+			err := <-errsFrom
+			errs <- err
 			return
 		}
 		op := <-msg
-		stream.Send(&pb.OpStream{Operation: op})
+		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+			errs <- err
+			return
+		}
 	}
 }
 
@@ -102,31 +126,35 @@ func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStoreQPU_Subsc
 func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeOpsServer) error {
 	msg := make(chan *pbQPU.Operation)
 	done := make(chan bool)
-	exit := make(chan bool)
+	errs := make(chan error)
+	errs1 := make(chan error)
 
-	go subscribeOpsConsumer(stream, msg, done, exit)
-	go s.ds.SubscribeOps(msg, done)
-	<-exit
+	go opsConsumer(stream, msg, done, errs, errs1)
+	go s.ds.SubscribeOps(msg, done, errs)
 
-	return nil
+	err := <-errs1
+	return err
 }
 
 //GetSnapshot ...
 func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapshotServer) error {
 	msg := make(chan *pbQPU.Object)
 	done := make(chan bool)
-	exit := make(chan bool)
+	errs := make(chan error)
+	errs1 := make(chan error)
 
-	go getSnapshotConsumer(stream, msg, done, exit)
-	go s.ds.GetSnapshot(msg, done)
-	<-exit
+	go snapshotConsumer(stream, msg, done, errs, errs1)
+	go s.ds.GetSnapshot(msg, done, errs)
 
-	return nil
+	err := <-errs1
+	return err
 }
 
 func main() {
 	err := ΝewServer()
 	if err != nil {
-		log.Fatalf("dataStoreQPU server failed %v", err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatalf("dataStoreQPU server failed")
 	}
 }

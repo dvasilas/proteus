@@ -9,13 +9,14 @@ import (
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
-//ForwardResponse ...
+//ForwardResponse sends an object received from downstream as part of query results to an upward stream corresponding to this query.
+//It returns any error encountered.
 func ForwardResponse(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
-	stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
-	return nil
+	return stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
 }
 
-//ForwardQuery ...
+//ForwardQuery selects an appropriate downstream for forwarding a query, based on the available QPUs and their configuration.
+//It returns a client object of the selected downstream QPU, and any error encountered.
 func ForwardQuery(conns []utils.DownwardConn, pred pbQPU.Predicate) (cli.Client, error) {
 	for _, c := range conns {
 		if c.QpuType == "index" && canProcessQuery(c, pred) {
@@ -29,7 +30,7 @@ func ForwardQuery(conns []utils.DownwardConn, pred pbQPU.Predicate) (cli.Client,
 			return c.Client, nil
 		}
 	}
-	return cli.Client{}, errors.New("dispatchQPU found no QPU to forward query")
+	return cli.Client{}, errors.New("dispatch found no QPU to forward query")
 }
 
 func predicateInAttrRange(conn utils.DownwardConn, pred pbQPU.Predicate) bool {

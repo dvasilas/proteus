@@ -37,17 +37,16 @@ func TestGetSnapshot(t *testing.T) {
 
 	c := Client{dsClient: dsqpuclient}
 
-	msg := make(chan *pbQPU.Object)
-	done := make(chan bool)
-
-	go c.GetSnapshot(time.Now().UnixNano(), msg, done)
-
+	streamFrom, cancel, err := c.GetSnapshot(time.Now().UnixNano())
+	defer cancel()
+	assert.Nil(t, err)
 	for {
-		if doneMsg := <-done; doneMsg {
+		streamMsg, err := streamFrom.Recv()
+		if err == io.EOF {
 			return
 		}
-		res := <-msg
-		assert.NotEmpty(t, res, "GetSnapshot returned empty result")
-		assert.NotNil(t, res.Key, "")
+		assert.Nil(t, err)
+		assert.NotEmpty(t, streamMsg, "GetSnapshot returned empty result")
+		assert.NotNil(t, streamMsg.Object.Key, "")
 	}
 }

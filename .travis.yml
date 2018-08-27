@@ -12,11 +12,11 @@ install:
   - go get google.golang.org/grpc
   - go get github.com/hpcloud/tail
   - go get github.com/stretchr/testify
-  - go get github.com/fatih/color
   - go get github.com/abiosoft/ishell
   - go get github.com/spf13/viper
   - go get github.com/fsnotify/fsnotify
   - go get github.com/google/btree
+  - go get github.com/sirupsen/logrus
 
 env:
   - PATH=$HOME/protoc/bin:$PATH

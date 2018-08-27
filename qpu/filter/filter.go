@@ -1,45 +1,39 @@
 package filter
 
 import (
-	"fmt"
-
 	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
-	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 )
 
-func match(obj *pbQPU.Object) (bool, error) {
-	//demo
-	color.Set(color.FgGreen)
-	defer color.Unset()
-	fmt.Println(obj)
-	//
-	return true, nil
+func match(obj *pbQPU.Object) bool {
+	log.WithFields(log.Fields{
+		"Object": obj,
+	}).Debug("Object matches query")
+	return true
 }
 
-func noMatch(obj *pbQPU.Object) (bool, error) {
-	//demo
-	color.Set(color.FgRed)
-	defer color.Unset()
-	fmt.Println(obj)
-	//
-	return false, nil
+func noMatch(obj *pbQPU.Object) bool {
+	log.WithFields(log.Fields{
+		"Object": obj,
+	}).Debug("Object does not match query")
+	return false
 }
 
-//Forward ...
+//Forward sends an object through an upstream stream if it matches the given predicate.
+//It returns any error encountered.
 func Forward(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
-	f, err := Filter(obj, pred)
-	if err != nil {
-		return nil
-	}
-	if f {
-		stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+	if Filter(obj, pred) {
+		return stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
 	}
 	return nil
 }
 
-//Filter ...
-func Filter(obj *pbQPU.Object, predicate []*pbQPU.Predicate) (bool, error) {
+//Filter examines whether an object satisfies a given predicate.
+//It returns a boolean indicated whether the predicate is satisfied.
+func Filter(obj *pbQPU.Object, predicate []*pbQPU.Predicate) bool {
+	log.SetLevel(log.DebugLevel)
+
 	for _, pred := range predicate {
 		switch pred.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
