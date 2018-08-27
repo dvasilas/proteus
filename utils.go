@@ -66,7 +66,7 @@ func NewDConn(conf QPUConfig) ([]DownwardConn, error) {
 
 //NewDConnClient ...
 func NewDConnClient(c cli.Client) []DownwardConn {
-	return []DownwardConn{DownwardConn{Client: c}}
+	return []DownwardConn{{Client: c}}
 }
 
 //ValInt ...
