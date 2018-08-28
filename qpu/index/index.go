@@ -8,7 +8,7 @@ import (
 //Entry ...
 type Entry struct {
 	Value    int64
-	Postings []pbQPU.Object
+	Postings map[string]pbQPU.Object
 }
 
 //Less ...
@@ -19,7 +19,7 @@ func (x Entry) Less(than btree.Item) bool {
 //Index ...
 type Index interface {
 	put(op *pbQPU.Operation) error
-	Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error)
+	Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error)
 	Update(op *pbQPU.Operation) error
 }
 
@@ -29,6 +29,7 @@ type BTreeIndex struct {
 	lbound    int64
 	ubound    int64
 	entries   *btree.BTree
+	state     map[string]pbQPU.Object
 }
 
 //New initializes a new BTreeIndex struct.
@@ -39,6 +40,7 @@ func New(attr string, lb int64, ub int64) *BTreeIndex {
 		lbound:    lb,
 		ubound:    ub,
 		entries:   btree.New(2),
+		state:     make(map[string]pbQPU.Object),
 	}
 }
 
@@ -70,23 +72,32 @@ func (i *BTreeIndex) Update(op *pbQPU.Operation) error {
 	return nil
 }
 
+func (i *BTreeIndex) removeOldEntry(op *pbQPU.Operation) {
+	if s, ok := i.state[(*op.Object).Key]; ok {
+		item := i.entries.Get(Entry{Value: s.Attributes[i.attribute].GetInt()})
+		delete(item.(Entry).Postings, s.Key)
+	}
+}
+
 func (i *BTreeIndex) put(op *pbQPU.Operation) error {
+	i.removeOldEntry(op)
 	entry := i.opToEntry(op)
 	if i.entries.Has(entry) {
 		item := i.entries.Get(entry)
-		newPostings := append(item.(Entry).Postings, *op.Object)
-		entry.Postings = newPostings
-		i.entries.ReplaceOrInsert(entry)
+		item.(Entry).Postings[(*op.Object).Key] = *op.Object
+		i.entries.ReplaceOrInsert(item)
 	} else {
-		entry.Postings = append([]pbQPU.Object{}, *op.Object)
+		entry.Postings = make(map[string]pbQPU.Object)
+		entry.Postings[(*op.Object).Key] = *op.Object
 		i.entries.ReplaceOrInsert(entry)
 	}
+	i.state[(*op.Object).Key] = *op.Object
 	return nil
 }
 
 //Get performs and index lookup based on a given query predicate.
 //It returns the retrieved objects and any error encountered.
-func (i *BTreeIndex) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
+func (i *BTreeIndex) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
 	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
 		entry := i.boundToEntry(p[0].Lbound)
 		if i.entries.Has(entry) {
@@ -94,10 +105,10 @@ func (i *BTreeIndex) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool, error) {
 			return item.(Entry).Postings, true, nil
 		}
 	} else {
-		res := []pbQPU.Object{}
+		res := make(map[string]pbQPU.Object)
 		it := func(item btree.Item) bool {
 			for _, o := range item.(Entry).Postings {
-				res = append(res, o)
+				res[o.Key] = o
 			}
 			return true
 		}
