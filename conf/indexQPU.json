@@ -3,7 +3,7 @@
     "hostname": "localhost",
     "port": "50055",
     "conns": [{
-        "hostname": "localhost",
+        "hostname": "host.docker.internal",
         "port": "50052"
     }]
 }

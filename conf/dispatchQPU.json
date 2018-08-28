@@ -2,19 +2,9 @@
     "qpuType": "dispatch",
     "hostname": "localhost",
     "port": "50056",
-    "conns": [{
-        "hostname": "localhost",
-        "port": "50053",
-        "qpuType": "scan",
-        "config": {
-            "attribute": "any",
-            "datatype": "any",
-            "lbound": "any",
-            "ubound": "any"
-        }
-    },
+    "conns": [
     {
-        "hostname": "localhost",
+        "hostname": "index.qpu.com",
         "port": "50055",
         "qpuType": "index",
         "config": {
@@ -22,6 +12,17 @@
             "datatype": "int",
             "lbound": "0",
             "ubound": "2048"
+        }
+    },
+    {
+        "hostname": "cache.qpu.com",
+        "port": "50054",
+        "qpuType": "cache",
+        "config": {
+            "attribute": "any",
+            "datatype": "any",
+            "lbound": "any",
+            "ubound": "any"
         }
     }
     ]

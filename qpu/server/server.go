@@ -227,6 +227,9 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 	} else if s.config.QpuType == "cache" {
 		cachedResult, hit := s.cache.Get(in.Predicate)
 		if hit {
+			log.WithFields(log.Fields{
+				"cache entry": cachedResult,
+			}).Info("cache hit, responding")
 			for _, item := range cachedResult {
 				if err := streamTo.Send(&pb.QueryResultStream{Object: &item}); err != nil {
 					return err

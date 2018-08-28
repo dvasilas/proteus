@@ -19,7 +19,7 @@ func ForwardResponse(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_F
 //It returns a client object of the selected downstream QPU, and any error encountered.
 func ForwardQuery(conns []utils.DownwardConn, pred pbQPU.Predicate) (cli.Client, error) {
 	for _, c := range conns {
-		if c.QpuType == "index" && canProcessQuery(c, pred) {
+		if (c.QpuType == "index" || c.QpuType == "cache") && canProcessQuery(c, pred) {
 			if predicateInAttrRange(c, pred) {
 				return c.Client, nil
 			}
@@ -40,12 +40,15 @@ func predicateInAttrRange(conn utils.DownwardConn, pred pbQPU.Predicate) bool {
 			return true
 		}
 	case *pbQPU.Value_Name:
+		if conn.Ubound.GetName() == "any" {
+			return true
+		}
 	}
 	return false
 }
 
 func canProcessQuery(conn utils.DownwardConn, pred pbQPU.Predicate) bool {
-	if conn.Attribute == pred.Attribute || pred.Attribute == "any" {
+	if conn.Attribute == pred.Attribute || conn.Attribute == "any" {
 		return true
 	}
 	return false

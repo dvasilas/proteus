@@ -1,31 +1,33 @@
-version: '2'
+version: '3'
 services:
-  datastore:
-    build:
-      context: .
-      dockerfile: dataStoreQPU/server/Dockerfile
-    ports:
-      - "127.0.0.1:50052:50052"
-    command: go run server.go
-    networks:
-      mynetwork:
-        aliases:
-          - ds.qpu.com
   sqpu:
     build:
-      context: .
+      context: ../
       dockerfile: qpu/server/Dockerfile
     ports:
-      - "127.0.0.1:50053-50056:50053-50056"
+      - "127.0.0.1:50053:50053"
     environment:
       - QPU_CONFIG_FILE=scanQPU
     command: go run server.go
-    depends_on:
-      - datastore
     networks:
       mynetwork:
         aliases:
           - scan.qpu.com
+  dqpu:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50056:50056"
+    environment:
+      - QPU_CONFIG_FILE=dispatchQPU
+    command: go run server.go
+    depends_on:
+      - sqpu
+    networks:
+      mynetwork:
+        aliases:
+          - dispatch.qpu.com
 
 networks:
   mynetwork:
