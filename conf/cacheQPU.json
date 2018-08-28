@@ -3,7 +3,7 @@
     "hostname": "localhost",
     "port": "50054",
     "conns": [{
-        "hostname": "localhost",
+        "hostname": "scan.qpu.com",
         "port": "50053"
     }]
 }

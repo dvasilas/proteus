@@ -1,0 +1,11 @@
+version: '3'
+services:
+  iqpu:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50055:50055"
+    environment:
+      - QPU_CONFIG_FILE=indexQPU
+    command: go run server.go
