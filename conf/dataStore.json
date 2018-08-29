@@ -2,7 +2,11 @@
     "hostname": "localhost",
     "port": "50052",
     "dataStore": {
-        "type": "fs",
-        "dataDir": "/"
+        "type": "s3",
+        "dataDir": "/",
+        "ΑwsAccessKeyId": "accessKey1",
+        "awsSecretAccessKey": "verySecretKey1",
+        "endpoint": "http://localhost:8000",
+        "bucketName": "buck"
     }
 }

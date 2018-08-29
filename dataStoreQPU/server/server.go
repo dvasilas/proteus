@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net"
 
 	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
+	s3 "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3DataStore"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -16,7 +18,6 @@ import (
 type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error)
 	SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error)
-	GetPath() string
 }
 
 //Config ...
@@ -24,8 +25,12 @@ type Config struct {
 	Hostname  string
 	Port      string
 	DataStore struct {
-		Type    string
-		DataDir string
+		Type               string
+		DataDir            string
+		ΑwsAccessKeyID     string
+		AwsSecretAccessKey string
+		Endpoint           string
+		BucketName         string
 	}
 }
 
@@ -67,7 +72,15 @@ func ΝewServer() error {
 	if err != nil {
 		return err
 	}
-	server := Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
+
+	var server Server
+	if conf.DataStore.Type == "fs" {
+		server = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
+	} else if conf.DataStore.Type == "s3" {
+		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName)}
+	} else {
+		return errors.New("Unknown dataStore type")
+	}
 
 	lis, err := net.Listen("tcp", conf.Hostname+":"+conf.Port)
 	if err != nil {

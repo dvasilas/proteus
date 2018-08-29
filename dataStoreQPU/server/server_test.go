@@ -13,6 +13,7 @@ import (
 )
 
 var s Server
+var conf Config
 
 type mockDataStoreQPUGetSnapshotServer struct {
 	grpc.ServerStream
@@ -35,7 +36,10 @@ func (m *DataStoreQPUSubscribeOpsServer) Send(op *pb.OpStream) error {
 }
 
 func TestMain(m *testing.M) {
-	conf, _ := getConfig()
+	var err error
+	if conf, err = getConfig(); err != nil {
+		return
+	}
 	s = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
 	returnCode := m.Run()
 	os.Exit(returnCode)
@@ -55,7 +59,7 @@ func TestSubscribeOps(t *testing.T) {
 	req := &pb.SubRequest{}
 	mock := &DataStoreQPUSubscribeOpsServer{}
 
-	f, err := os.OpenFile(s.ds.GetPath()+"temp.txt", os.O_CREATE|os.O_RDWR, 0644)
+	f, err := os.OpenFile(viper.Get("HOME").(string)+conf.DataStore.DataDir+"temp.txt", os.O_CREATE|os.O_RDWR, 0644)
 	assert.Nil(t, err)
 	time.Sleep(100 * time.Millisecond)
 
@@ -69,7 +73,7 @@ func TestSubscribeOps(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, mock.ops[0].Operation.Key, s.ds.GetPath()+"temp.txt")
+	assert.Equal(t, mock.ops[0].Operation.Key, viper.Get("HOME").(string)+conf.DataStore.DataDir+"temp.txt")
 	assert.Equal(t, mock.ops[0].Operation.Op, "WRITE")
 }
 

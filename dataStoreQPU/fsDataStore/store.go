@@ -20,11 +20,6 @@ func New(path string) FSDataStore {
 	}
 }
 
-//GetPath ...
-func (ds FSDataStore) GetPath() string {
-	return ds.path
-}
-
 //GetSnapshot ...
 func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error) {
 	f, err := os.Open(ds.path)
