@@ -17,6 +17,7 @@ install:
   - go get github.com/fsnotify/fsnotify
   - go get github.com/google/btree
   - go get github.com/sirupsen/logrus
+  - go get github.com/aws/aws-sdk-go
 
 env:
   - PATH=$HOME/protoc/bin:$PATH
