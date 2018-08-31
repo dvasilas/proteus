@@ -7,6 +7,7 @@
         "ΑwsAccessKeyId": "accessKey1",
         "awsSecretAccessKey": "verySecretKey1",
         "endpoint": "http://localhost:8000",
-        "bucketName": "buck"
+        "bucketName": "buck",
+        "logStreamEndpoint": "localhost:50051"
     }
 }
