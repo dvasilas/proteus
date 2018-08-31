@@ -31,6 +31,7 @@ type Config struct {
 		AwsSecretAccessKey string
 		Endpoint           string
 		BucketName         string
+		LogStreamEndpoint  string
 	}
 }
 
@@ -77,7 +78,7 @@ func ΝewServer() error {
 	if conf.DataStore.Type == "fs" {
 		server = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
 	} else if conf.DataStore.Type == "s3" {
-		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName)}
+		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName, conf.DataStore.LogStreamEndpoint)}
 	} else {
 		return errors.New("Unknown dataStore type")
 	}

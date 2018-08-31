@@ -2,9 +2,10 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -12,7 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	utils "github.com/dimitriosvasilas/modqp"
+	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3pb"
 	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	"google.golang.org/grpc"
 )
 
 type listBucketResult struct {
@@ -32,16 +35,44 @@ type S3DataStore struct {
 	awsSecretAccessKey string
 	endpoint           string
 	bucketName         string
+	logStreamEndpoint  string
+}
+
+func (ds S3DataStore) watch(stream pb.S3DataStore_WatchClient, msg chan *pbQPU.Operation, done chan bool, errs chan error) {
+	for {
+		op, err := stream.Recv()
+		if err == io.EOF {
+			done <- true
+			errs <- nil
+		}
+		if err != nil {
+			done <- true
+			errs <- err
+		}
+		done <- false
+		msg <- &pbQPU.Operation{
+			Key: op.Operation.Object.Key,
+			Op:  op.Operation.Op,
+			Object: &pbQPU.Object{
+				Key: op.Operation.Object.Key,
+				Attributes: map[string]*pbQPU.Value{
+					"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
+				},
+			},
+		}
+	}
 }
 
 //New ...
-func New(aKeyID string, aSecretKey string, endP string, bName string) S3DataStore {
-	return S3DataStore{
+func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP string) S3DataStore {
+	s := S3DataStore{
 		awsAccessKeyID:     aKeyID,
 		awsSecretAccessKey: aSecretKey,
 		endpoint:           endP,
 		bucketName:         bName,
+		logStreamEndpoint:  logSEndP,
 	}
+	return s
 }
 
 //GetSnapshot ...
@@ -91,6 +122,19 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 
 //SubscribeOps ...
 func (ds S3DataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
-	done <- true
-	errs <- errors.New("not implemented")
+	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
+	if err != nil {
+		done <- true
+		errs <- err
+	}
+	defer conn.Close()
+	ctx := context.Background()
+	client := pb.NewS3DataStoreClient(conn)
+	stream, err := client.Watch(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
+	if err != nil {
+		done <- true
+		errs <- err
+	}
+	go ds.watch(stream, msg, done, errs)
+	<-errs
 }
