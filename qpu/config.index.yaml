@@ -1,6 +1,0 @@
-qpuType: index
-hostname: localhost
-port: 50055
-conn:
-  hostname: localhost
-  port: 50052

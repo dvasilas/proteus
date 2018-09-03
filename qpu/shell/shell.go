@@ -8,8 +8,8 @@ import (
 
 	"github.com/abiosoft/ishell"
 	utils "github.com/dimitriosvasilas/modqp"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	log "github.com/sirupsen/logrus"
 )
 

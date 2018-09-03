@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net"
 
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	s3 "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3DataStore"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -93,12 +93,12 @@ func ΝewServer() error {
 
 	s := grpc.NewServer()
 
-	pb.RegisterDataStoreQPUServer(s, &server)
+	pb.RegisterDataStoreServer(s, &server)
 	reflection.Register(s)
 	return s.Serve(lis)
 }
 
-func snapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
+func snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errsFrom
@@ -113,7 +113,7 @@ func snapshotConsumer(stream pb.DataStoreQPU_SubscribeStatesServer, msg chan *pb
 	}
 }
 
-func opsConsumer(stream pb.DataStoreQPU_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
+func opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errsFrom
@@ -129,12 +129,12 @@ func opsConsumer(stream pb.DataStoreQPU_SubscribeOpsServer, msg chan *pbQPU.Oper
 }
 
 //SubscribeStates ...
-func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeStatesServer) error {
+func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStore_SubscribeStatesServer) error {
 	return nil
 }
 
 //SubscribeOps ...
-func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_SubscribeOpsServer) error {
+func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsServer) error {
 	msg := make(chan *pbQPU.Operation)
 	done := make(chan bool)
 	errs := make(chan error)
@@ -148,7 +148,7 @@ func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStoreQPU_Subscrib
 }
 
 //GetSnapshot ...
-func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStoreQPU_GetSnapshotServer) error {
+func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotServer) error {
 	msg := make(chan *pbQPU.Object)
 	done := make(chan bool)
 	errs := make(chan error)

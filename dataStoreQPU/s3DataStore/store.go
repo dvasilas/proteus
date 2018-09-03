@@ -13,8 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	utils "github.com/dimitriosvasilas/modqp"
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3pb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pb "github.com/dimitriosvasilas/modqp/protos/s3"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"google.golang.org/grpc"
 )
 

@@ -1,12 +1,10 @@
-//go:generate protoc --go_out=plugins=grpc:$GOPATH/src/ ./qpuUtilspb/qpuUtils.proto
-
 package utils
 
 import (
 	"strconv"
 
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
 //DownwardConn ...

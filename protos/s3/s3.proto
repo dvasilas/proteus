@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package s3datastore;
-option go_package = "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3pb";
+option go_package = "github.com/dimitriosvasilas/modqp/protos/s3";
 
 service S3DataStore {
   rpc watch(SubRequest) returns (stream OpStream) {}

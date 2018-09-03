@@ -10,14 +10,14 @@ import (
 
 	utils "github.com/dimitriosvasilas/modqp"
 	dSQPUcli "github.com/dimitriosvasilas/modqp/dataStoreQPU/client"
-	pbDsQPU "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
+	pbDsQPU "github.com/dimitriosvasilas/modqp/protos/datastore"
+	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/dimitriosvasilas/modqp/qpu/cache"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	"github.com/dimitriosvasilas/modqp/qpu/dispatch"
 	"github.com/dimitriosvasilas/modqp/qpu/filter"
 	"github.com/dimitriosvasilas/modqp/qpu/index"
-	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -136,7 +136,7 @@ func (s *Server) findResultConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindS
 }
 
 //TODO: Find a way to handle an error here
-func (s *Server) opConsumer(stream pbDsQPU.DataStoreQPU_SubscribeOpsClient, cancel context.CancelFunc) {
+func (s *Server) opConsumer(stream pbDsQPU.DataStore_SubscribeOpsClient, cancel context.CancelFunc) {
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
@@ -157,7 +157,7 @@ func (s *Server) opConsumer(stream pbDsQPU.DataStoreQPU_SubscribeOpsClient, canc
 	}
 }
 
-func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.DataStoreQPU_GetSnapshotClient, streamTo pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.DataStore_GetSnapshotClient, streamTo pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
 	for {
 		streamMsg, err := streamFrom.Recv()
 		if err == io.EOF {
@@ -174,7 +174,7 @@ func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.Da
 	}
 }
 
-func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStoreQPU_GetSnapshotClient, errs chan error) {
+func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient, errs chan error) {
 	for {
 		streamMsg, err := streamFrom.Recv()
 		if err == io.EOF {

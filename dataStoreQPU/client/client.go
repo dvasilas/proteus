@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
+	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
 	"google.golang.org/grpc"
 )
 
@@ -13,12 +13,12 @@ type activeStreams struct {
 
 //Client ...
 type Client struct {
-	dsClient      pb.DataStoreQPUClient
+	dsClient      pb.DataStoreClient
 	activeStreams activeStreams
 }
 
 //SubscribeStates ...
-func (c *Client) SubscribeStates(ts int64) (pb.DataStoreQPU_SubscribeStatesClient, context.CancelFunc, error) {
+func (c *Client) SubscribeStates(ts int64) (pb.DataStore_SubscribeStatesClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -27,7 +27,7 @@ func (c *Client) SubscribeStates(ts int64) (pb.DataStoreQPU_SubscribeStatesClien
 }
 
 // SubscribeOps ...
-func (c *Client) SubscribeOps(ts int64) (pb.DataStoreQPU_SubscribeOpsClient, context.CancelFunc, error) {
+func (c *Client) SubscribeOps(ts int64) (pb.DataStore_SubscribeOpsClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
@@ -43,7 +43,7 @@ func (c *Client) StopOpsSubscription(subID int64) {
 }
 
 //GetSnapshot ...
-func (c *Client) GetSnapshot(ts int64) (pb.DataStoreQPU_GetSnapshotClient, context.CancelFunc, error) {
+func (c *Client) GetSnapshot(ts int64) (pb.DataStore_GetSnapshotClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	stream, err := c.dsClient.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
@@ -57,5 +57,5 @@ func NewClient(address string) (Client, *grpc.ClientConn, error) {
 		return Client{}, nil, err
 	}
 	activeStrMap := make(map[int64]context.CancelFunc)
-	return Client{pb.NewDataStoreQPUClient(conn), activeStreams{activeStrMap}}, conn, nil
+	return Client{pb.NewDataStoreClient(conn), activeStreams{activeStrMap}}, conn, nil
 }
