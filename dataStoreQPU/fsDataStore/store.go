@@ -4,7 +4,7 @@ import (
 	"os"
 
 	utils "github.com/dimitriosvasilas/modqp"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/fsnotify/fsnotify"
 )
 

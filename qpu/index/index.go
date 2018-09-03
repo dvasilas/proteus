@@ -1,7 +1,7 @@
 package index
 
 import (
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/google/btree"
 )
 

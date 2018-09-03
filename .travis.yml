@@ -23,6 +23,7 @@ env:
   - PATH=$HOME/protoc/bin:$PATH
 
 before_script:
+  - make all
   - mkdir dataStoreQPU/client/mocks
   - go generate ./...
 

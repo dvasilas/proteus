@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	utils "github.com/dimitriosvasilas/modqp"
+	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
-	pb "github.com/dimitriosvasilas/modqp/qpu/qpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
 )
 
 //ForwardResponse sends an object received from downstream as part of query results to an upward stream corresponding to this query.

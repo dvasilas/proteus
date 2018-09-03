@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	utils "github.com/dimitriosvasilas/modqp"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/stretchr/testify/assert"
 )
 

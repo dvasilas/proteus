@@ -7,8 +7,8 @@ import (
 
 	utils "github.com/dimitriosvasilas/modqp"
 	mock "github.com/dimitriosvasilas/modqp/dataStoreQPU/client/mocks"
-	pb "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb"
-	pbQPU "github.com/dimitriosvasilas/modqp/qpuUtilspb"
+	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
+	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,13 +26,13 @@ func TestGetSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	stream := mock.NewMockDataStoreQPU_GetSnapshotClient(ctrl)
+	stream := mock.NewMockDataStore_GetSnapshotClient(ctrl)
 	for _, msg := range streamMessages {
 		stream.EXPECT().Recv().Return(&msg, nil)
 	}
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 
-	dsqpuclient := mock.NewMockDataStoreQPUClient(ctrl)
+	dsqpuclient := mock.NewMockDataStoreClient(ctrl)
 	dsqpuclient.EXPECT().GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any()).Return(stream, nil)
 
 	c := Client{dsClient: dsqpuclient}

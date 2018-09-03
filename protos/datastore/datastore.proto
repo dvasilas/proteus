@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package datastoreqpu;
-option go_package = "github.com/dimitriosvasilas/modqp/dataStoreQPU/dsqpupb";
+package datastore;
+option go_package = "github.com/dimitriosvasilas/modqp/protos/datastore";
 
-import "qpuUtils.proto";
+import "utils.proto";
 
-service DataStoreQPU {
+service DataStore {
   rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
   rpc SubscribeStates(SubRequest) returns (stream StateStream) {}
   rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
@@ -17,10 +17,10 @@ message SubRequest {
 
 message OpStream {
   string type = 1;
-  qpuUtils.Object state = 2;
-  qpuUtils.Operation operation = 3;
+  utils.Object state = 2;
+  utils.Operation operation = 3;
 }
 
 message StateStream {
-  qpuUtils.Object object = 1;
+  utils.Object object = 1;
 }
