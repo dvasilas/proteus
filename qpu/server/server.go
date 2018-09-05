@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"io"
 	"net"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	utils "github.com/dimitriosvasilas/modqp"
@@ -33,16 +36,27 @@ type Server struct {
 	index    index.Index
 }
 
-func getConfig() (utils.QPUConfig, error) {
+func getConfig(qType string) (utils.QPUConfig, error) {
 	var conf utils.QPUConfig
 	viper.AutomaticEnv()
 	err := viper.BindEnv("QPU_CONFIG_FILE")
 	if err != nil {
 		return conf, err
 	}
-	confFile := viper.Get("QPU_CONFIG_FILE")
-	viper.SetConfigName(confFile.(string))
-	viper.AddConfigPath("../../conf")
+	var confFile string
+	if qType == "noType" {
+		confF := viper.Get("QPU_CONFIG_FILE")
+		if confF == nil {
+			return conf, errors.New("QPU config file not specified")
+		}
+		confFile = confF.(string)
+	} else {
+		confFile = qType
+	}
+	viper.SetConfigName(confFile)
+	_, f, _, _ := runtime.Caller(0)
+	basepath := filepath.Dir(f)
+	viper.AddConfigPath(basepath + "/../../conf")
 	viper.SetConfigType("json")
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -63,8 +77,8 @@ func getConfig() (utils.QPUConfig, error) {
 }
 
 //NewServer ...
-func NewServer() error {
-	conf, err := getConfig()
+func NewServer(qType string) error {
+	conf, err := getConfig(qType)
 	if err != nil {
 		return err
 	}
@@ -275,7 +289,10 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 }
 
 func main() {
-	err := NewServer()
+	var qType string
+	flag.StringVar(&qType, "qpu", "noType", "the QPU type")
+	flag.Parse()
+	err := NewServer(qType)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
