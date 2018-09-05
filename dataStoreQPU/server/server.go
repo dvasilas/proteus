@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"path/filepath"
+	"runtime"
 
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	s3 "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3DataStore"
@@ -47,8 +49,10 @@ func getConfig() (Config, error) {
 	if err != nil {
 		return conf, err
 	}
+	_, f, _, _ := runtime.Caller(0)
+	basepath := filepath.Dir(f)
 	viper.SetConfigName("dataStore")
-	viper.AddConfigPath("../../conf")
+	viper.AddConfigPath(basepath + "/../../conf")
 	viper.SetConfigType("json")
 	if err = viper.ReadInConfig(); err != nil {
 		return conf, err

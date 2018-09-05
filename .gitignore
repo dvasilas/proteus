@@ -5,3 +5,5 @@
 *mock.go
 
 vendor/
+
+bin/
