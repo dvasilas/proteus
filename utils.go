@@ -32,6 +32,12 @@ type QPUConfig struct {
 			Lbound    string
 		}
 	}
+	Config struct {
+		IndexType string
+		Attribute string
+		LBound    string
+		UBound    string
+	}
 }
 
 //NewDConn ...

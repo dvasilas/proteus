@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -50,7 +51,7 @@ func (ds S3DataStore) watch(stream pb.S3DataStore_WatchClient, msg chan *pbQPU.O
 			errs <- err
 		}
 		done <- false
-		msg <- &pbQPU.Operation{
+		outOp := &pbQPU.Operation{
 			Key: op.Operation.Object.Key,
 			Op:  op.Operation.Op,
 			Object: &pbQPU.Object{
@@ -60,6 +61,12 @@ func (ds S3DataStore) watch(stream pb.S3DataStore_WatchClient, msg chan *pbQPU.O
 				},
 			},
 		}
+		for attrK := range op.Operation.Object.Attributes {
+			if strings.HasPrefix(attrK, "x-amz-meta-") && strings.Compare(attrK, "x-amz-meta-s3cmd-attrs") != 0 {
+				outOp.Object.Attributes["x-amz-meta"] = utils.ValStr(strings.TrimPrefix(attrK, "x-amz-meta-") + "-" + op.Operation.Object.Attributes[attrK].GetStringValue())
+			}
+		}
+		msg <- outOp
 	}
 }
 
@@ -108,13 +115,38 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 	xml.Unmarshal(body, &res)
 
 	for _, r := range res.Contents {
-		done <- false
-		msg <- &pbQPU.Object{
+		buff := bytes.NewBuffer([]byte{})
+		requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, ds.bucketName, r.Key)
+		request, err = http.NewRequest("HEAD", requestURL, buff)
+		if err != nil {
+			done <- true
+			errs <- err
+			return
+		}
+		reader := bytes.NewReader(buff.Bytes())
+		signer.Sign(request, reader, "s3", "us-east-1", time.Now())
+
+		resp, err = client.Do(request)
+		if err != nil {
+			done <- true
+			errs <- err
+			return
+		}
+
+		outObject := &pbQPU.Object{
 			Key: r.Key,
 			Attributes: map[string]*pbQPU.Value{
 				"size": utils.ValInt(r.Size),
 			},
 		}
+		for k := range resp.Header {
+			if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
+				outObject.Attributes["x-amz-meta"] = utils.ValStr(strings.TrimPrefix(strings.ToLower(k), "x-amz-meta-") + "-" + strings.ToLower(resp.Header[k][0]))
+			}
+		}
+
+		done <- false
+		msg <- outObject
 	}
 	done <- true
 	errs <- nil

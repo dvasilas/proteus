@@ -9,6 +9,7 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	utils "github.com/dimitriosvasilas/modqp"
@@ -101,7 +102,21 @@ func NewServer(qType string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, dsClient: c, index: index.New("size", 0, 2048)}
+		if conf.Config.IndexType == "int" {
+			lb, err := strconv.ParseInt(conf.Config.LBound, 10, 64)
+			if err != nil {
+				return errors.New("Upper bound in index configuration is not int")
+			}
+			ub, err := strconv.ParseInt(conf.Config.UBound, 10, 64)
+			if err != nil {
+				return errors.New("Upper bound in index configuration is not int")
+			}
+			server = Server{config: conf, dsClient: c, index: index.NewIndexI(conf.Config.Attribute, lb, ub)}
+		} else if conf.Config.IndexType == "string" {
+			server = Server{config: conf, dsClient: c, index: index.NewIndexS(conf.Config.Attribute, conf.Config.LBound, conf.Config.UBound)}
+		} else {
+			return errors.New("Unknown index type in index configuration")
+		}
 
 		stream, cancel, err := c.SubscribeOps(time.Now().UnixNano())
 		if err != nil {
@@ -162,7 +177,7 @@ func (s *Server) opConsumer(stream pbDsQPU.DataStore_SubscribeOpsClient, cancel 
 			}).Fatalf("opConsumer failed")
 			return
 		}
-		if err := s.index.Update(streamMsg.Operation); err != nil {
+		if err := index.Update(s.index, streamMsg.Operation); err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
 			}).Fatalf("opConsumer failed")
@@ -203,7 +218,7 @@ func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient,
 			Op:     "catchUp",
 			Object: streamMsg.Object,
 		}
-		if err := s.index.Update(op); err != nil {
+		if err := index.Update(s.index, op); err != nil {
 			errs <- err
 			return
 		}

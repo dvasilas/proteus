@@ -43,6 +43,8 @@ func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
 		query = map[string][2]*pbQPU.Value{attr: {utils.ValInt(lbound), utils.ValInt(ubound)}}
 	} else if attr == "key" {
 		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
+	} else if attr == "x-amz-meta" {
+		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
 	}
 	errs <- sendQuery(query, c)
 }

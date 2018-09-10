@@ -5,26 +5,40 @@ import (
 	"github.com/google/btree"
 )
 
-//Entry ...
-type Entry struct {
+//EntryI ...
+type EntryI struct {
 	Value    int64
 	Postings map[string]pbQPU.Object
 }
 
 //Less ...
-func (x Entry) Less(than btree.Item) bool {
-	return x.Value < than.(Entry).Value
+func (x EntryI) Less(than btree.Item) bool {
+	return x.Value < than.(EntryI).Value
+}
+
+//EntryS ...
+type EntryS struct {
+	Value    string
+	Postings map[string]pbQPU.Object
+}
+
+//Less ...
+func (x EntryS) Less(than btree.Item) bool {
+	if x.Value < than.(EntryS).Value {
+		return true
+	}
+	return false
 }
 
 //Index ...
 type Index interface {
+	filterIndexable(op *pbQPU.Operation) bool
 	put(op *pbQPU.Operation) error
 	Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error)
-	Update(op *pbQPU.Operation) error
 }
 
-//BTreeIndex ...
-type BTreeIndex struct {
+//BTreeIndexI ...
+type BTreeIndexI struct {
 	attribute string
 	lbound    int64
 	ubound    int64
@@ -32,10 +46,19 @@ type BTreeIndex struct {
 	state     map[string]pbQPU.Object
 }
 
-//New initializes a new BTreeIndex struct.
+//BTreeIndexS ...
+type BTreeIndexS struct {
+	attribute string
+	lbound    string
+	ubound    string
+	entries   *btree.BTree
+	state     map[string]pbQPU.Object
+}
+
+//NewIndexI initializes a new BTreeIndex struct.
 //It returns a pointer to the BTreeIndex struct.
-func New(attr string, lb int64, ub int64) *BTreeIndex {
-	return &BTreeIndex{
+func NewIndexI(attr string, lb int64, ub int64) *BTreeIndexI {
+	return &BTreeIndexI{
 		attribute: attr,
 		lbound:    lb,
 		ubound:    ub,
@@ -44,15 +67,34 @@ func New(attr string, lb int64, ub int64) *BTreeIndex {
 	}
 }
 
-func (i *BTreeIndex) opToEntry(op *pbQPU.Operation) Entry {
-	return Entry{Value: op.Object.Attributes[i.attribute].GetInt()}
+//NewIndexS ...
+func NewIndexS(attr string, lb string, ub string) *BTreeIndexS {
+	return &BTreeIndexS{
+		attribute: attr,
+		lbound:    lb,
+		ubound:    ub,
+		entries:   btree.New(2),
+		state:     make(map[string]pbQPU.Object),
+	}
 }
 
-func (i *BTreeIndex) boundToEntry(b *pbQPU.Value) Entry {
-	return Entry{Value: b.GetInt()}
+func (i *BTreeIndexI) opToEntry(op *pbQPU.Operation) EntryI {
+	return EntryI{Value: op.Object.Attributes[i.attribute].GetInt()}
 }
 
-func (i *BTreeIndex) filterIndexable(op *pbQPU.Operation) bool {
+func (i *BTreeIndexI) boundToEntry(b *pbQPU.Value) EntryI {
+	return EntryI{Value: b.GetInt()}
+}
+
+func (i *BTreeIndexS) opToEntry(op *pbQPU.Operation) EntryS {
+	return EntryS{Value: op.Object.Attributes[i.attribute].GetName()}
+}
+
+func (i *BTreeIndexS) boundToEntry(b *pbQPU.Value) EntryS {
+	return EntryS{Value: b.GetName()}
+}
+
+func (i *BTreeIndexI) filterIndexable(op *pbQPU.Operation) bool {
 	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
 		if attrValue.GetInt() > i.lbound && attrValue.GetInt() <= i.ubound {
 			return true
@@ -61,9 +103,18 @@ func (i *BTreeIndex) filterIndexable(op *pbQPU.Operation) bool {
 	return false
 }
 
+func (i *BTreeIndexS) filterIndexable(op *pbQPU.Operation) bool {
+	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
+		if (attrValue.GetName() > i.lbound || i.lbound == "any") && (attrValue.GetName() <= i.ubound || i.ubound == "any") {
+			return true
+		}
+	}
+	return false
+}
+
 //Update updates the index based on a given datastore operation.
 //It returns any error encountered.
-func (i *BTreeIndex) Update(op *pbQPU.Operation) error {
+func Update(i Index, op *pbQPU.Operation) error {
 	if i.filterIndexable(op) {
 		if err := i.put(op); err != nil {
 			return err
@@ -72,19 +123,42 @@ func (i *BTreeIndex) Update(op *pbQPU.Operation) error {
 	return nil
 }
 
-func (i *BTreeIndex) removeOldEntry(op *pbQPU.Operation) {
+func (i *BTreeIndexI) removeOldEntry(op *pbQPU.Operation) {
 	if s, ok := i.state[(*op.Object).Key]; ok {
-		item := i.entries.Get(Entry{Value: s.Attributes[i.attribute].GetInt()})
-		delete(item.(Entry).Postings, s.Key)
+		item := i.entries.Get(EntryI{Value: s.Attributes[i.attribute].GetInt()})
+		delete(item.(EntryI).Postings, s.Key)
 	}
 }
 
-func (i *BTreeIndex) put(op *pbQPU.Operation) error {
+func (i *BTreeIndexS) removeOldEntry(op *pbQPU.Operation) {
+	if s, ok := i.state[(*op.Object).Key]; ok {
+		item := i.entries.Get(EntryS{Value: s.Attributes[i.attribute].GetName()})
+		delete(item.(EntryS).Postings, s.Key)
+	}
+}
+
+func (i *BTreeIndexI) put(op *pbQPU.Operation) error {
 	i.removeOldEntry(op)
 	entry := i.opToEntry(op)
 	if i.entries.Has(entry) {
 		item := i.entries.Get(entry)
-		item.(Entry).Postings[(*op.Object).Key] = *op.Object
+		item.(EntryI).Postings[(*op.Object).Key] = *op.Object
+		i.entries.ReplaceOrInsert(item)
+	} else {
+		entry.Postings = make(map[string]pbQPU.Object)
+		entry.Postings[(*op.Object).Key] = *op.Object
+		i.entries.ReplaceOrInsert(entry)
+	}
+	i.state[(*op.Object).Key] = *op.Object
+	return nil
+}
+
+func (i *BTreeIndexS) put(op *pbQPU.Operation) error {
+	i.removeOldEntry(op)
+	entry := i.opToEntry(op)
+	if i.entries.Has(entry) {
+		item := i.entries.Get(entry)
+		item.(EntryS).Postings[(*op.Object).Key] = *op.Object
 		i.entries.ReplaceOrInsert(item)
 	} else {
 		entry.Postings = make(map[string]pbQPU.Object)
@@ -97,17 +171,39 @@ func (i *BTreeIndex) put(op *pbQPU.Operation) error {
 
 //Get performs and index lookup based on a given query predicate.
 //It returns the retrieved objects and any error encountered.
-func (i *BTreeIndex) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
+func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
 	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
 		entry := i.boundToEntry(p[0].Lbound)
 		if i.entries.Has(entry) {
 			item := i.entries.Get(entry)
-			return item.(Entry).Postings, true, nil
+			return item.(EntryI).Postings, true, nil
 		}
 	} else {
 		res := make(map[string]pbQPU.Object)
 		it := func(item btree.Item) bool {
-			for _, o := range item.(Entry).Postings {
+			for _, o := range item.(EntryI).Postings {
+				res[o.Key] = o
+			}
+			return true
+		}
+		i.entries.AscendRange(i.boundToEntry(p[0].Lbound), i.boundToEntry(p[0].Ubound), it)
+		return res, true, nil
+	}
+	return nil, false, nil
+}
+
+//Get ...
+func (i *BTreeIndexS) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
+	if p[0].Lbound.GetName() == p[0].Ubound.GetName() {
+		entry := i.boundToEntry(p[0].Lbound)
+		if i.entries.Has(entry) {
+			item := i.entries.Get(entry)
+			return item.(EntryS).Postings, true, nil
+		}
+	} else {
+		res := make(map[string]pbQPU.Object)
+		it := func(item btree.Item) bool {
+			for _, o := range item.(EntryS).Postings {
 				res[o.Key] = o
 			}
 			return true
