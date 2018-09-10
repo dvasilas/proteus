@@ -3,7 +3,13 @@
     "hostname": "localhost",
     "port": "50055",
     "conns": [{
-        "hostname": "host.docker.internal",
+        "hostname": "127.0.0.1",
         "port": "50052"
-    }]
+    }],
+    "config": {
+        "indexType": "string",
+        "attribute": "x-amz-meta",
+        "lBound": "any",
+        "uBound": "any"
+    }
 }
