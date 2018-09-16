@@ -1,0 +1,51 @@
+{
+    "qpuType": "dispatch",
+    "port": "50552",
+    "conns": [
+    {
+        "dataSet": {
+            "db": 1,
+            "replica": 1,
+            "shard": 1
+        },
+        "endpoint": "127.0.0.1:50350",
+        "qpuType": "index",
+        "config": {
+            "datatype": "int",
+            "attribute": "size",
+            "lbound": "0",
+            "ubound": "2028"
+            }
+    },
+    {
+        "dataSet": {
+            "db": 1,
+            "replica": 1,
+            "shard": 2
+        },
+        "endpoint": "127.0.0.1:50351",
+        "qpuType": "index",
+        "config": {
+            "datatype": "int",
+            "attribute": "size",
+            "lbound": "0",
+            "ubound": "1024"
+        }
+    },
+    {
+        "dataSet": {
+            "db": 1,
+            "replica": 1,
+            "shard": 2
+        },
+        "endpoint": "127.0.0.1:50352",
+        "qpuType": "index",
+        "config": {
+            "datatype": "int",
+            "attribute": "size",
+            "lbound": "1024",
+            "ubound": "2028"
+        }
+    }
+    ]
+}

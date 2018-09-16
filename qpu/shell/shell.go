@@ -8,22 +8,29 @@ import (
 
 	"github.com/abiosoft/ishell"
 	utils "github.com/dimitriosvasilas/modqp"
+	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	log "github.com/sirupsen/logrus"
 )
 
-func queryConsumer(msg chan *pbQPU.Object, done chan bool, errs chan error) error {
+func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error) error {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errs
 			return err
 		}
 		res := <-msg
-		log.WithFields(log.Fields{
-			"key":  res.Key,
-			"size": res.Attributes["size"].GetInt(),
-		}).Infof("result")
+		logMsg := log.Fields{
+			"key":     res.GetObject().GetKey(),
+			"dataset": res.GetDataset(),
+		}
+		for attr := range query {
+			if attr == "size" {
+				logMsg[attr] = res.GetObject().GetAttributes()[attr].GetInt()
+			}
+		}
+		log.WithFields(logMsg).Infof("result")
 	}
 }
 
@@ -50,12 +57,12 @@ func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
 }
 
 func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
-	msg := make(chan *pbQPU.Object)
+	msg := make(chan *pb.QueryResultStream)
 	done := make(chan bool)
 	errs := make(chan error)
 
 	go c.Find(time.Now().UnixNano(), query, msg, done, errs)
-	return queryConsumer(msg, done, errs)
+	return queryConsumer(query, msg, done, errs)
 }
 
 func main() {

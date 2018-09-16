@@ -16,7 +16,7 @@ type Client struct {
 }
 
 //Find ...
-func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *pbQPU.Object, done chan bool, errs chan error) {
+func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -44,7 +44,7 @@ func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *
 			errs <- err
 		}
 		done <- false
-		msg <- streamMsg.Object
+		msg <- streamMsg
 	}
 }
 

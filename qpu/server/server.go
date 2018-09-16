@@ -30,11 +30,12 @@ import (
 
 //Server ...
 type Server struct {
-	config   utils.QPUConfig
-	dConn    []utils.DownwardConn
-	dsClient dSQPUcli.Client
-	cache    *cache.Cache
-	index    index.Index
+	config       utils.QPUConfig
+	dispatchConn utils.DownwardConns
+	cacheConn    utils.QPUConn
+	dsClient     dSQPUcli.Client
+	cache        *cache.Cache
+	index        index.Index
 }
 
 func getConfig(qType string) (utils.QPUConfig, error) {
@@ -58,6 +59,7 @@ func getConfig(qType string) (utils.QPUConfig, error) {
 	_, f, _, _ := runtime.Caller(0)
 	basepath := filepath.Dir(f)
 	viper.AddConfigPath(basepath + "/../../conf")
+	viper.AddConfigPath(basepath + "/../../conf/local")
 	viper.SetConfigType("json")
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -83,26 +85,25 @@ func NewServer(qType string) error {
 	if err != nil {
 		return err
 	}
-
 	var server Server
 	if conf.QpuType == "scan" {
-		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
+		c, _, err := dSQPUcli.NewClient(conf.Conns[0].EndPoint)
 		if err != nil {
 			return err
 		}
 		server = Server{config: conf, dsClient: c}
 	} else if conf.QpuType == "cache" {
-		c, _, err := cli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
+		c, _, err := cli.NewClient(conf.Conns[0].EndPoint)
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, dConn: utils.NewDConnClient(c), cache: cache.New(10)}
+		server = Server{config: conf, cacheConn: utils.NewQPUConn(c), cache: cache.New(10)}
 	} else if conf.QpuType == "index" {
-		c, _, err := dSQPUcli.NewClient(conf.Conns[0].Hostname + ":" + conf.Conns[0].Port)
+		c, _, err := dSQPUcli.NewClient(conf.Conns[0].EndPoint)
 		if err != nil {
 			return err
 		}
-		if conf.Config.IndexType == "int" {
+		if conf.Config.DataType == "int" {
 			lb, err := strconv.ParseInt(conf.Config.LBound, 10, 64)
 			if err != nil {
 				return errors.New("Upper bound in index configuration is not int")
@@ -112,7 +113,7 @@ func NewServer(qType string) error {
 				return errors.New("Upper bound in index configuration is not int")
 			}
 			server = Server{config: conf, dsClient: c, index: index.NewIndexI(conf.Config.Attribute, lb, ub)}
-		} else if conf.Config.IndexType == "string" {
+		} else if conf.Config.DataType == "string" {
 			server = Server{config: conf, dsClient: c, index: index.NewIndexS(conf.Config.Attribute, conf.Config.LBound, conf.Config.UBound)}
 		} else {
 			return errors.New("Unknown index type in index configuration")
@@ -133,7 +134,7 @@ func NewServer(qType string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, dConn: downwardsConns}
+		server = Server{config: conf, dispatchConn: downwardsConns}
 	}
 
 	s := grpc.NewServer()
@@ -151,14 +152,14 @@ func NewServer(qType string) error {
 	return s.Serve(lis)
 }
 
-func (s *Server) findResultConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pbQPU.Object, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (s *Server) findResultConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errFind
 			errs <- err
 		}
 		streamMsg := <-msg
-		if err := process(streamMsg, pred, stream); err != nil {
+		if err := process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, stream); err != nil {
 			errs <- err
 		}
 	}
@@ -186,7 +187,7 @@ func (s *Server) opConsumer(stream pbDsQPU.DataStore_SubscribeOpsClient, cancel 
 	}
 }
 
-func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.DataStore_GetSnapshotClient, streamTo pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.DataStore_GetSnapshotClient, streamTo pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
 	for {
 		streamMsg, err := streamFrom.Recv()
 		if err == io.EOF {
@@ -196,7 +197,7 @@ func (s *Server) snapshotConsumer(pred []*pbQPU.Predicate, streamFrom pbDsQPU.Da
 			errs <- err
 			return
 		}
-		if err = process(streamMsg.Object, pred, streamTo); err != nil {
+		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamTo); err != nil {
 			errs <- err
 			return
 		}
@@ -214,9 +215,10 @@ func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient,
 			return
 		}
 		op := &pbQPU.Operation{
-			Key:    streamMsg.Object.Key,
-			Op:     "catchUp",
-			Object: streamMsg.Object,
+			Key:     streamMsg.GetObject().GetKey(),
+			Op:      "catchUp",
+			Object:  streamMsg.GetObject(),
+			DataSet: streamMsg.GetDataset(),
 		}
 		if err := index.Update(s.index, op); err != nil {
 			errs <- err
@@ -240,7 +242,7 @@ func (s *Server) indexCatchUp() error {
 
 //Find ...
 func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
-	msg := make(chan *pbQPU.Object)
+	msg := make(chan *pb.QueryResultStream)
 	done := make(chan bool)
 	errs := make(chan error)
 
@@ -260,7 +262,7 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 				"cache entry": cachedResult,
 			}).Info("cache hit, responding")
 			for _, item := range cachedResult {
-				if err := streamTo.Send(&pb.QueryResultStream{Object: &item}); err != nil {
+				if err := streamTo.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
 					return err
 				}
 			}
@@ -270,7 +272,7 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
 		go s.findResultConsumer(in.Predicate, streamTo, msg, done, errs1, errs, s.cache.StoreAndRespond)
-		go s.dConn[0].Client.Find(in.Timestamp, pred, msg, done, errs1)
+		go s.cacheConn.Client.Find(in.Timestamp, pred, msg, done, errs1)
 
 		err := <-errs
 		return err
@@ -281,23 +283,48 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		}
 		if found {
 			for _, item := range indexResult {
-				if err := streamTo.Send(&pb.QueryResultStream{Object: &item}); err != nil {
+				log.WithFields(log.Fields{
+					"entry": indexResult,
+				}).Info("index lookup")
+				if err := streamTo.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	} else if s.config.QpuType == "dispatch" {
-		client, err := dispatch.ForwardQuery(s.dConn, *in.Predicate[0])
+		clients, err := dispatch.ForwardQuery(s.dispatchConn, *in.Predicate[0])
 		if err != nil {
 			return err
 		}
-		errs1 := make(chan error)
+
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
-		go s.findResultConsumer(in.Predicate, streamTo, msg, done, errs1, errs, dispatch.ForwardResponse)
-		go client.Find(in.Timestamp, pred, msg, done, errs1)
-		<-errs
+		/*
+			var done [len(clients)]chan bool
+			var errs []chan error
+			var errs1 []chan error
+
+		*/
+		done := make([]chan bool, len(clients))
+		errs := make([]chan error, len(clients))
+		errs1 := make([]chan error, len(clients))
+		for i := range clients {
+			done[i] = make(chan bool)
+			errs[i] = make(chan error)
+			errs1[i] = make(chan error)
+		}
+		for i, c := range clients {
+			go s.findResultConsumer(in.Predicate, streamTo, msg, done[i], errs1[i], errs[i], dispatch.ForwardResponse)
+			go c.Find(in.Timestamp, pred, msg, done[i], errs1[i])
+			time.Sleep(time.Millisecond * 100)
+		}
+		for _, e := range errs {
+			err = <-e
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	return errors.New("QPU Type not known")

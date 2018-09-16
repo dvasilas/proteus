@@ -5,10 +5,16 @@ import (
 	"github.com/google/btree"
 )
 
+//Posting ...
+type Posting struct {
+	Object  pbQPU.Object
+	Dataset pbQPU.DataSet
+}
+
 //EntryI ...
 type EntryI struct {
 	Value    int64
-	Postings map[string]pbQPU.Object
+	Postings map[string]Posting
 }
 
 //Less ...
@@ -19,7 +25,7 @@ func (x EntryI) Less(than btree.Item) bool {
 //EntryS ...
 type EntryS struct {
 	Value    string
-	Postings map[string]pbQPU.Object
+	Postings map[string]Posting
 }
 
 //Less ...
@@ -34,7 +40,7 @@ func (x EntryS) Less(than btree.Item) bool {
 type Index interface {
 	filterIndexable(op *pbQPU.Operation) bool
 	put(op *pbQPU.Operation) error
-	Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error)
+	Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error)
 }
 
 //BTreeIndexI ...
@@ -142,11 +148,11 @@ func (i *BTreeIndexI) put(op *pbQPU.Operation) error {
 	entry := i.opToEntry(op)
 	if i.entries.Has(entry) {
 		item := i.entries.Get(entry)
-		item.(EntryI).Postings[(*op.Object).Key] = *op.Object
+		item.(EntryI).Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
 		i.entries.ReplaceOrInsert(item)
 	} else {
-		entry.Postings = make(map[string]pbQPU.Object)
-		entry.Postings[(*op.Object).Key] = *op.Object
+		entry.Postings = make(map[string]Posting)
+		entry.Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
 		i.entries.ReplaceOrInsert(entry)
 	}
 	i.state[(*op.Object).Key] = *op.Object
@@ -158,11 +164,11 @@ func (i *BTreeIndexS) put(op *pbQPU.Operation) error {
 	entry := i.opToEntry(op)
 	if i.entries.Has(entry) {
 		item := i.entries.Get(entry)
-		item.(EntryS).Postings[(*op.Object).Key] = *op.Object
+		item.(EntryS).Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
 		i.entries.ReplaceOrInsert(item)
 	} else {
-		entry.Postings = make(map[string]pbQPU.Object)
-		entry.Postings[(*op.Object).Key] = *op.Object
+		entry.Postings = make(map[string]Posting)
+		entry.Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
 		i.entries.ReplaceOrInsert(entry)
 	}
 	i.state[(*op.Object).Key] = *op.Object
@@ -171,7 +177,7 @@ func (i *BTreeIndexS) put(op *pbQPU.Operation) error {
 
 //Get performs and index lookup based on a given query predicate.
 //It returns the retrieved objects and any error encountered.
-func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
+func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error) {
 	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
 		entry := i.boundToEntry(p[0].Lbound)
 		if i.entries.Has(entry) {
@@ -179,10 +185,10 @@ func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, 
 			return item.(EntryI).Postings, true, nil
 		}
 	} else {
-		res := make(map[string]pbQPU.Object)
+		res := make(map[string]Posting)
 		it := func(item btree.Item) bool {
-			for _, o := range item.(EntryI).Postings {
-				res[o.Key] = o
+			for _, p := range item.(EntryI).Postings {
+				res[p.Object.GetKey()] = p
 			}
 			return true
 		}
@@ -193,7 +199,7 @@ func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, 
 }
 
 //Get ...
-func (i *BTreeIndexS) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, error) {
+func (i *BTreeIndexS) Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error) {
 	if p[0].Lbound.GetName() == p[0].Ubound.GetName() {
 		entry := i.boundToEntry(p[0].Lbound)
 		if i.entries.Has(entry) {
@@ -201,10 +207,10 @@ func (i *BTreeIndexS) Get(p []*pbQPU.Predicate) (map[string]pbQPU.Object, bool, 
 			return item.(EntryS).Postings, true, nil
 		}
 	} else {
-		res := make(map[string]pbQPU.Object)
+		res := make(map[string]Posting)
 		it := func(item btree.Item) bool {
-			for _, o := range item.(EntryS).Postings {
-				res[o.Key] = o
+			for _, p := range item.(EntryS).Postings {
+				res[p.Object.GetKey()] = p
 			}
 			return true
 		}

@@ -1,12 +1,16 @@
 {
-    "hostname": "localhost",
-    "port": "50052",
+    "port": "50151",
     "dataStore": {
+        "dataSet": {
+            "db": 1,
+            "replica": 1,
+            "shard": 2
+        },
         "type": "s3",
-        "dataDir": "/",
+        "dataDir": "/cloudserver",
         "ΑwsAccessKeyId": "accessKey1",
         "awsSecretAccessKey": "verySecretKey1",
-        "endpoint": "http://localhost:8000",
+        "endpoint": "http://localhost:8001",
         "bucketName": "buck",
         "logStreamEndpoint": "localhost:50051"
     }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"net"
 	"path/filepath"
 	"runtime"
@@ -24,9 +25,13 @@ type dataStore interface {
 
 //Config ...
 type Config struct {
-	Hostname  string
 	Port      string
 	DataStore struct {
+		DataSet struct {
+			DB      int
+			Replica int
+			Shard   int
+		}
 		Type               string
 		DataDir            string
 		ΑwsAccessKeyID     string
@@ -39,19 +44,31 @@ type Config struct {
 
 //Server ...
 type Server struct {
-	ds dataStore
+	ds     dataStore
+	config Config
 }
 
-func getConfig() (Config, error) {
+func getConfig(confFArg string) (Config, error) {
 	var conf Config
 	viper.AutomaticEnv()
 	err := viper.BindEnv("HOME")
 	if err != nil {
 		return conf, err
 	}
+	var confFile string
+	if confFArg == "noArg" {
+		confF := viper.Get("DS_CONFIG_FILE")
+		if confF == nil {
+			return conf, errors.New("QPU config file not specified")
+		}
+		confFile = confF.(string)
+	} else {
+		confFile = confFArg
+	}
+
 	_, f, _, _ := runtime.Caller(0)
 	basepath := filepath.Dir(f)
-	viper.SetConfigName("dataStore")
+	viper.SetConfigName(confFile)
 	viper.AddConfigPath(basepath + "/../../conf")
 	viper.SetConfigType("json")
 	if err = viper.ReadInConfig(); err != nil {
@@ -72,22 +89,22 @@ func getConfig() (Config, error) {
 }
 
 //ΝewServer ...
-func ΝewServer() error {
-	conf, err := getConfig()
+func ΝewServer(confFile string) error {
+	conf, err := getConfig(confFile)
 	if err != nil {
 		return err
 	}
 
 	var server Server
 	if conf.DataStore.Type == "fs" {
-		server = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}
+		server = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir), config: conf}
 	} else if conf.DataStore.Type == "s3" {
-		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName, conf.DataStore.LogStreamEndpoint)}
+		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName, conf.DataStore.LogStreamEndpoint), config: conf}
 	} else {
 		return errors.New("Unknown dataStore type")
 	}
 
-	lis, err := net.Listen("tcp", conf.Hostname+":"+conf.Port)
+	lis, err := net.Listen("tcp", ":"+conf.Port)
 	if err != nil {
 		return err
 	}
@@ -102,7 +119,7 @@ func ΝewServer() error {
 	return s.Serve(lis)
 }
 
-func snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
+func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errsFrom
@@ -110,14 +127,22 @@ func snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg chan *pbQPU
 			return
 		}
 		obj := <-msg
-		if err := stream.Send(&pb.StateStream{Object: obj}); err != nil {
+		toSend := &pb.StateStream{
+			Object: obj,
+			Dataset: &pbQPU.DataSet{
+				Db:      int64(s.config.DataStore.DataSet.DB),
+				Replica: int64(s.config.DataStore.DataSet.Replica),
+				Shard:   int64(s.config.DataStore.DataSet.Shard),
+			},
+		}
+		if err := stream.Send(toSend); err != nil {
 			errs <- err
 			return
 		}
 	}
 }
 
-func opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
+func (s *Server) opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errsFrom
@@ -125,7 +150,12 @@ func opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operati
 			return
 		}
 		op := <-msg
-		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+		ds := &pbQPU.DataSet{
+			Db:      int64(s.config.DataStore.DataSet.DB),
+			Replica: int64(s.config.DataStore.DataSet.Replica),
+			Shard:   int64(s.config.DataStore.DataSet.Shard),
+		}
+		if err := stream.Send(&pb.OpStream{Operation: op, Dataset: ds}); err != nil {
 			errs <- err
 			return
 		}
@@ -144,7 +174,7 @@ func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOp
 	errs := make(chan error)
 	errs1 := make(chan error)
 
-	go opsConsumer(stream, msg, done, errs, errs1)
+	go s.opsConsumer(stream, msg, done, errs, errs1)
 	go s.ds.SubscribeOps(msg, done, errs)
 
 	err := <-errs1
@@ -157,8 +187,7 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotS
 	done := make(chan bool)
 	errs := make(chan error)
 	errs1 := make(chan error)
-
-	go snapshotConsumer(stream, msg, done, errs, errs1)
+	go s.snapshotConsumer(stream, msg, done, errs, errs1)
 	go s.ds.GetSnapshot(msg, done, errs)
 
 	err := <-errs1
@@ -166,7 +195,10 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotS
 }
 
 func main() {
-	err := ΝewServer()
+	var confFile string
+	flag.StringVar(&confFile, "conf", "noArg", "configuration file to be used")
+	flag.Parse()
+	err := ΝewServer(confFile)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,

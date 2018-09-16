@@ -16,4 +16,5 @@ message FindRequest {
 
 message QueryResultStream {
     utils.Object object = 1;
+    utils.DataSet dataset = 2;
 }

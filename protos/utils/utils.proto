@@ -20,7 +20,8 @@ message Operation {
     string key = 1;
     string op = 2;
     Object object = 3;
-    int64 timestamp = 4;
+    DataSet dataSet = 4;
+    int64 timestamp = 5;
 }
 
 message FindRequest {
@@ -34,6 +35,8 @@ message Predicate {
     Value ubound = 3;
 }
 
-message QueryResultStream {
-    Object object = 1;
+message DataSet {
+    int64 db = 1;
+    int64 replica = 2;
+    int64 shard = 3;
 }

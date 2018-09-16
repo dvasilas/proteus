@@ -83,7 +83,7 @@ func TestPredicateToString(t *testing.T) {
 func TestGet(t *testing.T) {
 	for _, tt := range getTests {
 		cache := New(1)
-		cache.put(tt.toAdd, pbQPU.Object{})
+		cache.put(tt.toAdd, pbQPU.Object{}, pbQPU.DataSet{})
 		_, hit := cache.Get(tt.toGet)
 		assert.Equal(t, hit, tt.expectedHit, "")
 	}
@@ -91,7 +91,7 @@ func TestGet(t *testing.T) {
 
 func TestEvict(t *testing.T) {
 	var evicted [][]*pbQPU.Predicate
-	onEvictF := func(key []*pbQPU.Predicate, value []pbQPU.Object) {
+	onEvictF := func(key []*pbQPU.Predicate, value []CachedValue) {
 		evicted = append(evicted, key)
 	}
 	cache := New(10)
@@ -103,7 +103,7 @@ func TestEvict(t *testing.T) {
 				Lbound:    utils.ValInt(0),
 				Ubound:    utils.ValInt(0),
 			},
-		}, pbQPU.Object{})
+		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
 	assert.Equal(t, evicted[0][0].Attribute, "attr0", "")
 	assert.Equal(t, evicted[1][0].Attribute, "attr1", "")
@@ -111,7 +111,7 @@ func TestEvict(t *testing.T) {
 
 func TestEvictLRU(t *testing.T) {
 	var evicted [][]*pbQPU.Predicate
-	onEvictF := func(key []*pbQPU.Predicate, value []pbQPU.Object) {
+	onEvictF := func(key []*pbQPU.Predicate, value []CachedValue) {
 		evicted = append(evicted, key)
 	}
 	cache := New(10)
@@ -123,7 +123,7 @@ func TestEvictLRU(t *testing.T) {
 				Lbound:    utils.ValInt(0),
 				Ubound:    utils.ValInt(0),
 			},
-		}, pbQPU.Object{})
+		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
 	_, _ = cache.Get([]*pbQPU.Predicate{
 		{
@@ -146,7 +146,7 @@ func TestEvictLRU(t *testing.T) {
 				Lbound:    utils.ValInt(0),
 				Ubound:    utils.ValInt(0),
 			},
-		}, pbQPU.Object{})
+		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
 	assert.Equal(t, evicted[0][0].Attribute, "attr2", "")
 	assert.Equal(t, evicted[1][0].Attribute, "attr3", "")

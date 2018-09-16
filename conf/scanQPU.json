@@ -1,9 +1,0 @@
-{
-    "qpuType": "scan",
-    "hostname": "localhost",
-    "port": "50053",
-    "conns": [{
-            "hostname": "host.docker.internal",
-            "port": "50052"
-        }]
-}

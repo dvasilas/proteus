@@ -1,0 +1,7 @@
+{
+    "qpuType": "cache",
+    "port": "50451",
+    "conns": [{
+        "endpoint": "localhost:50251"
+    }]
+}

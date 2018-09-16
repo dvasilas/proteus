@@ -14,12 +14,18 @@ type Cache struct {
 	MaxEntries int
 	ll         *list.List
 	items      map[string]*list.Element
-	OnEvict    func(key []*pbQPU.Predicate, value []pbQPU.Object)
+	OnEvict    func(key []*pbQPU.Predicate, value []CachedValue)
 }
 
 type entry struct {
 	key   []*pbQPU.Predicate
-	value []pbQPU.Object
+	value []CachedValue
+}
+
+//CachedValue ...
+type CachedValue struct {
+	Object  pbQPU.Object
+	Dataset pbQPU.DataSet
 }
 
 //New initializes a new Cache struct.
@@ -34,14 +40,17 @@ func New(maxEntries int) *Cache {
 
 //StoreAndRespond stores an entry in the cache and forwards then this object through the given stream.
 //It returns any error encountered.
-func (c *Cache) StoreAndRespond(obj *pbQPU.Object, in []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
-	if err := c.put(in, *obj); err != nil {
+func (c *Cache) StoreAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+	if err := c.put(in, *obj, *ds); err != nil {
 		return err
 	}
-	return stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+	return stream.Send(&pb.QueryResultStream{
+		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
+		Dataset: ds,
+	})
 }
 
-func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
+func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object, ds pbQPU.DataSet) error {
 	if c.items == nil {
 		c.ll = list.New()
 		c.items = make(map[string]*list.Element)
@@ -49,9 +58,9 @@ func (c *Cache) put(query []*pbQPU.Predicate, obj pbQPU.Object) error {
 	key := predicateToKey(query)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
-		item.Value.(*entry).value = append(item.Value.(*entry).value, obj)
+		item.Value.(*entry).value = append(item.Value.(*entry).value, CachedValue{Object: obj, Dataset: ds})
 	} else {
-		item := c.ll.PushFront(&entry{query, []pbQPU.Object{obj}})
+		item := c.ll.PushFront(&entry{key: query, value: []CachedValue{CachedValue{Object: obj, Dataset: ds}}})
 		c.items[key] = item
 		if c.ll.Len() > c.MaxEntries {
 			c.evict()
@@ -79,7 +88,7 @@ func (c *Cache) evict() error {
 
 //Get retrieves a cached entry based on the given query predicate.
 //It returns the cached objects stored in that entry.
-func (c *Cache) Get(p []*pbQPU.Predicate) ([]pbQPU.Object, bool) {
+func (c *Cache) Get(p []*pbQPU.Predicate) ([]CachedValue, bool) {
 	if c.items == nil {
 		return nil, false
 	}
