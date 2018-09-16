@@ -37,7 +37,7 @@ func (m *DataStoreQPUSubscribeOpsServer) Send(op *pb.OpStream) error {
 
 func TestMain(m *testing.M) {
 	var err error
-	if conf, err = getConfig(); err != nil {
+	if conf, err = getConfig("scanQPU.1"); err != nil {
 		return
 	}
 	s = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}

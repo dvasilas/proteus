@@ -1,0 +1,13 @@
+{
+    "qpuType": "index",
+    "port": "50352",
+    "conns": [{
+        "endpoint": "localhost:50151"
+    }],
+    "config": {
+        "dataType": "int",
+        "attribute": "size",
+        "lBound": "1024",
+        "uBound": "2048"
+    }
+}

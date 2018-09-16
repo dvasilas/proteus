@@ -1,9 +1,0 @@
-{
-    "qpuType": "cache",
-    "hostname": "localhost",
-    "port": "50054",
-    "conns": [{
-        "hostname": "scan.qpu.com",
-        "port": "50053"
-    }]
-}

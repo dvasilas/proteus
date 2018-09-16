@@ -22,9 +22,12 @@ func noMatch(obj *pbQPU.Object) bool {
 
 //Forward sends an object through an upstream stream if it matches the given predicate.
 //It returns any error encountered.
-func Forward(obj *pbQPU.Object, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+func Forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
 	if Filter(obj, pred) {
-		return stream.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp}})
+		return stream.Send(&pb.QueryResultStream{
+			Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
+			Dataset: ds,
+		})
 	}
 	return nil
 }
