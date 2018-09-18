@@ -19,7 +19,6 @@ message OpStream {
   string type = 1;
   utils.Object state = 2;
   utils.Operation operation = 3;
-  utils.DataSet dataset = 4;
 }
 
 message StateStream {

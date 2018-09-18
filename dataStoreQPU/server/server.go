@@ -7,6 +7,7 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	s3 "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3DataStore"
@@ -28,9 +29,9 @@ type Config struct {
 	Port      string
 	DataStore struct {
 		DataSet struct {
-			DB      int
-			Replica int
-			Shard   int
+			DB    int
+			DC    int
+			Shard int
 		}
 		Type               string
 		DataDir            string
@@ -70,6 +71,8 @@ func getConfig(confFArg string) (Config, error) {
 	basepath := filepath.Dir(f)
 	viper.SetConfigName(confFile)
 	viper.AddConfigPath(basepath + "/../../conf")
+	viper.AddConfigPath(basepath + "/../../conf/local")
+	viper.AddConfigPath(basepath + "/../../conf/dockerCompose")
 	viper.SetConfigType("json")
 	if err = viper.ReadInConfig(); err != nil {
 		return conf, err
@@ -130,9 +133,9 @@ func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg
 		toSend := &pb.StateStream{
 			Object: obj,
 			Dataset: &pbQPU.DataSet{
-				Db:      int64(s.config.DataStore.DataSet.DB),
-				Replica: int64(s.config.DataStore.DataSet.Replica),
-				Shard:   int64(s.config.DataStore.DataSet.Shard),
+				Db:    int64(s.config.DataStore.DataSet.DB),
+				Dc:    int64(s.config.DataStore.DataSet.DC),
+				Shard: int64(s.config.DataStore.DataSet.Shard),
 			},
 		}
 		if err := stream.Send(toSend); err != nil {
@@ -142,7 +145,23 @@ func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg
 	}
 }
 
+func heartbeat(stream pb.DataStore_SubscribeOpsServer) {
+	op := &pbQPU.Operation{Op: "no_op"}
+	if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+		return
+	}
+	f := newHeartbeat(stream)
+	time.AfterFunc(10*time.Second, f)
+}
+
+func newHeartbeat(stream pb.DataStore_SubscribeOpsServer) func() {
+	return func() {
+		heartbeat(stream)
+	}
+}
+
 func (s *Server) opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
+	heartbeat(stream)
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errsFrom
@@ -151,11 +170,12 @@ func (s *Server) opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *p
 		}
 		op := <-msg
 		ds := &pbQPU.DataSet{
-			Db:      int64(s.config.DataStore.DataSet.DB),
-			Replica: int64(s.config.DataStore.DataSet.Replica),
-			Shard:   int64(s.config.DataStore.DataSet.Shard),
+			Db:    int64(s.config.DataStore.DataSet.DB),
+			Dc:    int64(s.config.DataStore.DataSet.DC),
+			Shard: int64(s.config.DataStore.DataSet.Shard),
 		}
-		if err := stream.Send(&pb.OpStream{Operation: op, Dataset: ds}); err != nil {
+		op.DataSet = ds
+		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
 			errs <- err
 			return
 		}

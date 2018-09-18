@@ -5,9 +5,9 @@
         "endpoint": "localhost:50150"
     }],
     "config": {
-        "dataType": "int",
-        "attribute": "size",
-        "lBound": "0",
-        "uBound": "2048"
+        "dataType": "string",
+        "attribute": "x-amz-meta",
+        "lBound": "any",
+        "uBound": "any"
     }
 }

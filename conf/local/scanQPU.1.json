@@ -1,8 +1,0 @@
-{
-    "qpuType": "scan",
-    "port": "50250",
-    "conns": [
-    {
-        "endpoint": "localhost:50150"
-    }]
-}

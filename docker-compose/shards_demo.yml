@@ -1,0 +1,66 @@
+version: '3'
+services:
+  iqpu1:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50350:50350"
+    command: go run server.go -qpu=iQPU.lind.1.docker
+    networks:
+      mynetwork:
+        aliases:
+          - index.ds1.s3
+  iqpu2:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50351:50351"
+    command: go run server.go -qpu=iQPU.lind.2.docker
+    networks:
+      mynetwork:
+        aliases:
+          - index.ds2.s3
+  iqpu3:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50352:50352"
+    command: go run server.go -qpu=iQPU.dind.1.docker
+    networks:
+      mynetwork:
+        aliases:
+          - index1.s3
+  iqpu4:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50353:50353"
+    command: go run server.go -qpu=iQPU.dind.2.docker
+    networks:
+      mynetwork:
+        aliases:
+          - index2.s3
+  dqpu:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50550:50550"
+    command: go run server.go -qpu=dQPU.docker
+    depends_on:
+      - iqpu1
+      - iqpu2
+      - iqpu3
+      - iqpu4
+    networks:
+      mynetwork:
+        aliases:
+          - dispatch.s3
+
+networks:
+  mynetwork:
+    driver: bridge

@@ -1,0 +1,18 @@
+{
+    "qpuType": "index",
+    "port": "50353",
+    "conns": [
+    {
+        "endpoint": "host.docker.internal:50150"
+    },
+    {
+        "endpoint": "host.docker.internal:50151"
+    }
+    ],
+    "config": {
+        "dataType": "int",
+        "attribute": "size",
+        "lBound": "1024",
+        "uBound": "2048"
+    }
+}

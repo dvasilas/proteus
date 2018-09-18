@@ -1,0 +1,13 @@
+{
+    "qpuType": "index",
+    "port": "50351",
+    "conns": [{
+        "endpoint": "host.docker.internal:50151"
+    }],
+    "config": {
+        "dataType": "string",
+        "attribute": "x-amz-meta",
+        "lBound": "any",
+        "uBound": "any"
+    }
+}
