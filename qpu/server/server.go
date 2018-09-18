@@ -33,7 +33,7 @@ type Server struct {
 	config       utils.QPUConfig
 	dispatchConn utils.DownwardConns
 	cacheConn    utils.QPUConn
-	dsClient     dSQPUcli.Client
+	dsClient     []dSQPUcli.Client
 	cache        *cache.Cache
 	index        index.Index
 }
@@ -60,6 +60,7 @@ func getConfig(qType string) (utils.QPUConfig, error) {
 	basepath := filepath.Dir(f)
 	viper.AddConfigPath(basepath + "/../../conf")
 	viper.AddConfigPath(basepath + "/../../conf/local")
+	viper.AddConfigPath(basepath + "/../../conf/dockerCompose")
 	viper.SetConfigType("json")
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -91,7 +92,7 @@ func NewServer(qType string) error {
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, dsClient: c}
+		server = Server{config: conf, dsClient: []dSQPUcli.Client{c}}
 	} else if conf.QpuType == "cache" {
 		c, _, err := cli.NewClient(conf.Conns[0].EndPoint)
 		if err != nil {
@@ -99,9 +100,13 @@ func NewServer(qType string) error {
 		}
 		server = Server{config: conf, cacheConn: utils.NewQPUConn(c), cache: cache.New(10)}
 	} else if conf.QpuType == "index" {
-		c, _, err := dSQPUcli.NewClient(conf.Conns[0].EndPoint)
-		if err != nil {
-			return err
+		var dsConns []dSQPUcli.Client
+		for _, conn := range conf.Conns {
+			c, _, err := dSQPUcli.NewClient(conn.EndPoint)
+			if err != nil {
+				return err
+			}
+			dsConns = append(dsConns, c)
 		}
 		if conf.Config.DataType == "int" {
 			lb, err := strconv.ParseInt(conf.Config.LBound, 10, 64)
@@ -112,19 +117,21 @@ func NewServer(qType string) error {
 			if err != nil {
 				return errors.New("Upper bound in index configuration is not int")
 			}
-			server = Server{config: conf, dsClient: c, index: index.NewIndexI(conf.Config.Attribute, lb, ub)}
+			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexI(conf.Config.Attribute, lb, ub)}
 		} else if conf.Config.DataType == "string" {
-			server = Server{config: conf, dsClient: c, index: index.NewIndexS(conf.Config.Attribute, conf.Config.LBound, conf.Config.UBound)}
+			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexS(conf.Config.Attribute, conf.Config.LBound, conf.Config.UBound)}
 		} else {
 			return errors.New("Unknown index type in index configuration")
 		}
 
-		stream, cancel, err := c.SubscribeOps(time.Now().UnixNano())
-		if err != nil {
-			cancel()
-			return err
+		for _, c := range server.dsClient {
+			stream, cancel, err := c.SubscribeOps(time.Now().UnixNano())
+			if err != nil {
+				cancel()
+				return err
+			}
+			go server.opConsumer(stream, cancel)
 		}
-		go server.opConsumer(stream, cancel)
 
 		if err := server.indexCatchUp(); err != nil {
 			return err
@@ -170,19 +177,24 @@ func (s *Server) opConsumer(stream pbDsQPU.DataStore_SubscribeOpsClient, cancel 
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
-			log.Warnf("opConsumer received EOF, which is not expected")
+			log.Fatalf("opConsumer received EOF, which is not expected")
 			return
 		} else if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-			}).Fatalf("opConsumer failed")
+			}).Fatalf("opConsumer: stream.Recv() error")
 			return
-		}
-		if err := index.Update(s.index, streamMsg.Operation); err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Fatalf("opConsumer failed")
-			return
+		} else {
+			if streamMsg.Operation.Op == "no_op" {
+				continue
+			}
+			if err := index.Update(s.index, streamMsg.Operation); err != nil {
+				log.WithFields(log.Fields{
+					"error": err,
+					"op":    streamMsg.Operation,
+				}).Fatalf("opConsumer: index Update failed")
+				return
+			}
 		}
 	}
 }
@@ -228,16 +240,26 @@ func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient,
 }
 
 func (s *Server) indexCatchUp() error {
-	errs := make(chan error)
-
-	streamFrom, cancel, err := s.dsClient.GetSnapshot(time.Now().UnixNano())
-	defer cancel()
-	if err != nil {
-		return err
+	errs := make([]chan error, len(s.dsClient))
+	for i := range s.dsClient {
+		errs[i] = make(chan error)
 	}
-	go s.catchUpConsumer(streamFrom, errs)
-	err = <-errs
-	return err
+
+	for i, c := range s.dsClient {
+		streamFrom, cancel, err := c.GetSnapshot(time.Now().UnixNano())
+		defer cancel()
+		if err != nil {
+			return err
+		}
+		go s.catchUpConsumer(streamFrom, errs[i])
+	}
+	for i := range s.dsClient {
+		err := <-errs[i]
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 //Find ...
@@ -247,7 +269,7 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 	errs := make(chan error)
 
 	if s.config.QpuType == "scan" {
-		streamFrom, cancel, err := s.dsClient.GetSnapshot(in.Timestamp)
+		streamFrom, cancel, err := s.dsClient[0].GetSnapshot(in.Timestamp)
 		defer cancel()
 		if err != nil {
 			return err
@@ -300,12 +322,6 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
-		/*
-			var done [len(clients)]chan bool
-			var errs []chan error
-			var errs1 []chan error
-
-		*/
 		done := make([]chan bool, len(clients))
 		errs := make([]chan error, len(clients))
 		errs1 := make([]chan error, len(clients))

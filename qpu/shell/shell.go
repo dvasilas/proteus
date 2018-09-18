@@ -28,6 +28,8 @@ func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStr
 		for attr := range query {
 			if attr == "size" {
 				logMsg[attr] = res.GetObject().GetAttributes()[attr].GetInt()
+			} else if attr == "x-amz-meta" {
+				logMsg[attr] = res.GetObject().GetAttributes()[attr].GetName()
 			}
 		}
 		log.WithFields(logMsg).Infof("result")
@@ -52,6 +54,9 @@ func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
 		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
 	} else if attr == "x-amz-meta" {
 		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
+	} else {
+		errs <- errors.New("Unknown attribute")
+		return
 	}
 	errs <- sendQuery(query, c)
 }

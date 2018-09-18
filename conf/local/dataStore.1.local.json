@@ -1,17 +1,17 @@
 {
-    "port": "50151",
+    "port": "50150",
     "dataStore": {
         "dataSet": {
             "db": 1,
-            "replica": 1,
-            "shard": 2
+            "dc": 1,
+            "shard": 1
         },
         "type": "s3",
         "dataDir": "/cloudserver",
         "ΑwsAccessKeyId": "accessKey1",
         "awsSecretAccessKey": "verySecretKey1",
-        "endpoint": "http://localhost:8001",
+        "endpoint": "http://localhost:8000",
         "bucketName": "buck",
-        "logStreamEndpoint": "localhost:50051"
+        "logStreamEndpoint": "localhost:50050"
     }
 }

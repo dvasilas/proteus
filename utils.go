@@ -26,28 +26,28 @@ func (c *DownwardConns) DB(ID int) (db *DB) {
 
 //DB ...
 type DB struct {
-	Replicas map[int]*Replica
+	DCs map[int]*DC
 }
 
-//Replica ...
-func (db *DB) Replica(ID int) (r *Replica) {
-	if db.Replicas == nil {
-		db.Replicas = map[int]*Replica{}
+//DC ...
+func (db *DB) DC(ID int) (r *DC) {
+	if db.DCs == nil {
+		db.DCs = map[int]*DC{}
 	}
-	if r = db.Replicas[ID]; r == nil {
-		r = &Replica{}
-		db.Replicas[ID] = r
+	if r = db.DCs[ID]; r == nil {
+		r = &DC{}
+		db.DCs[ID] = r
 	}
 	return
 }
 
-//Replica ...
-type Replica struct {
+//DC ...
+type DC struct {
 	Shards map[int]*Shard
 }
 
 //Shard ...
-func (r *Replica) Shard(ID int) (s *Shard) {
+func (r *DC) Shard(ID int) (s *Shard) {
 	if r.Shards == nil {
 		r.Shards = map[int]*Shard{}
 	}
@@ -95,9 +95,9 @@ type QPUConfig struct {
 	Port    string
 	Conns   []struct {
 		DataSet struct {
-			DB      int
-			Replica int
-			Shard   int
+			DB    int
+			DC    int
+			Shard int
 		}
 		EndPoint string
 		QpuType  string
@@ -127,16 +127,16 @@ func NewDConn(conf QPUConfig) (DownwardConns, error) {
 		var lb *pbQPU.Value
 		var ub *pbQPU.Value
 		switch conn.Config.DataType {
-		case "any":
-			lb = ValStr("any")
-			ub = ValStr("any")
+		case "string":
+			lb = ValStr(conn.Config.Lbound)
+			ub = ValStr(conn.Config.Ubound)
 		case "int":
 			lbI, _ := strconv.ParseInt(conn.Config.Lbound, 10, 64)
 			lb = ValInt(lbI)
 			ubI, _ := strconv.ParseInt(conn.Config.Ubound, 10, 64)
 			ub = ValInt(ubI)
 		}
-		dConns.DB(conn.DataSet.DB).Replica(conn.DataSet.Replica).Shard(conn.DataSet.Shard).QPU(c, conn.QpuType, conn.Config.Attribute, lb, ub)
+		dConns.DB(conn.DataSet.DB).DC(conn.DataSet.DC).Shard(conn.DataSet.Shard).QPU(c, conn.QpuType, conn.Config.Attribute, lb, ub)
 		//clients = append(clients, dConn)
 	}
 	return dConns, nil

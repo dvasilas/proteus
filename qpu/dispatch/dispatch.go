@@ -2,7 +2,6 @@ package dispatch
 
 import (
 	"errors"
-	"fmt"
 
 	utils "github.com/dimitriosvasilas/modqp"
 	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
@@ -21,15 +20,14 @@ func ForwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predica
 
 //ForwardQuery selects an appropriate downstream for forwarding a query, based on the available QPUs and their configuration.
 //It returns a client object of the selected downstream QPU, and any error encountered.
-func ForwardQuery(conns utils.DownwardConns, pred pbQPU.Predicate) ([]cli.Client, error) {
+func ForwardQuery(conns utils.DownwardConns, query pbQPU.Predicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
 	for _, db := range conns.DBs {
-		for _, r := range db.Replicas {
+		for _, r := range db.DCs {
 			for _, sh := range r.Shards {
 				for _, q := range sh.QPUs {
-					fmt.Println(q)
-					if (q.QpuType == "index" || q.QpuType == "cache") && canProcessQuery(q, pred) {
-						if predicateInAttrRange(q, pred) {
+					if (q.QpuType == "index" || q.QpuType == "cache") && canProcessQuery(q, query) {
+						if queryInAttrRange(q, query) {
 							forwardTo = append(forwardTo, q.Client)
 						}
 					}
@@ -49,11 +47,10 @@ func ForwardQuery(conns utils.DownwardConns, pred pbQPU.Predicate) ([]cli.Client
 
 }
 
-func predicateInAttrRange(conn utils.QPUConn, pred pbQPU.Predicate) bool {
+func queryInAttrRange(conn utils.QPUConn, query pbQPU.Predicate) bool {
 	switch conn.Lbound.Val.(type) {
 	case *pbQPU.Value_Int:
-		if pred.Lbound.GetInt() > conn.Ubound.GetInt() || pred.Ubound.GetInt() < conn.Lbound.GetInt() {
-			fmt.Println("predicateInAttrRange Not OK")
+		if query.Lbound.GetInt() > conn.Ubound.GetInt() || query.Ubound.GetInt() < conn.Lbound.GetInt() {
 			return false
 		}
 		return true
@@ -65,8 +62,8 @@ func predicateInAttrRange(conn utils.QPUConn, pred pbQPU.Predicate) bool {
 	return false
 }
 
-func canProcessQuery(conn utils.QPUConn, pred pbQPU.Predicate) bool {
-	if conn.Attribute == pred.Attribute || conn.Attribute == "any" {
+func canProcessQuery(conn utils.QPUConn, query pbQPU.Predicate) bool {
+	if conn.Attribute == query.Attribute || conn.Attribute == "any" {
 		return true
 	}
 	return false
