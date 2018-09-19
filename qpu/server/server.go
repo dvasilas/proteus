@@ -18,7 +18,6 @@ import (
 	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/dimitriosvasilas/modqp/qpu/cache"
-	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	"github.com/dimitriosvasilas/modqp/qpu/dispatch"
 	"github.com/dimitriosvasilas/modqp/qpu/filter"
 	"github.com/dimitriosvasilas/modqp/qpu/index"
@@ -32,7 +31,6 @@ import (
 type Server struct {
 	config       utils.QPUConfig
 	dispatchConn utils.DownwardConns
-	cacheConn    utils.QPUConn
 	dsClient     []dSQPUcli.Client
 	cache        *cache.Cache
 	index        index.Index
@@ -70,13 +68,6 @@ func getConfig(qType string) (utils.QPUConfig, error) {
 		return conf, err
 	}
 
-	confJSON, err := json.Marshal(conf)
-	if err != nil {
-		return conf, err
-	}
-	log.WithFields(log.Fields{
-		"configuration": string(confJSON),
-	}).Info("read configuration")
 	return conf, nil
 }
 
@@ -93,12 +84,24 @@ func NewServer(qType string) error {
 			return err
 		}
 		server = Server{config: conf, dsClient: []dSQPUcli.Client{c}}
-	} else if conf.QpuType == "cache" {
-		c, _, err := cli.NewClient(conf.Conns[0].EndPoint)
+		dSConfig, err := server.dsClient[0].GetConfig()
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, cacheConn: utils.NewQPUConn(c), cache: cache.New(10)}
+		server.config.Conns[0].DataSet.DB = int(dSConfig.Dataset.Db)
+		server.config.Conns[0].DataSet.DC = int(dSConfig.Dataset.Dc)
+		server.config.Conns[0].DataSet.Shard = int(dSConfig.Dataset.Shard)
+		server.config.CanProcess.DataType = "any"
+		server.config.CanProcess.Attribute = "any"
+		server.config.CanProcess.LBound = "any"
+		server.config.CanProcess.UBound = "any"
+
+	} else if conf.QpuType == "cache" {
+		downwardsConn, err := utils.NewDConn(conf)
+		if err != nil {
+			return err
+		}
+		server = Server{config: conf, dispatchConn: downwardsConn, cache: cache.New(10)}
 	} else if conf.QpuType == "index" {
 		var dsConns []dSQPUcli.Client
 		for _, conn := range conf.Conns {
@@ -108,23 +111,32 @@ func NewServer(qType string) error {
 			}
 			dsConns = append(dsConns, c)
 		}
-		if conf.Config.DataType == "int" {
-			lb, err := strconv.ParseInt(conf.Config.LBound, 10, 64)
+		if conf.CanProcess.DataType == "int" {
+			lb, err := strconv.ParseInt(conf.CanProcess.LBound, 10, 64)
 			if err != nil {
 				return errors.New("Upper bound in index configuration is not int")
 			}
-			ub, err := strconv.ParseInt(conf.Config.UBound, 10, 64)
+			ub, err := strconv.ParseInt(conf.CanProcess.UBound, 10, 64)
 			if err != nil {
 				return errors.New("Upper bound in index configuration is not int")
 			}
-			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexI(conf.Config.Attribute, lb, ub)}
-		} else if conf.Config.DataType == "string" {
-			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexS(conf.Config.Attribute, conf.Config.LBound, conf.Config.UBound)}
+			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexI(conf.CanProcess.Attribute, lb, ub)}
+		} else if conf.CanProcess.DataType == "string" {
+			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexS(conf.CanProcess.Attribute, conf.CanProcess.LBound, conf.CanProcess.UBound)}
 		} else {
 			return errors.New("Unknown index type in index configuration")
 		}
 
-		for _, c := range server.dsClient {
+		for i, c := range server.dsClient {
+
+			dSConfig, err := c.GetConfig()
+			if err != nil {
+				return err
+			}
+			server.config.Conns[i].DataSet.DB = int(dSConfig.Dataset.Db)
+			server.config.Conns[i].DataSet.DC = int(dSConfig.Dataset.Dc)
+			server.config.Conns[i].DataSet.Shard = int(dSConfig.Dataset.Shard)
+
 			stream, cancel, err := c.SubscribeOps(time.Now().UnixNano())
 			if err != nil {
 				cancel()
@@ -143,6 +155,19 @@ func NewServer(qType string) error {
 		}
 		server = Server{config: conf, dispatchConn: downwardsConns}
 	}
+
+	confJSON, err := json.Marshal(server.config)
+	if err != nil {
+		return err
+	}
+	dispatchConfJSON, err := json.Marshal(server.dispatchConn)
+	if err != nil {
+		return err
+	}
+	log.WithFields(log.Fields{
+		"configuration":  string(confJSON),
+		"dispatchConfig": string(dispatchConfJSON),
+	}).Info("QPU initialization")
 
 	s := grpc.NewServer()
 	pb.RegisterQPUServer(s, &server)
@@ -293,10 +318,14 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		errs1 := make(chan error)
 		pred := map[string][2]*pbQPU.Value{in.Predicate[0].Attribute: {in.Predicate[0].Lbound, in.Predicate[0].Ubound}}
 
+		clients, err := dispatch.ForwardQuery(s.dispatchConn, *in.Predicate[0])
+		if err != nil {
+			return err
+		}
 		go s.findResultConsumer(in.Predicate, streamTo, msg, done, errs1, errs, s.cache.StoreAndRespond)
-		go s.cacheConn.Client.Find(in.Timestamp, pred, msg, done, errs1)
+		go clients[0].Find(in.Timestamp, pred, msg, done, errs1)
 
-		err := <-errs
+		err = <-errs
 		return err
 	} else if s.config.QpuType == "index" {
 		indexResult, found, err := s.index.Get(in.Predicate)
@@ -344,6 +373,52 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		return nil
 	}
 	return errors.New("QPU Type not known")
+}
+
+//GetConfig ...
+func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.ConfigResponse, error) {
+	resp := new(pb.ConfigResponse)
+	resp.QPUType = s.config.QpuType
+	if s.config.QpuType == "scan" || s.config.QpuType == "index" {
+		lb, ub, err := utils.AttrBoundStrToVal(s.config.CanProcess.DataType, s.config.CanProcess.LBound, s.config.CanProcess.UBound)
+		if err != nil {
+			return nil, err
+		}
+		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+			Datatype:  s.config.CanProcess.DataType,
+			Attribute: s.config.CanProcess.Attribute,
+			Lbound:    lb,
+			Ubound:    ub,
+		})
+		for _, c := range s.config.Conns {
+			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
+				Db:    int64(c.DataSet.DB),
+				Dc:    int64(c.DataSet.DC),
+				Shard: int64(c.DataSet.Shard),
+			})
+		}
+	} else {
+		for dbID, db := range s.dispatchConn.DBs {
+			for rID, r := range db.DCs {
+				for shID, sh := range r.Shards {
+					resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
+						Db:    int64(dbID),
+						Dc:    int64(rID),
+						Shard: int64(shID),
+					})
+					for _, q := range sh.QPUs {
+						resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+							Datatype:  q.DataType,
+							Attribute: q.Attribute,
+							Lbound:    q.Lbound,
+							Ubound:    q.Ubound,
+						})
+					}
+				}
+			}
+		}
+	}
+	return resp, nil
 }
 
 func main() {

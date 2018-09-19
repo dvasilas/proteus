@@ -1,15 +1,14 @@
 {
     "qpuType": "index",
     "port": "50352",
-    "conns": [
-    {
-        "endpoint": "localhost:50150"
-    },
-    {
-        "endpoint": "localhost:50151"
-    }
+    "conns": [{
+            "endpoint": "localhost:50150"
+        },
+        {
+            "endpoint": "localhost:50151"
+        }
     ],
-    "config": {
+    "canProcess": {
         "dataType": "int",
         "attribute": "size",
         "lBound": "0",

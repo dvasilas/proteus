@@ -50,6 +50,13 @@ func (c *Client) GetSnapshot(ts int64) (pb.DataStore_GetSnapshotClient, context.
 	return stream, cancel, err
 }
 
+//GetConfig ...
+func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
+	ctx := context.TODO()
+	resp, err := c.dsClient.GetConfig(ctx, &pb.ConfigRequest{})
+	return resp, err
+}
+
 //NewClient ...
 func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())

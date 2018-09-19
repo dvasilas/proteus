@@ -4,7 +4,7 @@
     "conns": [{
         "endpoint": "host.docker.internal:50150"
     }],
-    "config": {
+    "canProcess": {
         "dataType": "string",
         "attribute": "x-amz-meta",
         "lBound": "any",

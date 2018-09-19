@@ -1,65 +1,17 @@
 {
     "qpuType": "dispatch",
     "port": "50550",
-    "conns": [
-    {
-        "dataSet": {
-            "db": 1,
-            "dc": 1,
-            "shard": 1
+    "conns": [{
+            "endpoint": "127.0.0.1:50350"
         },
-        "endpoint": "127.0.0.1:50350",
-        "qpuType": "index",
-        "config": {
-            "dataType": "string",
-            "attribute": "x-amz-meta",
-            "lBound": "any",
-            "uBound": "any"
-            }
-    },
-    {
-        "dataSet": {
-            "db": 1,
-            "dc": 1,
-            "shard": 2
+        {
+            "endpoint": "127.0.0.1:50351"
         },
-        "endpoint": "127.0.0.1:50351",
-        "qpuType": "index",
-        "config": {
-            "dataType": "string",
-            "attribute": "x-amz-meta",
-            "lBound": "any",
-            "uBound": "any"
+        {
+            "endpoint": "127.0.0.1:50352"
+        },
+        {
+            "endpoint": "127.0.0.1:50353"
         }
-    },
-    {
-        "dataSet": {
-            "db": 1,
-            "dc": 1,
-            "shard": 12
-        },
-        "endpoint": "127.0.0.1:50352",
-        "qpuType": "index",
-        "config": {
-            "dataType": "int",
-            "attribute": "size",
-            "lBound": "0",
-            "uBound": "1024"
-        }
-    }, {
-        "dataSet": {
-            "db": 1,
-            "dc": 1,
-            "shard": 12
-        },
-        "endpoint": "127.0.0.1:50353",
-        "qpuType": "index",
-        "config": {
-            "dataType": "int",
-            "attribute": "size",
-            "lBound": "1024",
-            "uBound": "2048"
-        }
-    }
     ]
 }

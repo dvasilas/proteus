@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -212,6 +213,18 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotS
 
 	err := <-errs1
 	return err
+}
+
+//GetConfig ...
+func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.ConfigResponse, error) {
+
+	return &pb.ConfigResponse{
+		Dataset: &pbQPU.DataSet{
+			Db:    int64(s.config.DataStore.DataSet.DB),
+			Dc:    int64(s.config.DataStore.DataSet.DC),
+			Shard: int64(s.config.DataStore.DataSet.Shard),
+		}}, nil
+
 }
 
 func main() {
