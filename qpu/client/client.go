@@ -12,7 +12,7 @@ import (
 
 //Client ...
 type Client struct {
-	sQPUClient pb.QPUClient
+	cli pb.QPUClient
 }
 
 //Find ...
@@ -26,7 +26,7 @@ func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *
 		req.Predicate = append(req.Predicate, &pbQPU.Predicate{Attribute: attr, Lbound: bounds[0], Ubound: bounds[1]})
 	}
 
-	stream, err := c.sQPUClient.Find(ctx, req)
+	stream, err := c.cli.Find(ctx, req)
 	if err != nil {
 		done <- true
 		errs <- err
@@ -46,6 +46,13 @@ func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *
 		done <- false
 		msg <- streamMsg
 	}
+}
+
+//GetConfig ...
+func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
+	ctx := context.TODO()
+	resp, err := c.cli.GetConfig(ctx, &pb.ConfigRequest{})
+	return resp, err
 }
 
 //NewClient ...

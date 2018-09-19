@@ -33,6 +33,7 @@ proto: $(PROTOC_CMD)
 	protoc --proto_path=./protos/utils/ --proto_path=./protos/datastore/ --go_out=plugins=grpc:$(GOPATH)/src ./protos/datastore/datastore.proto
 	protoc --proto_path=./protos/utils --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
 	protoc --proto_path=./protos/qpu --proto_path=./protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/qpu/qpu.proto
+	go generate ./...
 
 build_ds_server: dep proto
 	go build -o bin/ds_server -v ./dataStoreQPU/server/server.go
@@ -64,5 +65,6 @@ test:
 clean:
 	rm ./protos/utils/utils.pb.go ./protos/datastore/datastore.pb.go ./protos/s3/s3.pb.go ./protos/qpu/qpu.pb.go
 	rm -rf ./bin
+	rm -rf ./dataStoreQPU/client/mocks
 
 .PHONY: build_qpu_server build_qpu_server test clean

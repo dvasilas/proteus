@@ -9,6 +9,7 @@ service DataStore {
   rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
   rpc SubscribeStates(SubRequest) returns (stream StateStream) {}
   rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
+  rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
 }
 
 message SubRequest {
@@ -23,5 +24,12 @@ message OpStream {
 
 message StateStream {
   utils.Object object = 1;
+  utils.DataSet dataset = 2;
+}
+
+message ConfigRequest {
+}
+
+message ConfigResponse {
   utils.DataSet dataset = 2;
 }

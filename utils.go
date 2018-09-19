@@ -64,10 +64,11 @@ type Shard struct {
 }
 
 //QPU ...
-func (sh *Shard) QPU(c cli.Client, qType string, attr string, lb *pbQPU.Value, ub *pbQPU.Value) {
+func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pbQPU.Value, ub *pbQPU.Value) {
 	q := QPUConn{
 		Client:    c,
 		QpuType:   qType,
+		DataType:  dt,
 		Attribute: attr,
 		Lbound:    lb,
 		Ubound:    ub,
@@ -84,6 +85,7 @@ func (sh *Shard) QPU(c cli.Client, qType string, attr string, lb *pbQPU.Value, u
 type QPUConn struct {
 	Client    cli.Client
 	QpuType   string
+	DataType  string
 	Attribute string
 	Lbound    *pbQPU.Value
 	Ubound    *pbQPU.Value
@@ -94,21 +96,14 @@ type QPUConfig struct {
 	QpuType string
 	Port    string
 	Conns   []struct {
-		DataSet struct {
+		EndPoint string
+		DataSet  struct {
 			DB    int
 			DC    int
 			Shard int
 		}
-		EndPoint string
-		QpuType  string
-		Config   struct {
-			DataType  string
-			Attribute string
-			Ubound    string
-			Lbound    string
-		}
 	}
-	Config struct {
+	CanProcess struct {
 		DataType  string
 		Attribute string
 		LBound    string
@@ -124,27 +119,21 @@ func NewDConn(conf QPUConfig) (DownwardConns, error) {
 		if err != nil {
 			return DownwardConns{}, err
 		}
-		var lb *pbQPU.Value
-		var ub *pbQPU.Value
-		switch conn.Config.DataType {
-		case "string":
-			lb = ValStr(conn.Config.Lbound)
-			ub = ValStr(conn.Config.Ubound)
-		case "int":
-			lbI, _ := strconv.ParseInt(conn.Config.Lbound, 10, 64)
-			lb = ValInt(lbI)
-			ubI, _ := strconv.ParseInt(conn.Config.Ubound, 10, 64)
-			ub = ValInt(ubI)
+		connConf, err := c.GetConfig()
+		if err != nil {
+			return DownwardConns{}, err
 		}
-		dConns.DB(conn.DataSet.DB).DC(conn.DataSet.DC).Shard(conn.DataSet.Shard).QPU(c, conn.QpuType, conn.Config.Attribute, lb, ub)
-		//clients = append(clients, dConn)
+		dConns.DB(int(connConf.GetDataset()[0].GetDb())).
+			DC(int(connConf.GetDataset()[0].GetDc())).
+			Shard(int(connConf.GetDataset()[0].GetShard())).
+			QPU(c,
+				connConf.QPUType,
+				connConf.GetSupportedQueries()[0].GetDatatype(),
+				connConf.GetSupportedQueries()[0].GetAttribute(),
+				connConf.GetSupportedQueries()[0].GetLbound(),
+				connConf.GetSupportedQueries()[0].GetUbound())
 	}
 	return dConns, nil
-}
-
-//NewQPUConn ...
-func NewQPUConn(c cli.Client) QPUConn {
-	return QPUConn{Client: c}
 }
 
 //ValInt ...
@@ -155,4 +144,27 @@ func ValInt(i int64) *pbQPU.Value {
 //ValStr ...
 func ValStr(s string) *pbQPU.Value {
 	return &pbQPU.Value{Val: &pbQPU.Value_Name{Name: s}}
+}
+
+//AttrBoundStrToVal ...
+func AttrBoundStrToVal(dataType string, lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
+	var lb *pbQPU.Value
+	var ub *pbQPU.Value
+	switch dataType {
+	case "int":
+		lbI, err := strconv.ParseInt(lBound, 10, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		lb = ValInt(lbI)
+		ubI, err := strconv.ParseInt(uBound, 10, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		ub = ValInt(ubI)
+	default:
+		lb = ValStr(lBound)
+		ub = ValStr(uBound)
+	}
+	return lb, ub, nil
 }

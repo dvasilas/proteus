@@ -9,7 +9,7 @@
         "endpoint": "host.docker.internal:50151"
     }
     ],
-    "config": {
+    "canProcess": {
         "dataType": "int",
         "attribute": "size",
         "lBound": "1024",

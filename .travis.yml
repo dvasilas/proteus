@@ -12,11 +12,9 @@ env:
 
 before_script:
   - make all
-  - mkdir dataStoreQPU/client/mocks
-  - go generate ./...
 
 script:
-  - go test -v ./...
+  - make test
 
 notifications:
   email: false

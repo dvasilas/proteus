@@ -30,9 +30,10 @@ message FindRequest {
 }
 
 message Predicate {
-    string attribute = 1;
-    Value lbound = 2;
-    Value ubound = 3;
+    string datatype = 1;
+    string attribute = 2;
+    Value lbound = 3;
+    Value ubound = 4;
 }
 
 message DataSet {

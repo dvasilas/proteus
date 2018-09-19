@@ -7,6 +7,7 @@ import "utils.proto";
 
 service QPU {
     rpc Find(FindRequest) returns (stream QueryResultStream) {}
+    rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
 }
 
 message FindRequest {
@@ -17,4 +18,13 @@ message FindRequest {
 message QueryResultStream {
     utils.Object object = 1;
     utils.DataSet dataset = 2;
+}
+
+message ConfigRequest {
+}
+
+message ConfigResponse {
+    string QPUType = 1;
+    repeated utils.DataSet dataset = 2;
+    repeated utils.Predicate supportedQueries = 3;
 }
