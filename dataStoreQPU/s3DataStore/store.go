@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,7 +64,12 @@ func (ds S3DataStore) watch(stream pb.S3DataStore_WatchClient, msg chan *pbQPU.O
 		}
 		for attrK := range op.Operation.Object.Attributes {
 			if strings.HasPrefix(attrK, "x-amz-meta-") && strings.Compare(attrK, "x-amz-meta-s3cmd-attrs") != 0 {
-				outOp.Object.Attributes["x-amz-meta"] = utils.ValStr(strings.TrimPrefix(attrK, "x-amz-meta-") + "-" + op.Operation.Object.Attributes[attrK].GetStringValue())
+				attrK, attrV, err := formatAttributes(attrK, op.Operation.Object.Attributes[attrK].GetStringValue())
+				if err != nil {
+					done <- true
+					errs <- err
+				}
+				outOp.Object.Attributes[attrK] = attrV
 			}
 		}
 		msg <- outOp
@@ -141,15 +147,38 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 		}
 		for k := range resp.Header {
 			if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
-				outObject.Attributes["x-amz-meta"] = utils.ValStr(strings.TrimPrefix(strings.ToLower(k), "x-amz-meta-") + "-" + strings.ToLower(resp.Header[k][0]))
+				attrK, attrV, err := formatAttributes(k, resp.Header[k][0])
+				if err != nil {
+					done <- true
+					errs <- err
+					return
+				}
+				outObject.Attributes[attrK] = attrV
 			}
 		}
-
 		done <- false
 		msg <- outObject
 	}
 	done <- true
 	errs <- nil
+}
+
+func formatAttributes(k string, v string) (string, *pbQPU.Value, error) {
+	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+
+		}
+		return strings.ToLower(k), utils.ValFlt(f), nil
+	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return "", &pbQPU.Value{}, err
+		}
+		return strings.ToLower(k), utils.ValInt(i), nil
+	} else {
+		return strings.ToLower(k), utils.ValStr(v), nil
+	}
 }
 
 //SubscribeOps ...

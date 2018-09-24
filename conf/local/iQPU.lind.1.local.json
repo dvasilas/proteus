@@ -4,10 +4,10 @@
     "conns": [{
         "endpoint": "localhost:50150"
     }],
-    "canProcess": {
-        "dataType": "string",
+    "indexConfig": {
+        "dataType": "float",
         "attribute": "x-amz-meta",
-        "lBound": "any",
-        "uBound": "any"
+        "lBound": "0.0",
+        "uBound": "1.0"
     }
 }

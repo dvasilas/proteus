@@ -54,10 +54,15 @@ func queryInAttrRange(conn utils.QPUConn, query pbQPU.Predicate) bool {
 			return false
 		}
 		return true
-	case *pbQPU.Value_Name:
-		if conn.Ubound.GetName() == "any" {
+	case *pbQPU.Value_Str:
+		if conn.Ubound.GetStr() == "any" {
 			return true
 		}
+	case *pbQPU.Value_Flt:
+		if query.Lbound.GetFlt() > conn.Ubound.GetFlt() || query.Ubound.GetFlt() < conn.Lbound.GetFlt() {
+			return false
+		}
+		return true
 	}
 	return false
 }

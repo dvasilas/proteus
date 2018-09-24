@@ -7,6 +7,12 @@ import (
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 )
 
+//Posting ...
+type Posting struct {
+	Object  pbQPU.Object
+	Dataset pbQPU.DataSet
+}
+
 //DownwardConns ...
 type DownwardConns struct {
 	DBs map[int]*DB
@@ -103,7 +109,7 @@ type QPUConfig struct {
 			Shard int
 		}
 	}
-	CanProcess struct {
+	IndexConfig struct {
 		DataType  string
 		Attribute string
 		LBound    string
@@ -143,7 +149,12 @@ func ValInt(i int64) *pbQPU.Value {
 
 //ValStr ...
 func ValStr(s string) *pbQPU.Value {
-	return &pbQPU.Value{Val: &pbQPU.Value_Name{Name: s}}
+	return &pbQPU.Value{Val: &pbQPU.Value_Str{Str: s}}
+}
+
+//ValFlt ...
+func ValFlt(f float64) *pbQPU.Value {
+	return &pbQPU.Value{Val: &pbQPU.Value_Flt{Flt: f}}
 }
 
 //AttrBoundStrToVal ...
@@ -162,6 +173,17 @@ func AttrBoundStrToVal(dataType string, lBound string, uBound string) (*pbQPU.Va
 			return nil, nil, err
 		}
 		ub = ValInt(ubI)
+	case "float":
+		lbF, err := strconv.ParseFloat(lBound, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		lb = ValFlt(lbF)
+		ubF, err := strconv.ParseFloat(uBound, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		ub = ValFlt(ubF)
 	default:
 		lb = ValStr(lBound)
 		ub = ValStr(uBound)

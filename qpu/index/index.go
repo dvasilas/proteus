@@ -1,221 +1,106 @@
 package index
 
 import (
+	"errors"
+
+	utils "github.com/dimitriosvasilas/modqp"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	indexI "github.com/dimitriosvasilas/modqp/qpu/index/indexInt"
+	indexTF "github.com/dimitriosvasilas/modqp/qpu/index/indexTagFloat"
+	indexTS "github.com/dimitriosvasilas/modqp/qpu/index/indexTagStr"
 	"github.com/google/btree"
 )
 
-//Posting ...
-type Posting struct {
-	Object  pbQPU.Object
-	Dataset pbQPU.DataSet
-}
-
-//EntryI ...
-type EntryI struct {
-	Value    int64
-	Postings map[string]Posting
-}
-
-//Less ...
-func (x EntryI) Less(than btree.Item) bool {
-	return x.Value < than.(EntryI).Value
-}
-
-//EntryS ...
-type EntryS struct {
-	Value    string
-	Postings map[string]Posting
-}
-
-//Less ...
-func (x EntryS) Less(than btree.Item) bool {
-	if x.Value < than.(EntryS).Value {
-		return true
-	}
-	return false
+//Impl ...
+type Impl interface {
+	FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string)
+	OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item
+	GetPostings(entry btree.Item) map[string]utils.Posting
+	AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item
+	BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item
+	ReducedKeyToTagKey(k string) string
 }
 
 //Index ...
-type Index interface {
-	filterIndexable(op *pbQPU.Operation) bool
-	put(op *pbQPU.Operation) error
-	Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error)
-}
-
-//BTreeIndexI ...
-type BTreeIndexI struct {
+type Index struct {
+	Index     Impl
 	attribute string
-	lbound    int64
-	ubound    int64
+	lbound    *pbQPU.Value
+	ubound    *pbQPU.Value
 	entries   *btree.BTree
 	state     map[string]pbQPU.Object
 }
 
-//BTreeIndexS ...
-type BTreeIndexS struct {
-	attribute string
-	lbound    string
-	ubound    string
-	entries   *btree.BTree
-	state     map[string]pbQPU.Object
-}
-
-//NewIndexI initializes a new BTreeIndex struct.
-//It returns a pointer to the BTreeIndex struct.
-func NewIndexI(attr string, lb int64, ub int64) *BTreeIndexI {
-	return &BTreeIndexI{
+//New ...
+func New(datatype string, attr string, lb string, ub string) (*Index, error) {
+	i := &Index{
 		attribute: attr,
-		lbound:    lb,
-		ubound:    ub,
 		entries:   btree.New(2),
 		state:     make(map[string]pbQPU.Object),
 	}
-}
-
-//NewIndexS ...
-func NewIndexS(attr string, lb string, ub string) *BTreeIndexS {
-	return &BTreeIndexS{
-		attribute: attr,
-		lbound:    lb,
-		ubound:    ub,
-		entries:   btree.New(2),
-		state:     make(map[string]pbQPU.Object),
+	lbound, ubound, err := utils.AttrBoundStrToVal(datatype, lb, ub)
+	if err != nil {
+		return &Index{}, errors.New("Bounds in index configuration is not the right datatype")
 	}
-}
-
-func (i *BTreeIndexI) opToEntry(op *pbQPU.Operation) EntryI {
-	return EntryI{Value: op.Object.Attributes[i.attribute].GetInt()}
-}
-
-func (i *BTreeIndexI) boundToEntry(b *pbQPU.Value) EntryI {
-	return EntryI{Value: b.GetInt()}
-}
-
-func (i *BTreeIndexS) opToEntry(op *pbQPU.Operation) EntryS {
-	return EntryS{Value: op.Object.Attributes[i.attribute].GetName()}
-}
-
-func (i *BTreeIndexS) boundToEntry(b *pbQPU.Value) EntryS {
-	return EntryS{Value: b.GetName()}
-}
-
-func (i *BTreeIndexI) filterIndexable(op *pbQPU.Operation) bool {
-	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
-		if attrValue.GetInt() > i.lbound && attrValue.GetInt() <= i.ubound {
-			return true
-		}
+	i.lbound = lbound
+	i.ubound = ubound
+	if datatype == "float" {
+		i.Index = indexTF.New()
+	} else if datatype == "int" && attr == "size" {
+		i.Index = indexI.New()
+	} else if datatype == "string" && attr == "x-amz-meta" {
+		i.Index = indexTS.New()
+	} else {
+		return &Index{}, errors.New("index datatype not implemented")
 	}
-	return false
-}
-
-func (i *BTreeIndexS) filterIndexable(op *pbQPU.Operation) bool {
-	if attrValue, ok := op.Object.Attributes[i.attribute]; ok {
-		if (attrValue.GetName() > i.lbound || i.lbound == "any") && (attrValue.GetName() <= i.ubound || i.ubound == "any") {
-			return true
-		}
-	}
-	return false
+	return i, nil
 }
 
 //Update updates the index based on a given datastore operation.
 //It returns any error encountered.
-func Update(i Index, op *pbQPU.Operation) error {
-	if i.filterIndexable(op) {
-		if err := i.put(op); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (i *BTreeIndexI) removeOldEntry(op *pbQPU.Operation) {
-	if s, ok := i.state[(*op.Object).Key]; ok {
-		item := i.entries.Get(EntryI{Value: s.Attributes[i.attribute].GetInt()})
-		delete(item.(EntryI).Postings, s.Key)
-	}
-}
-
-func (i *BTreeIndexS) removeOldEntry(op *pbQPU.Operation) {
-	if s, ok := i.state[(*op.Object).Key]; ok {
-		item := i.entries.Get(EntryS{Value: s.Attributes[i.attribute].GetName()})
-		delete(item.(EntryS).Postings, s.Key)
-	}
-}
-
-func (i *BTreeIndexI) put(op *pbQPU.Operation) error {
-	i.removeOldEntry(op)
-	entry := i.opToEntry(op)
-	if i.entries.Has(entry) {
-		item := i.entries.Get(entry)
-		item.(EntryI).Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
-		i.entries.ReplaceOrInsert(item)
-	} else {
-		entry.Postings = make(map[string]Posting)
-		entry.Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
-		i.entries.ReplaceOrInsert(entry)
-	}
-	i.state[(*op.Object).Key] = *op.Object
-	return nil
-}
-
-func (i *BTreeIndexS) put(op *pbQPU.Operation) error {
-	i.removeOldEntry(op)
-	entry := i.opToEntry(op)
-	if i.entries.Has(entry) {
-		item := i.entries.Get(entry)
-		item.(EntryS).Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
-		i.entries.ReplaceOrInsert(item)
-	} else {
-		entry.Postings = make(map[string]Posting)
-		entry.Postings[(*op.Object).Key] = Posting{Object: *op.GetObject(), Dataset: *op.GetDataSet()}
-		i.entries.ReplaceOrInsert(entry)
-	}
-	i.state[(*op.Object).Key] = *op.Object
-	return nil
-}
-
-//Get performs and index lookup based on a given query predicate.
-//It returns the retrieved objects and any error encountered.
-func (i *BTreeIndexI) Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error) {
-	if p[0].Lbound.GetInt() == p[0].Ubound.GetInt() {
-		entry := i.boundToEntry(p[0].Lbound)
-		if i.entries.Has(entry) {
-			item := i.entries.Get(entry)
-			return item.(EntryI).Postings, true, nil
-		}
-	} else {
-		res := make(map[string]Posting)
-		it := func(item btree.Item) bool {
-			for _, p := range item.(EntryI).Postings {
-				res[p.Object.GetKey()] = p
+func Update(i *Index, op *pbQPU.Operation) error {
+	for k, v := range op.GetObject().GetAttributes() {
+		if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
+			removeOldEntry(k, v, op.GetObject(), i)
+			if err := put(k, v, op.GetObject(), op.GetDataSet(), i); err != nil {
+				return err
 			}
-			return true
 		}
-		i.entries.AscendRange(i.boundToEntry(p[0].Lbound), i.boundToEntry(p[0].Ubound), it)
-		return res, true, nil
 	}
-	return nil, false, nil
+	return nil
+}
+
+func put(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet, i *Index) error {
+	entry := i.Index.OpToEntry(attrKey, attrVal)
+	if i.entries.Has(entry) {
+		item := i.entries.Get(entry)
+		item = i.Index.AppendPostings(item, obj.Key, utils.Posting{Object: *obj, Dataset: *ds})
+		i.entries.ReplaceOrInsert(item)
+	} else {
+		entry = i.Index.AppendPostings(entry, obj.Key, utils.Posting{Object: *obj, Dataset: *ds})
+		i.entries.ReplaceOrInsert(entry)
+	}
+	i.state[obj.Key] = *obj
+	return nil
 }
 
 //Get ...
-func (i *BTreeIndexS) Get(p []*pbQPU.Predicate) (map[string]Posting, bool, error) {
-	if p[0].Lbound.GetName() == p[0].Ubound.GetName() {
-		entry := i.boundToEntry(p[0].Lbound)
-		if i.entries.Has(entry) {
-			item := i.entries.Get(entry)
-			return item.(EntryS).Postings, true, nil
+func (i *Index) Get(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error) {
+	res := make(map[string]utils.Posting)
+	it := func(item btree.Item) bool {
+		for _, p := range i.Index.GetPostings(item) {
+			res[p.Object.GetKey()] = p
 		}
-	} else {
-		res := make(map[string]Posting)
-		it := func(item btree.Item) bool {
-			for _, p := range item.(EntryS).Postings {
-				res[p.Object.GetKey()] = p
-			}
-			return true
-		}
-		i.entries.AscendRange(i.boundToEntry(p[0].Lbound), i.boundToEntry(p[0].Ubound), it)
-		return res, true, nil
+		return true
 	}
-	return nil, false, nil
+	i.entries.AscendRange(i.Index.BoundToEntry(p[0].GetAttribute(), p[0].Lbound), i.Index.BoundToEntry(p[0].GetAttribute(), p[0].Ubound), it)
+	return res, true, nil
+}
+
+func removeOldEntry(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, i *Index) {
+	if s, ok := i.state[obj.Key]; ok {
+		entry := i.Index.OpToEntry(attrKey, s.Attributes[i.Index.ReducedKeyToTagKey(attrKey)])
+		item := i.entries.Get(entry)
+		delete(i.Index.GetPostings(item), s.Key)
+	}
 }

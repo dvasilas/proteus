@@ -9,7 +9,6 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 
 	utils "github.com/dimitriosvasilas/modqp"
@@ -33,7 +32,7 @@ type Server struct {
 	dispatchConn utils.DownwardConns
 	dsClient     []dSQPUcli.Client
 	cache        *cache.Cache
-	index        index.Index
+	index        *index.Index
 }
 
 func getConfig(qType string) (utils.QPUConfig, error) {
@@ -91,10 +90,10 @@ func NewServer(qType string) error {
 		server.config.Conns[0].DataSet.DB = int(dSConfig.Dataset.Db)
 		server.config.Conns[0].DataSet.DC = int(dSConfig.Dataset.Dc)
 		server.config.Conns[0].DataSet.Shard = int(dSConfig.Dataset.Shard)
-		server.config.CanProcess.DataType = "any"
-		server.config.CanProcess.Attribute = "any"
-		server.config.CanProcess.LBound = "any"
-		server.config.CanProcess.UBound = "any"
+		server.config.IndexConfig.DataType = "any"
+		server.config.IndexConfig.Attribute = "any"
+		server.config.IndexConfig.LBound = "any"
+		server.config.IndexConfig.UBound = "any"
 
 	} else if conf.QpuType == "cache" {
 		downwardsConn, err := utils.NewDConn(conf)
@@ -111,24 +110,12 @@ func NewServer(qType string) error {
 			}
 			dsConns = append(dsConns, c)
 		}
-		if conf.CanProcess.DataType == "int" {
-			lb, err := strconv.ParseInt(conf.CanProcess.LBound, 10, 64)
-			if err != nil {
-				return errors.New("Upper bound in index configuration is not int")
-			}
-			ub, err := strconv.ParseInt(conf.CanProcess.UBound, 10, 64)
-			if err != nil {
-				return errors.New("Upper bound in index configuration is not int")
-			}
-			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexI(conf.CanProcess.Attribute, lb, ub)}
-		} else if conf.CanProcess.DataType == "string" {
-			server = Server{config: conf, dsClient: dsConns, index: index.NewIndexS(conf.CanProcess.Attribute, conf.CanProcess.LBound, conf.CanProcess.UBound)}
-		} else {
-			return errors.New("Unknown index type in index configuration")
+		index, err := index.New(conf.IndexConfig.DataType, conf.IndexConfig.Attribute, conf.IndexConfig.LBound, conf.IndexConfig.UBound)
+		if err != nil {
+			return err
 		}
-
+		server = Server{config: conf, dsClient: dsConns, index: index}
 		for i, c := range server.dsClient {
-
 			dSConfig, err := c.GetConfig()
 			if err != nil {
 				return err
@@ -380,13 +367,13 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 	resp := new(pb.ConfigResponse)
 	resp.QPUType = s.config.QpuType
 	if s.config.QpuType == "scan" || s.config.QpuType == "index" {
-		lb, ub, err := utils.AttrBoundStrToVal(s.config.CanProcess.DataType, s.config.CanProcess.LBound, s.config.CanProcess.UBound)
+		lb, ub, err := utils.AttrBoundStrToVal(s.config.IndexConfig.DataType, s.config.IndexConfig.LBound, s.config.IndexConfig.UBound)
 		if err != nil {
 			return nil, err
 		}
 		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
-			Datatype:  s.config.CanProcess.DataType,
-			Attribute: s.config.CanProcess.Attribute,
+			Datatype:  s.config.IndexConfig.DataType,
+			Attribute: s.config.IndexConfig.Attribute,
 			Lbound:    lb,
 			Ubound:    ub,
 		})
