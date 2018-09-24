@@ -31,7 +31,6 @@ func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *
 		done <- true
 		errs <- err
 	}
-
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
