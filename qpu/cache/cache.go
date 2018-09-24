@@ -112,8 +112,10 @@ func predicateToKey(p []*pbQPU.Predicate) string {
 		switch pp.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
 			entryKey += pp.Attribute + "/" + strconv.FormatInt(pp.Lbound.GetInt(), 10) + "/" + strconv.FormatInt(pp.Ubound.GetInt(), 10)
-		case *pbQPU.Value_Name:
-			entryKey += pp.Attribute + "/" + pp.Lbound.GetName() + "/" + pp.Ubound.GetName()
+		case *pbQPU.Value_Str:
+			entryKey += pp.Attribute + "/" + pp.Lbound.GetStr() + "/" + pp.Ubound.GetStr()
+		case *pbQPU.Value_Flt:
+			entryKey += pp.Attribute + "/" + strconv.FormatFloat(float64(pp.Lbound.GetFlt()), 'E', -1, 32) + "/" + strconv.FormatFloat(float64(pp.Ubound.GetFlt()), 'E', -1, 32)
 		}
 		if i < len(p)-1 {
 			entryKey += "&"

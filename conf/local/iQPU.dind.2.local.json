@@ -8,7 +8,7 @@
             "endpoint": "localhost:50151"
         }
     ],
-    "canProcess": {
+    "indexConfig": {
         "dataType": "int",
         "attribute": "size",
         "lBound": "1024",

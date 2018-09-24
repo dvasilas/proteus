@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/abiosoft/ishell"
@@ -14,48 +14,26 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error) error {
-	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errs
-			return err
-		}
-		res := <-msg
-		logMsg := log.Fields{
-			"key":     res.GetObject().GetKey(),
-			"dataset": res.GetDataset(),
-		}
-		for attr := range query {
-			if attr == "size" {
-				logMsg[attr] = res.GetObject().GetAttributes()[attr].GetInt()
-			} else if attr == "x-amz-meta" {
-				logMsg[attr] = res.GetObject().GetAttributes()[attr].GetName()
-			}
-		}
-		log.WithFields(logMsg).Infof("result")
-	}
-}
-
-func find(attr string, lb string, ub string, c cli.Client, errs chan error) {
+func find(datatype string, attr string, lb string, ub string, c cli.Client, errs chan error) {
 	var query map[string][2]*pbQPU.Value
-	if attr == "size" {
-		lbound, err := strconv.ParseInt(lb, 10, 64)
+	if datatype == "int" {
+		lbound, ubound, err := utils.AttrBoundStrToVal("int", lb, ub)
 		if err != nil {
-			errs <- errors.New("Lower bound is not int")
+			errs <- errors.New("bound error")
 			return
 		}
-		ubound, err := strconv.ParseInt(ub, 10, 64)
+		query = map[string][2]*pbQPU.Value{attr: {lbound, ubound}}
+	} else if datatype == "str" {
+		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
+	} else if datatype == "float" {
+		lbound, ubound, err := utils.AttrBoundStrToVal("float", lb, ub)
 		if err != nil {
-			errs <- errors.New("Upper bound is not int")
+			errs <- errors.New("bound error")
 			return
 		}
-		query = map[string][2]*pbQPU.Value{attr: {utils.ValInt(lbound), utils.ValInt(ubound)}}
-	} else if attr == "key" {
-		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
-	} else if attr == "x-amz-meta" {
-		query = map[string][2]*pbQPU.Value{attr: {utils.ValStr(lb), utils.ValStr(ub)}}
+		query = map[string][2]*pbQPU.Value{attr: {lbound, ubound}}
 	} else {
-		errs <- errors.New("Unknown attribute")
+		errs <- errors.New("Unknown datatype")
 		return
 	}
 	errs <- sendQuery(query, c)
@@ -68,6 +46,39 @@ func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
 
 	go c.Find(time.Now().UnixNano(), query, msg, done, errs)
 	return queryConsumer(query, msg, done, errs)
+}
+
+func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error) error {
+	for {
+		if doneMsg := <-done; doneMsg {
+			err := <-errs
+			return err
+		}
+		res := <-msg
+		displayResults(query, res.GetObject(), res.GetDataset())
+	}
+}
+
+func displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet) {
+	logMsg := log.Fields{
+		"key":     obj.GetKey(),
+		"dataset": ds,
+	}
+	for attr := range obj.GetAttributes() {
+		for q := range query {
+			if strings.Contains(attr, q) {
+				switch obj.GetAttributes()[attr].Val.(type) {
+				case *pbQPU.Value_Int:
+					logMsg[q] = obj.GetAttributes()[attr].GetInt()
+				case *pbQPU.Value_Flt:
+					logMsg[q] = obj.GetAttributes()[attr].GetFlt()
+				default:
+					logMsg[q] = obj.GetAttributes()[attr].GetStr()
+				}
+			}
+		}
+	}
+	log.WithFields(logMsg).Infof("result")
 }
 
 func main() {
@@ -89,7 +100,7 @@ func main() {
 			os.Args = append(os.Args, os.Args[3])
 		}
 
-		go find(os.Args[2], os.Args[3], os.Args[4], c, errs)
+		go find(os.Args[2], os.Args[3], os.Args[4], os.Args[5], c, errs)
 		err := <-errs
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -114,7 +125,7 @@ func main() {
 				if len(ctx.Args) == 2 {
 					ctx.Args = append(ctx.Args, ctx.Args[1])
 				}
-				go find(ctx.Args[0], ctx.Args[1], ctx.Args[2], c, errs)
+				go find(ctx.Args[0], ctx.Args[1], ctx.Args[2], ctx.Args[3], c, errs)
 				err := <-errs
 				if err != nil {
 					ctx.Err(err)

@@ -35,19 +35,21 @@ func Forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predicate, stre
 //Filter examines whether an object satisfies a given predicate.
 //It returns a boolean indicated whether the predicate is satisfied.
 func Filter(obj *pbQPU.Object, predicate []*pbQPU.Predicate) bool {
-	log.SetLevel(log.DebugLevel)
-
 	for _, pred := range predicate {
 		switch pred.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
 			if obj.Attributes[pred.Attribute].GetInt() < pred.Lbound.GetInt() || obj.Attributes[pred.Attribute].GetInt() > pred.Ubound.GetInt() {
 				return noMatch(obj)
 			}
-		case *pbQPU.Value_Name:
+		case *pbQPU.Value_Str:
 			if pred.Attribute == "key" {
-				if obj.Key != pred.Lbound.GetName() {
+				if obj.Key != pred.Lbound.GetStr() {
 					return noMatch(obj)
 				}
+			}
+		case *pbQPU.Value_Flt:
+			if obj.Attributes[pred.Attribute].GetFlt() < pred.Lbound.GetFlt() || obj.Attributes[pred.Attribute].GetFlt() > pred.Ubound.GetFlt() {
+				return noMatch(obj)
 			}
 		default:
 			return noMatch(obj)

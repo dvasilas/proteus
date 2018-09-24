@@ -11,8 +11,9 @@ message Object {
 
 message Value {
     oneof val {
-        string name = 1;
+        string str = 1;
         int64 int = 2;
+        double flt = 3;
     }
 }
 
