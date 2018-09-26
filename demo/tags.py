@@ -9,6 +9,9 @@
 #
 # To run TagBox
 # docker run -p 8080:8080 -e "MB_KEY=$MB_KEY" machinebox/tagbox
+#
+# requires
+# MB_KEY env variable
 import sys, getopt
 import argparse
 import os
@@ -18,60 +21,59 @@ import json
 from pprint import pprint
 import subprocess
 import shlex
-
-images = ["./images/car.jpg",
-				"./images/coffee.jpg",
-				"./images/laptop.jpg",
-				"./images/monkey.jpg",
-				"./images/towerbridge.jpg"]
+from os import listdir
+from os.path import isfile, join
 
 def main(argv):
 	filepath = ""
 
 	# Parse arguments. File full path and op (upload/download)
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--endpointport', help='endpointport help')
-	parser.add_argument('--bucket', help='bucket help')
+	parser.add_argument('--endpointport', help='')
+	parser.add_argument('--bucket', help='')
+	parser.add_argument('--dir', help='')
 	args = vars(parser.parse_args())
 
 	zenkoendpoint = args['endpointport']
 	zenkobucket = args['bucket']
+	path = args['dir']
 
-	for filepath in images:
-		filename = ntpath.basename(filepath)
-		print filepath
-		print filename
+	images = [f for f in listdir(path) if isfile(join(path, f))]
+
+	for filename in images:
+		filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), path, filename)
+
+		print(filepath)
+		print(filename)
 
 		# Upload file with public read access
-		print "Uploading file to Zenko ..."
+		print("Uploading file to Zenko ...")
 		command = 's3cmd put --host=127.0.0.1:' + zenkoendpoint + ' --acl-public ' + filepath + ' s3://'+ zenkobucket + '/' + filename
-		print command
+		print(command)
 		os.system(command)
 
 		# Analyze file with machinebox
-		print "MachineBox analyzing file ..."
+		print("MachineBox analyzing file ...")
 		command = 'curl -H \'Content-Type: application/json\' -d \'{"url":"http://host.docker.internal:' + zenkoendpoint  + '/' + zenkobucket + '/' + filename + '"}\' http://localhost:8080/tagbox/check'
-		print command
+		print(command)
 		result = subprocess.check_output(command, shell=True)
-		print result
+		print(result)
 
-		json_res = json.loads(result)
+		json_res = json.loads(result.decode('utf-8'))
 
-		print json_res["tags"]
+		print(json_res["tags"])
 
 		tagset_str = ''
 
 		if len(json_res["tags"]) != 0:
 			i=0
 			while i<len(json_res["tags"]):
-				print json_res["tags"][i]["tag"]
 				json_res["tags"][i]["tag"] = json_res["tags"][i]["tag"].replace(" ","-")
-				print json_res["tags"][i]["confidence"]
-				tagset_str = tagset_str + ' --add-header=x-amz-meta-'+str(json_res["tags"][i]["tag"]) + ':' + str(json_res["tags"][i]["confidence"])
+				tagset_str = tagset_str + ' --add-header=x-amz-meta-f-'+str(json_res["tags"][i]["tag"]) + ':' + str(json_res["tags"][i]["confidence"])
 				i=i+1
 
 		command = 's3cmd modify --host=127.0.0.1:' + zenkoendpoint + ' s3://'+ zenkobucket + '/' + filename + ' ' + tagset_str
-		print command
+		print(command)
 		os.system(command)
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@
         "dataType": "int",
         "attribute": "size",
         "lBound": "0",
-        "uBound": "1024"
+        "uBound": "1048576",
+        "consLevel": "async"
     }
 }

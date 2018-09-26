@@ -83,20 +83,16 @@ func initShell(c cli.Client) {
 		Name: "find",
 		Help: "Perform a query on object attribute",
 		Func: func(ctx *ishell.Context) {
-			ctx.ProgressBar().Indeterminate(true)
-			ctx.ProgressBar().Start()
 			query, err := processQueryString(ctx.Args[0])
 			if err != nil {
-				log.WithFields(log.Fields{
-					"error": err,
-				}).Fatal("Find failed")
+				ctx.Err(err)
+				return
 			}
 			err = find(query, c)
 			if err != nil {
 				ctx.Err(err)
 				return
 			}
-			ctx.ProgressBar().Stop()
 		},
 	})
 	shell.Run()

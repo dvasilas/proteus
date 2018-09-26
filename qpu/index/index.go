@@ -65,7 +65,9 @@ func Update(i *Index, op *pbQPU.Operation) error {
 	}).Debug("index:Update")
 	for k, v := range op.GetObject().GetAttributes() {
 		if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
-			removeOldEntry(k, v, op.GetObject(), i)
+			if op.GetOpId() != "catchUp" {
+				removeOldEntry(k, v, op.GetObject(), i)
+			}
 			if err := put(k, v, op.GetObject(), op.GetDataSet(), i); err != nil {
 				return err
 			}
