@@ -9,6 +9,7 @@ import (
 	indexTF "github.com/dimitriosvasilas/modqp/qpu/index/indexTagFloat"
 	indexTS "github.com/dimitriosvasilas/modqp/qpu/index/indexTagStr"
 	"github.com/google/btree"
+	log "github.com/sirupsen/logrus"
 )
 
 //Impl ...
@@ -59,6 +60,9 @@ func New(datatype string, attr string, lb string, ub string) (*Index, error) {
 //Update updates the index based on a given datastore operation.
 //It returns any error encountered.
 func Update(i *Index, op *pbQPU.Operation) error {
+	log.WithFields(log.Fields{
+		"operation": op,
+	}).Debug("index:Update")
 	for k, v := range op.GetObject().GetAttributes() {
 		if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
 			removeOldEntry(k, v, op.GetObject(), i)

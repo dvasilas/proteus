@@ -63,7 +63,7 @@ func TestSubscribeOps(t *testing.T) {
 	assert.Nil(t, err)
 	time.Sleep(100 * time.Millisecond)
 
-	go s.SubscribeOps(req, mock)
+	go s.SubscribeOpsAsync(req, mock)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -73,8 +73,7 @@ func TestSubscribeOps(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, mock.ops[0].Operation.Key, viper.Get("HOME").(string)+conf.DataStore.DataDir+"temp.txt")
-	assert.Equal(t, mock.ops[0].Operation.Op, "WRITE")
+	assert.Equal(t, mock.ops[0].Operation.Object.Key, viper.Get("HOME").(string)+conf.DataStore.DataDir+"temp.txt")
 }
 
 func testEndToEndSubscribeOps(t *testing.T) {

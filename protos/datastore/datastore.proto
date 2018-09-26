@@ -6,7 +6,8 @@ option go_package = "github.com/dimitriosvasilas/modqp/protos/datastore";
 import "utils.proto";
 
 service DataStore {
-  rpc SubscribeOps(SubRequest) returns (stream OpStream) {}
+  rpc SubscribeOpsSync(stream OpAckStream) returns (stream OpStream) {}
+  rpc SubscribeOpsAsync(SubRequest) returns (stream OpStream) {}
   rpc SubscribeStates(SubRequest) returns (stream StateStream) {}
   rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
   rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
@@ -14,6 +15,11 @@ service DataStore {
 
 message SubRequest {
   int64 timestamp = 1;
+}
+
+message OpAckStream {
+  string msg = 1;
+  string opId = 2;
 }
 
 message OpStream {
