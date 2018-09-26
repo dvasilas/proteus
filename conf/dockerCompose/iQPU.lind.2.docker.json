@@ -5,9 +5,10 @@
         "endpoint": "host.docker.internal:50151"
     }],
     "indexConfig": {
-        "dataType": "string",
+        "dataType": "float",
         "attribute": "x-amz-meta",
-        "lBound": "any",
-        "uBound": "any"
+        "lBound": "0.0",
+        "uBound": "1.0",
+        "consLevel": "async"
     }
 }

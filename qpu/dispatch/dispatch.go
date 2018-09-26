@@ -68,8 +68,24 @@ func queryInAttrRange(conn utils.QPUConn, query pbQPU.Predicate) bool {
 }
 
 func canProcessQuery(conn utils.QPUConn, query pbQPU.Predicate) bool {
-	if conn.Attribute == query.Attribute || conn.Attribute == "any" {
+	if conn.Attribute == "any" {
 		return true
+	}
+	switch query.Lbound.Val.(type) {
+	case *pbQPU.Value_Int:
+		if conn.DataType == "int" {
+			return true
+		}
+	case *pbQPU.Value_Str:
+		if conn.DataType == "string" {
+			return true
+		}
+	case *pbQPU.Value_Flt:
+		if conn.DataType == "float" {
+			return true
+		}
+	default:
+		return false
 	}
 	return false
 }
