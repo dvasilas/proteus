@@ -76,6 +76,8 @@ func NewServer(qType string) error {
 	if err != nil {
 		return err
 	}
+	log.SetLevel(log.DebugLevel)
+
 	var server Server
 	if conf.QpuType == "scan" {
 		c, _, err := dSQPUcli.NewClient(conf.Conns[0].EndPoint)
@@ -124,12 +126,23 @@ func NewServer(qType string) error {
 			server.config.Conns[i].DataSet.DC = int(dSConfig.Dataset.Dc)
 			server.config.Conns[i].DataSet.Shard = int(dSConfig.Dataset.Shard)
 
-			stream, cancel, err := c.SubscribeOps(time.Now().UnixNano())
-			if err != nil {
-				cancel()
-				return err
+			if conf.IndexConfig.ConsLevel == "async" {
+				stream, cancel, err := c.SubscribeOpsAsync(time.Now().UnixNano())
+				if err != nil {
+					cancel()
+					return err
+				}
+				go server.opConsumerAsync(stream, cancel)
+			} else if conf.IndexConfig.ConsLevel == "sync" {
+				stream, cancel, err := c.SubscribeOpsSync(time.Now().UnixNano())
+				if err != nil {
+					cancel()
+					return err
+				}
+				go server.opConsumerSync(stream, cancel)
+			} else {
+				return errors.New("ConsLevel in IndexConfig can be sync/async")
 			}
-			go server.opConsumer(stream, cancel)
 		}
 
 		if err := server.indexCatchUp(); err != nil {
@@ -185,26 +198,60 @@ func (s *Server) findResultConsumer(pred []*pbQPU.Predicate, stream pb.QPU_FindS
 }
 
 //TODO: Find a way to handle an error here
-func (s *Server) opConsumer(stream pbDsQPU.DataStore_SubscribeOpsClient, cancel context.CancelFunc) {
+func (s *Server) opConsumerAsync(stream pbDsQPU.DataStore_SubscribeOpsAsyncClient, cancel context.CancelFunc) {
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
-			log.Fatalf("opConsumer received EOF, which is not expected")
+			log.Fatal("opConsumer received EOF, which is not expected")
 			return
 		} else if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-			}).Fatalf("opConsumer: stream.Recv() error")
+			}).Fatal("opConsumer: stream.Recv() error")
 			return
 		} else {
-			if streamMsg.Operation.Op == "no_op" {
+			if streamMsg.Operation.OpId == "no_op" {
 				continue
 			}
 			if err := index.Update(s.index, streamMsg.Operation); err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
 					"op":    streamMsg.Operation,
-				}).Fatalf("opConsumer: index Update failed")
+				}).Fatal("opConsumer: index Update failed")
+				return
+			}
+		}
+	}
+}
+
+func (s *Server) opConsumerSync(stream pbDsQPU.DataStore_SubscribeOpsSyncClient, cancel context.CancelFunc) {
+	for {
+		streamMsg, err := stream.Recv()
+		if err == io.EOF {
+			log.Fatal("opConsumer received EOF, which is not expected")
+			return
+		} else if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Fatal("opConsumer: stream.Recv() error")
+			return
+		} else {
+			if streamMsg.Operation.OpId == "no_op" {
+				continue
+			}
+			log.WithFields(log.Fields{
+				"op": streamMsg.GetOperation(),
+			}).Debug("QPUServer:opConsumerSync:  received op")
+			if err := index.Update(s.index, streamMsg.Operation); err != nil {
+				log.WithFields(log.Fields{
+					"error": err,
+					"op":    streamMsg.Operation,
+				}).Fatal("opConsumer: index Update failed")
+				return
+			}
+			log.Debug("QPUServer:index updated, sending ACK")
+			if err := stream.Send(&pbDsQPU.OpAckStream{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}); err != nil {
+				log.Fatal("opConsumerSync stream.Send failed")
 				return
 			}
 		}
@@ -239,8 +286,7 @@ func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient,
 			return
 		}
 		op := &pbQPU.Operation{
-			Key:     streamMsg.GetObject().GetKey(),
-			Op:      "catchUp",
+			OpId:    "catchUp",
 			Object:  streamMsg.GetObject(),
 			DataSet: streamMsg.GetDataset(),
 		}
@@ -416,6 +462,6 @@ func main() {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
-		}).Fatalf("QPU server failed")
+		}).Fatal("QPU server failed")
 	}
 }

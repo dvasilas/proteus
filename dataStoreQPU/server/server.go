@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
 	"net"
 	"path/filepath"
 	"runtime"
@@ -22,7 +23,8 @@ import (
 
 type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error)
-	SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error)
+	SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan bool, errs chan error)
+	SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error)
 }
 
 //Config ...
@@ -98,6 +100,7 @@ func ΝewServer(confFile string) error {
 	if err != nil {
 		return err
 	}
+	log.SetLevel(log.DebugLevel)
 
 	var server Server
 	if conf.DataStore.Type == "fs" {
@@ -146,22 +149,22 @@ func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg
 	}
 }
 
-func heartbeat(stream pb.DataStore_SubscribeOpsServer) {
-	op := &pbQPU.Operation{Op: "no_op"}
-	if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+func heartbeat(stream pb.DataStore_SubscribeOpsAsyncServer) {
+	opID := &pbQPU.Operation{OpId: "no_op"}
+	if err := stream.Send(&pb.OpStream{Operation: opID}); err != nil {
 		return
 	}
 	f := newHeartbeat(stream)
 	time.AfterFunc(10*time.Second, f)
 }
 
-func newHeartbeat(stream pb.DataStore_SubscribeOpsServer) func() {
+func newHeartbeat(stream pb.DataStore_SubscribeOpsAsyncServer) func() {
 	return func() {
 		heartbeat(stream)
 	}
 }
 
-func (s *Server) opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
+func (s *Server) opsConsumerAsync(stream pb.DataStore_SubscribeOpsAsyncServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
 	heartbeat(stream)
 	for {
 		if doneMsg := <-done; doneMsg {
@@ -183,20 +186,73 @@ func (s *Server) opsConsumer(stream pb.DataStore_SubscribeOpsServer, msg chan *p
 	}
 }
 
+func (s *Server) opsConsumerSync(stream pb.DataStore_SubscribeOpsSyncServer, msg chan *pbQPU.Operation, done chan bool, ack chan bool, errsFrom chan error, errs chan error) {
+	heartbeat(stream)
+	for {
+		if doneMsg := <-done; doneMsg {
+			err := <-errsFrom
+			errs <- err
+			return
+		}
+		op := <-msg
+
+		ds := &pbQPU.DataSet{
+			Db:    int64(s.config.DataStore.DataSet.DB),
+			Dc:    int64(s.config.DataStore.DataSet.DC),
+			Shard: int64(s.config.DataStore.DataSet.Shard),
+		}
+		op.DataSet = ds
+		log.Debug("DataStoreQPU:opsConsumerSync received op, sending to indexQPU")
+		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+			errs <- err
+			return
+		}
+		log.Debug("DataStoreQPU:opsConsumerSync waiting for ACK, ..")
+		ackMsg, err := stream.Recv()
+		if err == io.EOF {
+			errs <- errors.New("opsConsumerSync reveived nil")
+			return
+		}
+		if err != nil {
+			errs <- err
+			return
+		}
+		log.WithFields(log.Fields{
+			"message": ackMsg,
+		}).Debug("S3DataStore:watchSync received ACK, forwarding ACK")
+		ack <- true
+	}
+}
+
 //SubscribeStates ...
 func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStore_SubscribeStatesServer) error {
 	return nil
 }
 
-//SubscribeOps ...
-func (s *Server) SubscribeOps(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsServer) error {
+//SubscribeOpsAsync ...
+func (s *Server) SubscribeOpsAsync(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsAsyncServer) error {
 	msg := make(chan *pbQPU.Operation)
 	done := make(chan bool)
 	errs := make(chan error)
 	errs1 := make(chan error)
 
-	go s.opsConsumer(stream, msg, done, errs, errs1)
-	go s.ds.SubscribeOps(msg, done, errs)
+	go s.opsConsumerAsync(stream, msg, done, errs, errs1)
+	go s.ds.SubscribeOpsAsync(msg, done, errs)
+
+	err := <-errs1
+	return err
+}
+
+//SubscribeOpsSync ...
+func (s *Server) SubscribeOpsSync(stream pb.DataStore_SubscribeOpsSyncServer) error {
+	msg := make(chan *pbQPU.Operation)
+	done := make(chan bool)
+	errs := make(chan error)
+	errs1 := make(chan error)
+	ack := make(chan bool)
+
+	go s.opsConsumerSync(stream, msg, done, ack, errs, errs1)
+	go s.ds.SubscribeOpsSync(msg, done, ack, errs)
 
 	err := <-errs1
 	return err
@@ -235,6 +291,6 @@ func main() {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
-		}).Fatalf("dataStoreQPU server failed")
+		}).Fatal("dataStoreQPU server failed")
 	}
 }

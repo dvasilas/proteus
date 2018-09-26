@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"os"
 
 	utils "github.com/dimitriosvasilas/modqp"
@@ -61,8 +62,7 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, do
 			}
 			done <- false
 			msg <- &pbQPU.Operation{
-				Key: event.Name,
-				Op:  event.Op.String(),
+				OpId: "noId",
 				Object: &pbQPU.Object{
 					Key: f.Name(),
 					Attributes: map[string]*pbQPU.Value{
@@ -80,8 +80,8 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, do
 	}
 }
 
-//SubscribeOps ...
-func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
+//SubscribeOpsAsync ...
+func (ds FSDataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		errs <- err
@@ -95,4 +95,9 @@ func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, done chan bool, er
 		errs <- err
 	}
 	<-errs
+}
+
+//SubscribeOpsSync ...
+func (ds FSDataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error) {
+	errs <- errors.New("Not supported")
 }

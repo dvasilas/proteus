@@ -114,6 +114,7 @@ type QPUConfig struct {
 		Attribute string
 		LBound    string
 		UBound    string
+		ConsLevel string
 	}
 }
 

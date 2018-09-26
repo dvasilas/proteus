@@ -4,7 +4,13 @@ package s3datastore;
 option go_package = "github.com/dimitriosvasilas/modqp/protos/s3";
 
 service S3DataStore {
-  rpc watch(SubRequest) returns (stream OpStream) {}
+    rpc watchSync(stream OpAck) returns (stream OpStream) {}
+    rpc watchAsync(SubRequest) returns (stream OpStream) {}
+}
+
+message OpAck {
+    string msg = 1;
+    string opId = 2;
 }
 
 message SubRequest {
@@ -28,6 +34,6 @@ message Value {
 }
 
 message Operation {
-    string op = 2;
+    string opId = 2;
     Object object = 3;
 }

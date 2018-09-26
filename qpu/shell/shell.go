@@ -73,7 +73,7 @@ func displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQ
 			}
 		}
 	}
-	log.WithFields(logMsg).Infof("result")
+	log.WithFields(logMsg).Info("result")
 }
 func initShell(c cli.Client) {
 	shell := ishell.New()
@@ -89,7 +89,7 @@ func initShell(c cli.Client) {
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
-				}).Fatalf("Find failed")
+				}).Fatal("Find failed")
 			}
 			err = find(query, c)
 			if err != nil {
@@ -148,26 +148,26 @@ func main() {
 	c, conn, err := cli.NewClient(endpoint)
 	defer conn.Close()
 	if err != nil {
-		log.Fatalf("failed to create Client %v", err)
+		log.Fatal("failed to create Client %v", err)
 	}
 	if mode == "cmd" {
 		query, err := processQueryString(queryIn)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-			}).Fatalf("Find failed")
+			}).Fatal("Find failed")
 		}
 		err = find(query, c)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-			}).Fatalf("Find failed")
+			}).Fatal("Find failed")
 		}
 	} else if mode == "sh" {
 		initShell(c)
 	} else if mode == "http" {
 		log.WithFields(log.Fields{
 			"error": errors.New("Not implemented"),
-		}).Fatalf("Find failed")
+		}).Fatal("Find failed")
 	}
 }

@@ -18,8 +18,7 @@ message Value {
 }
 
 message Operation {
-    string key = 1;
-    string op = 2;
+    string opId = 2;
     Object object = 3;
     DataSet dataSet = 4;
     int64 timestamp = 5;

@@ -26,11 +26,20 @@ func (c *Client) SubscribeStates(ts int64) (pb.DataStore_SubscribeStatesClient, 
 	return stream, cancel, err
 }
 
-// SubscribeOps ...
-func (c *Client) SubscribeOps(ts int64) (pb.DataStore_SubscribeOpsClient, context.CancelFunc, error) {
+// SubscribeOpsAsync ...
+func (c *Client) SubscribeOpsAsync(ts int64) (pb.DataStore_SubscribeOpsAsyncClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	stream, err := c.dsClient.SubscribeOps(ctx, &pb.SubRequest{Timestamp: ts})
+	stream, err := c.dsClient.SubscribeOpsAsync(ctx, &pb.SubRequest{Timestamp: ts})
+	c.activeStreams.opSubStreams[ts] = cancel
+	return stream, cancel, err
+}
+
+// SubscribeOpsSync ...
+func (c *Client) SubscribeOpsSync(ts int64) (pb.DataStore_SubscribeOpsSyncClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	stream, err := c.dsClient.SubscribeOpsSync(ctx)
 	c.activeStreams.opSubStreams[ts] = cancel
 	return stream, cancel, err
 }
