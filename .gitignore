@@ -7,3 +7,7 @@
 vendor/
 
 bin/
+
+.DS_STORE
+
+.vscode

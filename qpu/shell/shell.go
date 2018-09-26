@@ -59,17 +59,19 @@ func displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQ
 		"key":     obj.GetKey(),
 		"dataset": ds,
 	}
-	for attr := range obj.GetAttributes() {
-		for q := range query {
-			if strings.Contains(attr, q) {
-				switch obj.GetAttributes()[attr].Val.(type) {
-				case *pbQPU.Value_Int:
-					logMsg[q] = obj.GetAttributes()[attr].GetInt()
-				case *pbQPU.Value_Flt:
-					logMsg[q] = obj.GetAttributes()[attr].GetFlt()
-				default:
-					logMsg[q] = obj.GetAttributes()[attr].GetStr()
-				}
+	for qAttr := range query {
+		switch query[qAttr][0].Val.(type) {
+		case *pbQPU.Value_Int:
+			logMsg[qAttr] = obj.GetAttributes()[qAttr].GetInt()
+		case *pbQPU.Value_Flt:
+			attrK := "x-amz-meta-f-" + qAttr
+			logMsg[qAttr] = obj.GetAttributes()[attrK].GetFlt()
+		default:
+			if qAttr == "key" {
+				logMsg[qAttr] = obj.GetKey()
+			} else {
+				attrK := "x-amz-meta-" + qAttr
+				logMsg[qAttr] = obj.GetAttributes()[attrK].GetStr()
 			}
 		}
 	}
