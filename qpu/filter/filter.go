@@ -32,23 +32,45 @@ func Forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predicate, stre
 	return nil
 }
 
-//Filter examines whether an object satisfies a given predicate.
-//It returns a boolean indicated whether the predicate is satisfied.
-func Filter(obj *pbQPU.Object, predicate []*pbQPU.Predicate) bool {
-	for _, pred := range predicate {
-		switch pred.Lbound.Val.(type) {
+//Filter examines whether an object satisfies a given query.
+//It returns a boolean indicated whether the query is satisfied.
+func Filter(obj *pbQPU.Object, query []*pbQPU.Predicate) bool {
+	for _, q := range query {
+		switch q.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
-			if obj.Attributes[pred.Attribute].GetInt() < pred.Lbound.GetInt() || obj.Attributes[pred.Attribute].GetInt() > pred.Ubound.GetInt() {
+			attrK := "size"
+			if q.Attribute != "size" {
+				attrK = "x-amz-meta-f-" + q.Attribute
+			}
+			if attrVal, ok := obj.GetAttributes()[attrK]; ok {
+				if attrVal.GetInt() < q.Lbound.GetInt() || attrVal.GetInt() > q.Ubound.GetInt() {
+					return noMatch(obj)
+				}
+			} else {
 				return noMatch(obj)
 			}
 		case *pbQPU.Value_Str:
-			if pred.Attribute == "key" {
-				if obj.Key != pred.Lbound.GetStr() {
+			if q.Attribute == "key" {
+				if obj.GetKey() < q.Lbound.GetStr() || obj.GetKey() > q.Ubound.GetStr() {
+					return noMatch(obj)
+				}
+			} else {
+				attrK := "x-amz-meta-f-" + q.Attribute
+				if attrVal, ok := obj.GetAttributes()[attrK]; ok {
+					if attrVal.GetStr() < q.Lbound.GetStr() || attrVal.GetStr() > q.Ubound.GetStr() {
+						return noMatch(obj)
+					}
+				} else {
 					return noMatch(obj)
 				}
 			}
 		case *pbQPU.Value_Flt:
-			if obj.Attributes[pred.Attribute].GetFlt() < pred.Lbound.GetFlt() || obj.Attributes[pred.Attribute].GetFlt() > pred.Ubound.GetFlt() {
+			attrK := "x-amz-meta-f-" + q.Attribute
+			if attrVal, ok := obj.GetAttributes()[attrK]; ok {
+				if attrVal.GetFlt() < q.Lbound.GetFlt() || attrVal.GetFlt() > q.Ubound.GetFlt() {
+					return noMatch(obj)
+				}
+			} else {
 				return noMatch(obj)
 			}
 		default:
