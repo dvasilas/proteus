@@ -1,0 +1,17 @@
+{
+    "port": "50150",
+    "dataStore": {
+        "dataSet": {
+            "db": 1,
+            "dc": 1,
+            "shard": 1
+        },
+        "type": "antidote",
+        "dataDir": "/cloudserver",
+        "ΑwsAccessKeyId": "accessKey1",
+        "awsSecretAccessKey": "verySecretKey1",
+        "endpoint": "http://localhost:8000",
+        "bucketName": "local-s3",
+        "logStreamEndpoint": "localhost:50050"
+    }
+}

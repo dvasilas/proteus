@@ -18,7 +18,7 @@ message SubRequest {
 }
 
 message OpStream {
-  Operation operation = 3;
+  Operation operation = 1;
 }
 
 message Object {
@@ -34,6 +34,6 @@ message Value {
 }
 
 message Operation {
-    string opId = 2;
-    Object object = 3;
+    string opId = 1;
+    Object object = 2;
 }

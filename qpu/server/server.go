@@ -89,9 +89,9 @@ func NewServer(qType string) error {
 		if err != nil {
 			return err
 		}
-		server.config.Conns[0].DataSet.DB = int(dSConfig.Dataset.Db)
-		server.config.Conns[0].DataSet.DC = int(dSConfig.Dataset.Dc)
-		server.config.Conns[0].DataSet.Shard = int(dSConfig.Dataset.Shard)
+		server.config.Conns[0].DataSet.DB = dSConfig.Dataset.Db
+		server.config.Conns[0].DataSet.DC = dSConfig.Dataset.Dc
+		server.config.Conns[0].DataSet.Shard = dSConfig.Dataset.Shard
 		server.config.IndexConfig.DataType = "any"
 		server.config.IndexConfig.Attribute = "any"
 		server.config.IndexConfig.LBound = "any"
@@ -122,9 +122,9 @@ func NewServer(qType string) error {
 			if err != nil {
 				return err
 			}
-			server.config.Conns[i].DataSet.DB = int(dSConfig.Dataset.Db)
-			server.config.Conns[i].DataSet.DC = int(dSConfig.Dataset.Dc)
-			server.config.Conns[i].DataSet.Shard = int(dSConfig.Dataset.Shard)
+			server.config.Conns[i].DataSet.DB = dSConfig.Dataset.Db
+			server.config.Conns[i].DataSet.DC = dSConfig.Dataset.Dc
+			server.config.Conns[i].DataSet.Shard = dSConfig.Dataset.Shard
 
 			if conf.IndexConfig.ConsLevel == "async" {
 				stream, cancel, err := c.SubscribeOpsAsync(time.Now().UnixNano())
@@ -149,6 +149,7 @@ func NewServer(qType string) error {
 			return err
 		}
 	} else if conf.QpuType == "dispatch" {
+		time.Sleep(5 * time.Second)
 		downwardsConns, err := utils.NewDConn(conf)
 		if err != nil {
 			return err
@@ -213,7 +214,11 @@ func (s *Server) opConsumerAsync(stream pbDsQPU.DataStore_SubscribeOpsAsyncClien
 			if streamMsg.Operation.OpId == "no_op" {
 				continue
 			}
-			if err := index.Update(s.index, streamMsg.Operation); err != nil {
+			log.WithFields(log.Fields{
+				"operation": streamMsg.GetOperation(),
+			}).Debug("index QPU received operation")
+
+			if err := index.Update(s.index, streamMsg.GetOperation()); err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
 					"op":    streamMsg.Operation,
@@ -361,15 +366,15 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		err = <-errs
 		return err
 	} else if s.config.QpuType == "index" {
+		log.WithFields(log.Fields{
+			"query": in.Predicate,
+		}).Info("Index lookup")
 		indexResult, found, err := s.index.Get(in.Predicate)
 		if err != nil {
 			return err
 		}
 		if found {
 			for _, item := range indexResult {
-				log.WithFields(log.Fields{
-					"entry": indexResult,
-				}).Info("index lookup")
 				if err := streamTo.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
 					return err
 				}
@@ -377,6 +382,9 @@ func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
 		}
 		return nil
 	} else if s.config.QpuType == "dispatch" {
+		log.WithFields(log.Fields{
+			"query": *in.Predicate[0],
+		}).Info("Received query")
 		clients, err := dispatch.ForwardQuery(s.dispatchConn, *in.Predicate[0])
 		if err != nil {
 			return err
@@ -425,9 +433,9 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 		})
 		for _, c := range s.config.Conns {
 			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-				Db:    int64(c.DataSet.DB),
-				Dc:    int64(c.DataSet.DC),
-				Shard: int64(c.DataSet.Shard),
+				Db:    c.DataSet.DB,
+				Dc:    c.DataSet.DC,
+				Shard: c.DataSet.Shard,
 			})
 		}
 	} else {
@@ -435,9 +443,9 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 			for rID, r := range db.DCs {
 				for shID, sh := range r.Shards {
 					resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-						Db:    int64(dbID),
-						Dc:    int64(rID),
-						Shard: int64(shID),
+						Db:    dbID,
+						Dc:    rID,
+						Shard: shID,
 					})
 					for _, q := range sh.QPUs {
 						resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
