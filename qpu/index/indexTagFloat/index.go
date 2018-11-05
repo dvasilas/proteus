@@ -15,17 +15,17 @@ type Entry struct {
 	Postings map[string]utils.Posting
 }
 
-//BTreeIndexF ...
-type BTreeIndexF struct {
+//IndexTagFloat ...
+type IndexTagFloat struct {
 }
 
 //New ...
-func New() *BTreeIndexF {
-	return &BTreeIndexF{}
+func New() *IndexTagFloat {
+	return &IndexTagFloat{}
 }
 
 //FilterIndexable ...
-func (i *BTreeIndexF) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
+func (i *IndexTagFloat) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
 	switch attrVal.Val.(type) {
 	case *pbQPU.Value_Flt:
 		if strings.HasPrefix(attrKey, "x-amz-meta-f-") {
@@ -50,27 +50,27 @@ func (x Entry) Less(than btree.Item) bool {
 }
 
 //OpToEntry ...
-func (i *BTreeIndexF) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
+func (i *IndexTagFloat) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
 	return Entry{Key: attrKey, Value: attrVal.GetFlt(), Postings: make(map[string]utils.Posting)}
 }
 
 //BoundToEntry ...
-func (i *BTreeIndexF) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
+func (i *IndexTagFloat) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
 	return Entry{Key: attrKey, Value: b.GetFlt()}
 }
 
 //GetPostings ...
-func (i *BTreeIndexF) GetPostings(entry btree.Item) map[string]utils.Posting {
+func (i *IndexTagFloat) GetPostings(entry btree.Item) map[string]utils.Posting {
 	return entry.(Entry).Postings
 }
 
 //AppendPostings ...
-func (i *BTreeIndexF) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
+func (i *IndexTagFloat) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
 	entry.(Entry).Postings[key] = p
 	return entry
 }
 
 //ReducedKeyToTagKey ...
-func (i *BTreeIndexF) ReducedKeyToTagKey(k string) string {
+func (i *IndexTagFloat) ReducedKeyToTagKey(k string) string {
 	return "x-amz-meta-f-" + k
 }

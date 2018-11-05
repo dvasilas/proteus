@@ -1,6 +1,6 @@
 version: '3'
 services:
-  iqpu1:
+  indexqpu_local_1:
     build:
       context: ../
       dockerfile: qpu/server/Dockerfile
@@ -11,7 +11,7 @@ services:
       mynetwork:
         aliases:
           - index.ds1.s3
-  iqpu2:
+  indexqpu_local_2:
     build:
       context: ../
       dockerfile: qpu/server/Dockerfile
@@ -22,7 +22,7 @@ services:
       mynetwork:
         aliases:
           - index.ds2.s3
-  iqpu3:
+  indexqpu_sharded_1:
     build:
       context: ../
       dockerfile: qpu/server/Dockerfile
@@ -33,7 +33,7 @@ services:
       mynetwork:
         aliases:
           - index1.s3
-  iqpu4:
+  indexqpu_sharded_2:
     build:
       context: ../
       dockerfile: qpu/server/Dockerfile
@@ -44,7 +44,7 @@ services:
       mynetwork:
         aliases:
           - index2.s3
-  dqpu:
+  dispatchqpu:
     build:
       context: ../
       dockerfile: qpu/server/Dockerfile
@@ -52,10 +52,10 @@ services:
       - "127.0.0.1:50550:50550"
     command: go run server.go -qpu=dQPU.docker
     depends_on:
-      - iqpu1
-      - iqpu2
-      - iqpu3
-      - iqpu4
+      - indexqpu_local_1
+      - indexqpu_local_2
+      - indexqpu_sharded_1
+      - indexqpu_sharded_2
     networks:
       mynetwork:
         aliases:
