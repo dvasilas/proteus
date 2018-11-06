@@ -57,6 +57,7 @@ Dispatch QPU: Works as query router for the QPU network
 
 
 Data store QPU: Data store abstraction; exposes common API for any data store; creates streams of objects/updates
+
 ----
 
 #### QPU Interface
@@ -76,10 +77,9 @@ Data store QPU: Data store abstraction; exposes common API for any data store; c
 
 
 ### Decentralized query processing protocol
-1. Given a query, a QPU first tries to process it according the search algorithm it implements (performing index/cache lookup, data store scan) 
+1. Given a query, a QPU first tries to process it according the search algorithm it implements (performing index/cache lookup, data store scan).
 
-2. If not possible, breaks down the given query to sub-queries; forwards sub-queries to neighbouring QPUs
+2. If not possible, breaks down the given query to sub-queries; forwards sub-queries to neighbouring QPUs.
+Query break down based on set of rules & QPU knowledge about neighbour capabilities.
 
-3. Query break down based on set of rules & QPU knowledge about neighbour capabilities
-
-4. Each neighbour recursively runs the same protocol; until sub-queries simple enough that can be processed in step1; results then incrementally combined
+4. Each neighbour recursively runs the same protocol; until sub-queries simple enough that can be processed in step1; results then incrementally combined.
