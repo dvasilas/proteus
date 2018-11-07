@@ -1,4 +1,4 @@
-This document describes the basic design of the Aries framework, and provides the reader with usefull information for setting up and using the frameowrk, including:
+This document describes the basic design of the Proteus framework, and provides the reader with usefull information for setting up and using the frameowrk, including:
 - the interface between the system's components
 - the distributed query execution semantics
 - how the framework can be installed and configured
@@ -7,7 +7,7 @@ This document describes the basic design of the Aries framework, and provides th
 ----
 ### Overview
 
-With Aries, a query processing system is deployed as a modular distributed architecture, composed of components that perform primitive query processing tasks.
+With Proteus, a query processing system is deployed as a modular distributed architecture, composed of components that perform primitive query processing tasks.
 
 The architecture's building block, termed **Q**uery **P**rocessing **U**nit, works as a service that receives and processes queries.
 
@@ -18,7 +18,7 @@ Query processing systems are built by deploying QPUs in different nodes of the s
 ----
 
 ### Data model
-Aries can in principle support multiple data models (object storage, NoSQL column storage, text document). The current implementation supports the object storage model.
+Proteus can in principle support multiple data models (object storage, NoSQL column storage, text document). The current implementation supports the object storage model.
 
 #### Object storage
 The dataset consists of a set of data items called *objects*.
