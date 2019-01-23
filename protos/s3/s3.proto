@@ -3,9 +3,15 @@ syntax = "proto3";
 package s3datastore;
 option go_package = "github.com/dimitriosvasilas/modqp/protos/s3";
 
+import "utils.proto";
+
 service S3DataStore {
     rpc watchSync(stream OpAck) returns (stream OpStream) {}
     rpc watchAsync(SubRequest) returns (stream OpStream) {}
+}
+
+message SubRequest {
+    int64 timestamp = 1;
 }
 
 message OpAck {
@@ -13,27 +19,6 @@ message OpAck {
     string opId = 2;
 }
 
-message SubRequest {
-  int64 timestamp = 1;
-}
-
 message OpStream {
-  Operation operation = 1;
-}
-
-message Object {
-  string key = 1;
-  map<string, Value> attributes = 2;
-}
-
-message Value {
-  oneof val {
-    string string_value = 1;
-    int64 int_value = 2;
-  }
-}
-
-message Operation {
-    string opId = 1;
-    Object object = 2;
+    utils.Operation operation = 1;
 }

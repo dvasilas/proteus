@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	pb "github.com/dimitriosvasilas/modqp/protos/s3"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 )
 
@@ -43,10 +43,8 @@ type S3DataStore struct {
 
 func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error) {
 	for {
-		op, err := stream.Recv()
-		log.WithFields(log.Fields{
-			"operation": op.GetOperation(),
-		}).Debug("S3DataStore:watchSync received operation")
+		inMsg, err := stream.Recv()
+
 		if err == io.EOF {
 			done <- true
 			errs <- nil
@@ -58,37 +56,31 @@ func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan 
 			return
 		}
 		done <- false
-		outOp := &pbQPU.Operation{
-			OpId: op.GetOperation().GetOpId(),
-			OpPayload: &pbQPU.OperationPayload{
-				Payload: &pbQPU.OperationPayload_State{
-					State: &pbQPU.Object{
-						Key: op.GetOperation().GetObject().GetKey(),
-						Attributes: map[string]*pbQPU.Value{
-							"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
-						},
-					},
-				},
-			},
+
+		op := inMsg.GetOperation()
+
+		log.WithFields(log.Fields{
+			"opId":   op.GetOpId(),
+			"key":    op.GetKey(),
+			"bucket": op.GetBucket(),
+			"object": op.GetOpPayload().GetState(),
+		}).Debug("S3DataStore:watchSync received op")
+
+		op, err = formatAttributes(op)
+		if err != nil {
+			done <- true
+			errs <- err
+			return
 		}
-		for attrK := range op.Operation.Object.Attributes {
-			if strings.HasPrefix(attrK, "x-amz-meta-") && strings.Compare(attrK, "x-amz-meta-s3cmd-attrs") != 0 {
-				attrK, attrV, err := formatAttributes(attrK, op.Operation.Object.Attributes[attrK].GetStringValue())
-				if err != nil {
-					done <- true
-					errs <- err
-				}
-				outOp.GetOpPayload().GetState().GetAttributes()[attrK] = attrV
-			}
-		}
+
 		log.Debug("S3DataStore:watchSync processed and forwarding operation")
-		msg <- outOp
+		msg <- op
 
 		ackMsg := <-ack
 		log.WithFields(log.Fields{
 			"message": ackMsg,
 		}).Debug("S3DataStore:watchSync received ACK, sending ACK to data store")
-		if err := stream.Send(&pb.OpAck{Msg: "ack", OpId: op.GetOperation().GetOpId()}); err != nil {
+		if err := stream.Send(&pb.OpAck{Msg: "ack", OpId: op.GetOpId()}); err != nil {
 			done <- true
 			errs <- err
 			return
@@ -98,7 +90,8 @@ func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan 
 
 func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg chan *pbQPU.Operation, done chan bool, errs chan error) {
 	for {
-		op, err := stream.Recv()
+		inMsg, err := stream.Recv()
+
 		if err == io.EOF {
 			done <- true
 			errs <- nil
@@ -108,29 +101,24 @@ func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg cha
 			errs <- err
 		}
 		done <- false
-		outOp := &pbQPU.Operation{
-			OpPayload: &pbQPU.OperationPayload{
-				Payload: &pbQPU.OperationPayload_State{
-					State: &pbQPU.Object{
-						Key: op.Operation.Object.Key,
-						Attributes: map[string]*pbQPU.Value{
-							"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
-						},
-					},
-				},
-			},
+
+		op := inMsg.GetOperation()
+
+		log.WithFields(log.Fields{
+			"opId":   op.GetOpId(),
+			"key":    op.GetKey(),
+			"bucket": op.GetBucket(),
+			"object": op.GetOpPayload().GetState(),
+		}).Debug("S3DataStore:watchAsync received op")
+
+		op, err = formatAttributes(op)
+		if err != nil {
+			done <- true
+			errs <- err
+			return
 		}
-		for attrK := range op.Operation.Object.Attributes {
-			if strings.HasPrefix(attrK, "x-amz-meta-") && strings.Compare(attrK, "x-amz-meta-s3cmd-attrs") != 0 {
-				attrK, attrV, err := formatAttributes(attrK, op.Operation.Object.Attributes[attrK].GetStringValue())
-				if err != nil {
-					done <- true
-					errs <- err
-				}
-				outOp.GetOpPayload().GetState().GetAttributes()[attrK] = attrV
-			}
-		}
-		msg <- outOp
+
+		msg <- op
 	}
 }
 
@@ -143,6 +131,22 @@ func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP s
 		bucketName:         bName,
 		logStreamEndpoint:  logSEndP,
 	}
+
+	err := viper.BindEnv("DEBUG")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("BindEnv DEBUG failed")
+	}
+	debug := viper.GetBool("DEBUG")
+	if debug {
+		fmt.Println("debug")
+		log.SetLevel(log.DebugLevel)
+	} else {
+		fmt.Println("no debug")
+		log.SetLevel(log.InfoLevel)
+	}
+
 	return s
 }
 
@@ -205,7 +209,7 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 		}
 		for k := range resp.Header {
 			if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
-				attrK, attrV, err := formatAttributes(k, resp.Header[k][0])
+				attrK, attrV, err := utils.AttrToVal(k, resp.Header[k][0])
 				if err != nil {
 					done <- true
 					errs <- err
@@ -219,24 +223,6 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 	}
 	done <- true
 	errs <- nil
-}
-
-func formatAttributes(k string, v string) (string, *pbQPU.Value, error) {
-	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-
-		}
-		return strings.ToLower(k), utils.ValFlt(f), nil
-	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
-		i, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return "", &pbQPU.Value{}, err
-		}
-		return strings.ToLower(k), utils.ValInt(i), nil
-	} else {
-		return strings.ToLower(k), utils.ValStr(v), nil
-	}
 }
 
 //SubscribeOpsSync ...
@@ -285,4 +271,17 @@ func (ds S3DataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan boo
 	}
 	go ds.watchAsync(stream, msg, done, errs)
 	<-errs
+}
+
+func formatAttributes(op *pbQPU.Operation) (*pbQPU.Operation, error) {
+	for attrK := range op.GetOpPayload().GetState().GetAttributes() {
+		if strings.HasPrefix(attrK, "x-amz-meta-") && strings.Compare(attrK, "x-amz-meta-s3cmd-attrs") != 0 {
+			attrK, attrV, err := utils.AttrToVal(attrK, op.GetOpPayload().GetState().GetAttributes()[attrK].GetStr())
+			if err != nil {
+				return nil, err
+			}
+			op.GetOpPayload().GetState().GetAttributes()[attrK] = attrV
+		}
+	}
+	return op, nil
 }
