@@ -52,10 +52,14 @@ func (ds AntidoteDataStore) formatOperation(crdtOp *pb.Operation) (*pbQPU.Operat
 	op := &pbQPU.Operation{}
 	op.Key = crdtOp.GetCrdtType() + "__" + crdtOp.GetKey()
 	op.Bucket = crdtOp.GetBucket()
-	op.Op = &pbQPU.Op{
-		AttrKey:   crdtOp.GetOp().GetMapKey(),
-		AttrType:  crdtOp.GetOp().GetMapType(),
-		OpPayload: crdtOp.GetOp().GetMapVal(),
+	op.OpPayload = &pbQPU.OperationPayload{
+		Payload: &pbQPU.OperationPayload_Op{
+			Op: &pbQPU.Op{
+				AttrKey:  crdtOp.GetOp().GetMapKey(),
+				AttrType: crdtOp.GetOp().GetMapType(),
+				Payload:  crdtOp.GetOp().GetMapVal(),
+			},
+		},
 	}
 	op.DataSet = &pbQPU.DataSet{
 		Db:    "Antidote",

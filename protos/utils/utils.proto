@@ -21,12 +21,12 @@ message Operation {
     string opId = 1;
     string key = 2;
     string bucket = 3;
-    OperatonPayload opPayload = 4;
+    OperationPayload opPayload = 4;
     DataSet dataSet = 5;
     int64 timestamp = 6;
 }
 
-message OperatonPayload {
+message OperationPayload {
     oneof payload {
         Object state = 1;
         Op op = 2;

@@ -46,7 +46,7 @@ func New(datatype string, attr string, lb string, ub string) (*Index, error) {
 	}
 	i.lbound = lbound
 	i.ubound = ubound
-	if datatype == "x-amz-meta" {
+	if datatype == "float" && attr == "x-amz-meta" {
 		i.Index = indexTagF.New()
 	} else if attr == "size" {
 		i.Index = indexSize.New()
@@ -66,8 +66,9 @@ func Update(i *Index, op *pbQPU.Operation) error {
 	log.WithFields(log.Fields{
 		"operation": op,
 	}).Debug("index:Update")
+
 	switch op.GetOpPayload().Payload.(type) {
-	case *pbQPU.OperatonPayload_State:
+	case *pbQPU.OperationPayload_State:
 		for k, v := range op.GetOpPayload().GetState().GetAttributes() {
 			if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
 				if op.GetOpId() != "catchUp" {
@@ -78,7 +79,8 @@ func Update(i *Index, op *pbQPU.Operation) error {
 				}
 			}
 		}
-	case *pbQPU.OperatonPayload_Op:
+	case *pbQPU.OperationPayload_Op:
+		log.Debug("index:Update: OperationPayload_Op")
 	}
 
 	return nil

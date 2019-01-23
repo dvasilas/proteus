@@ -63,12 +63,16 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, do
 			done <- false
 			msg <- &pbQPU.Operation{
 				OpId: "noId",
-				Object: &pbQPU.Object{
-					Key: f.Name(),
-					Attributes: map[string]*pbQPU.Value{
-						"size":    utils.ValInt(f.Size()),
-						"mode":    utils.ValInt(int64(f.Mode())),
-						"modTime": utils.ValInt(f.ModTime().UnixNano()),
+				OpPayload: &pbQPU.OperationPayload{
+					Payload: &pbQPU.OperationPayload_State{
+						State: &pbQPU.Object{
+							Key: f.Name(),
+							Attributes: map[string]*pbQPU.Value{
+								"size":    utils.ValInt(f.Size()),
+								"mode":    utils.ValInt(int64(f.Mode())),
+								"modTime": utils.ValInt(f.ModTime().UnixNano()),
+							},
+						},
 					},
 				},
 			}
