@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strconv"
+	"strings"
 
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
@@ -190,4 +191,23 @@ func AttrBoundStrToVal(dataType string, lBound string, uBound string) (*pbQPU.Va
 		ub = ValStr(uBound)
 	}
 	return lb, ub, nil
+}
+
+//AttrToVal ...
+func AttrToVal(k string, v string) (string, *pbQPU.Value, error) {
+	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+
+		}
+		return strings.ToLower(k), ValFlt(f), nil
+	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return "", &pbQPU.Value{}, err
+		}
+		return strings.ToLower(k), ValInt(i), nil
+	} else {
+		return strings.ToLower(k), ValStr(v), nil
+	}
 }
