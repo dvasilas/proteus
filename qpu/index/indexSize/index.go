@@ -1,9 +1,10 @@
-package indexint
+package indexsize
 
 import (
 	utils "github.com/dimitriosvasilas/modqp"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/google/btree"
+	log "github.com/sirupsen/logrus"
 )
 
 //Entry ...
@@ -12,17 +13,25 @@ type Entry struct {
 	Postings map[string]utils.Posting
 }
 
-//BTreeIndexI ...
-type BTreeIndexI struct {
+//IndexSize ...
+type IndexSize struct {
 }
 
 //New ...
-func New() *BTreeIndexI {
-	return &BTreeIndexI{}
+func New() *IndexSize {
+	return &IndexSize{}
 }
 
 //FilterIndexable ...
-func (i *BTreeIndexI) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
+func (i *IndexSize) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
+	log.WithFields(log.Fields{
+		"attrKey": attrKey,
+		"attrVal": attrVal,
+		"attr":    attr,
+		"lb":      lb,
+		"ub":      ub,
+	}).Debug("IndexSize:FilterIndexable")
+
 	switch attrVal.Val.(type) {
 	case *pbQPU.Value_Int:
 		if attrKey == attr {
@@ -42,27 +51,27 @@ func (x Entry) Less(than btree.Item) bool {
 }
 
 //OpToEntry ...
-func (i *BTreeIndexI) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
+func (i *IndexSize) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
 	return Entry{Value: attrVal.GetInt(), Postings: make(map[string]utils.Posting)}
 }
 
 //BoundToEntry ...
-func (i *BTreeIndexI) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
+func (i *IndexSize) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
 	return Entry{Value: b.GetInt()}
 }
 
 //GetPostings ...
-func (i *BTreeIndexI) GetPostings(entry btree.Item) map[string]utils.Posting {
+func (i *IndexSize) GetPostings(entry btree.Item) map[string]utils.Posting {
 	return entry.(Entry).Postings
 }
 
 //AppendPostings ...
-func (i *BTreeIndexI) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
+func (i *IndexSize) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
 	entry.(Entry).Postings[key] = p
 	return entry
 }
 
 //ReducedKeyToTagKey ...
-func (i *BTreeIndexI) ReducedKeyToTagKey(k string) string {
+func (i *IndexSize) ReducedKeyToTagKey(k string) string {
 	return k
 }

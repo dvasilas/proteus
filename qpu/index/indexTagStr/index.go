@@ -15,17 +15,17 @@ type Entry struct {
 	Postings map[string]utils.Posting
 }
 
-//BTreeIndexS ...
-type BTreeIndexS struct {
+//IndexTagStr ...
+type IndexTagStr struct {
 }
 
 //New ...
-func New() *BTreeIndexS {
-	return &BTreeIndexS{}
+func New() *IndexTagStr {
+	return &IndexTagStr{}
 }
 
 //FilterIndexable ...
-func (i *BTreeIndexS) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
+func (i *IndexTagStr) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
 	switch attrVal.Val.(type) {
 	case *pbQPU.Value_Str:
 		if strings.HasPrefix(attrKey, "x-amz-meta-") {
@@ -52,27 +52,27 @@ func (x Entry) Less(than btree.Item) bool {
 }
 
 //OpToEntry ...
-func (i *BTreeIndexS) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
+func (i *IndexTagStr) OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item {
 	return Entry{Key: attrKey, Value: attrVal.GetStr(), Postings: make(map[string]utils.Posting)}
 }
 
 //BoundToEntry ...
-func (i *BTreeIndexS) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
+func (i *IndexTagStr) BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item {
 	return Entry{Key: attrKey, Value: b.GetStr()}
 }
 
 //GetPostings ...
-func (i *BTreeIndexS) GetPostings(entry btree.Item) map[string]utils.Posting {
+func (i *IndexTagStr) GetPostings(entry btree.Item) map[string]utils.Posting {
 	return entry.(Entry).Postings
 }
 
 //AppendPostings ...
-func (i *BTreeIndexS) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
+func (i *IndexTagStr) AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item {
 	entry.(Entry).Postings[key] = p
 	return entry
 }
 
 //ReducedKeyToTagKey ...
-func (i *BTreeIndexS) ReducedKeyToTagKey(k string) string {
+func (i *IndexTagStr) ReducedKeyToTagKey(k string) string {
 	return "x-amz-meta-" + k
 }

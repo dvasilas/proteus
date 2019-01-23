@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	ant "github.com/dimitriosvasilas/modqp/dataStoreQPU/antidoteDataStore"
 	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
 	s3 "github.com/dimitriosvasilas/modqp/dataStoreQPU/s3DataStore"
 	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
@@ -32,9 +33,9 @@ type Config struct {
 	Port      string
 	DataStore struct {
 		DataSet struct {
-			DB    int
-			DC    int
-			Shard int
+			DB    string
+			DC    string
+			Shard string
 		}
 		Type               string
 		DataDir            string
@@ -107,6 +108,8 @@ func ΝewServer(confFile string) error {
 		server = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir), config: conf}
 	} else if conf.DataStore.Type == "s3" {
 		server = Server{ds: s3.New(conf.DataStore.ΑwsAccessKeyID, conf.DataStore.AwsSecretAccessKey, conf.DataStore.Endpoint, conf.DataStore.BucketName, conf.DataStore.LogStreamEndpoint), config: conf}
+	} else if conf.DataStore.Type == "antidote" {
+		server = Server{ds: ant.New(), config: conf}
 	} else {
 		return errors.New("Unknown dataStore type")
 	}
@@ -137,9 +140,9 @@ func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg
 		toSend := &pb.StateStream{
 			Object: obj,
 			Dataset: &pbQPU.DataSet{
-				Db:    int64(s.config.DataStore.DataSet.DB),
-				Dc:    int64(s.config.DataStore.DataSet.DC),
-				Shard: int64(s.config.DataStore.DataSet.Shard),
+				Db:    s.config.DataStore.DataSet.DB,
+				Dc:    s.config.DataStore.DataSet.DC,
+				Shard: s.config.DataStore.DataSet.Shard,
 			},
 		}
 		if err := stream.Send(toSend); err != nil {
@@ -173,12 +176,18 @@ func (s *Server) opsConsumerAsync(stream pb.DataStore_SubscribeOpsAsyncServer, m
 			return
 		}
 		op := <-msg
-		ds := &pbQPU.DataSet{
-			Db:    int64(s.config.DataStore.DataSet.DB),
-			Dc:    int64(s.config.DataStore.DataSet.DC),
-			Shard: int64(s.config.DataStore.DataSet.Shard),
+		log.WithFields(log.Fields{
+			"operation": op,
+		}).Debug("datastore QPU received operation")
+
+		if s.config.DataStore.Type == "s3" {
+			ds := &pbQPU.DataSet{
+				Db:    s.config.DataStore.DataSet.DB,
+				Dc:    s.config.DataStore.DataSet.DC,
+				Shard: s.config.DataStore.DataSet.Shard,
+			}
+			op.DataSet = ds
 		}
-		op.DataSet = ds
 		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
 			errs <- err
 			return
@@ -197,9 +206,9 @@ func (s *Server) opsConsumerSync(stream pb.DataStore_SubscribeOpsSyncServer, msg
 		op := <-msg
 
 		ds := &pbQPU.DataSet{
-			Db:    int64(s.config.DataStore.DataSet.DB),
-			Dc:    int64(s.config.DataStore.DataSet.DC),
-			Shard: int64(s.config.DataStore.DataSet.Shard),
+			Db:    s.config.DataStore.DataSet.DB,
+			Dc:    s.config.DataStore.DataSet.DC,
+			Shard: s.config.DataStore.DataSet.Shard,
 		}
 		op.DataSet = ds
 		log.Debug("DataStoreQPU:opsConsumerSync received op, sending to indexQPU")
@@ -276,9 +285,9 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 
 	return &pb.ConfigResponse{
 		Dataset: &pbQPU.DataSet{
-			Db:    int64(s.config.DataStore.DataSet.DB),
-			Dc:    int64(s.config.DataStore.DataSet.DC),
-			Shard: int64(s.config.DataStore.DataSet.Shard),
+			Db:    s.config.DataStore.DataSet.DB,
+			Dc:    s.config.DataStore.DataSet.DC,
+			Shard: s.config.DataStore.DataSet.Shard,
 		}}, nil
 
 }

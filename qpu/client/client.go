@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-
 	"google.golang.org/grpc"
 )
 

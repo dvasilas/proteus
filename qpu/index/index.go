@@ -5,9 +5,10 @@ import (
 
 	utils "github.com/dimitriosvasilas/modqp"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-	indexI "github.com/dimitriosvasilas/modqp/qpu/index/indexInt"
-	indexTF "github.com/dimitriosvasilas/modqp/qpu/index/indexTagFloat"
-	indexTS "github.com/dimitriosvasilas/modqp/qpu/index/indexTagStr"
+	indexMapCrdtKeys "github.com/dimitriosvasilas/modqp/qpu/index/indexMapCrdt/indexKeys"
+	indexSize "github.com/dimitriosvasilas/modqp/qpu/index/indexSize"
+	indexTagF "github.com/dimitriosvasilas/modqp/qpu/index/indexTagFloat"
+	indexTagStr "github.com/dimitriosvasilas/modqp/qpu/index/indexTagStr"
 	"github.com/google/btree"
 	log "github.com/sirupsen/logrus"
 )
@@ -45,12 +46,14 @@ func New(datatype string, attr string, lb string, ub string) (*Index, error) {
 	}
 	i.lbound = lbound
 	i.ubound = ubound
-	if datatype == "float" {
-		i.Index = indexTF.New()
-	} else if datatype == "int" && attr == "size" {
-		i.Index = indexI.New()
+	if datatype == "float" && attr == "x-amz-meta" {
+		i.Index = indexTagF.New()
+	} else if attr == "size" {
+		i.Index = indexSize.New()
 	} else if datatype == "string" && attr == "x-amz-meta" {
-		i.Index = indexTS.New()
+		i.Index = indexTagStr.New()
+	} else if attr == "mapCrdtKeys" {
+		i.Index = indexMapCrdtKeys.New()
 	} else {
 		return &Index{}, errors.New("index datatype not implemented")
 	}
@@ -63,16 +66,23 @@ func Update(i *Index, op *pbQPU.Operation) error {
 	log.WithFields(log.Fields{
 		"operation": op,
 	}).Debug("index:Update")
-	for k, v := range op.GetObject().GetAttributes() {
-		if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
-			if op.GetOpId() != "catchUp" {
-				removeOldEntry(k, v, op.GetObject(), i)
-			}
-			if err := put(k, v, op.GetObject(), op.GetDataSet(), i); err != nil {
-				return err
+
+	switch op.GetOpPayload().Payload.(type) {
+	case *pbQPU.OperationPayload_State:
+		for k, v := range op.GetOpPayload().GetState().GetAttributes() {
+			if indexable, k := i.Index.FilterIndexable(k, v, i.attribute, i.lbound, i.ubound); indexable {
+				if op.GetOpId() != "catchUp" {
+					removeOldEntry(k, v, op.GetOpPayload().GetState(), i)
+				}
+				if err := put(k, v, op.GetOpPayload().GetState(), op.GetDataSet(), i); err != nil {
+					return err
+				}
 			}
 		}
+	case *pbQPU.OperationPayload_Op:
+		log.Debug("index:Update: OperationPayload_Op")
 	}
+
 	return nil
 }
 

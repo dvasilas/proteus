@@ -60,10 +60,14 @@ func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan 
 		done <- false
 		outOp := &pbQPU.Operation{
 			OpId: op.GetOperation().GetOpId(),
-			Object: &pbQPU.Object{
-				Key: op.GetOperation().GetObject().GetKey(),
-				Attributes: map[string]*pbQPU.Value{
-					"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
+			OpPayload: &pbQPU.OperationPayload{
+				Payload: &pbQPU.OperationPayload_State{
+					State: &pbQPU.Object{
+						Key: op.GetOperation().GetObject().GetKey(),
+						Attributes: map[string]*pbQPU.Value{
+							"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
+						},
+					},
 				},
 			},
 		}
@@ -74,7 +78,7 @@ func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan 
 					done <- true
 					errs <- err
 				}
-				outOp.Object.Attributes[attrK] = attrV
+				outOp.GetOpPayload().GetState().GetAttributes()[attrK] = attrV
 			}
 		}
 		log.Debug("S3DataStore:watchSync processed and forwarding operation")
@@ -105,10 +109,14 @@ func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg cha
 		}
 		done <- false
 		outOp := &pbQPU.Operation{
-			Object: &pbQPU.Object{
-				Key: op.Operation.Object.Key,
-				Attributes: map[string]*pbQPU.Value{
-					"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
+			OpPayload: &pbQPU.OperationPayload{
+				Payload: &pbQPU.OperationPayload_State{
+					State: &pbQPU.Object{
+						Key: op.Operation.Object.Key,
+						Attributes: map[string]*pbQPU.Value{
+							"size": utils.ValInt(op.Operation.Object.Attributes["size"].GetIntValue()),
+						},
+					},
 				},
 			},
 		}
@@ -119,7 +127,7 @@ func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg cha
 					done <- true
 					errs <- err
 				}
-				outOp.Object.Attributes[attrK] = attrV
+				outOp.GetOpPayload().GetState().GetAttributes()[attrK] = attrV
 			}
 		}
 		msg <- outOp

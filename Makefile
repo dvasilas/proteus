@@ -32,6 +32,7 @@ proto: $(PROTOC_CMD)
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/utils/utils.proto
 	protoc --proto_path=./protos/utils/ --proto_path=./protos/datastore/ --go_out=plugins=grpc:$(GOPATH)/src ./protos/datastore/datastore.proto
 	protoc --proto_path=./protos/utils --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
+	protoc --proto_path=./protos/utils --proto_path=./protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./protos/antidote/antidote.proto
 	protoc --proto_path=./protos/qpu --proto_path=./protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/qpu/qpu.proto
 	go generate ./...
 

@@ -15,13 +15,13 @@ type Posting struct {
 
 //DownwardConns ...
 type DownwardConns struct {
-	DBs map[int]*DB
+	DBs map[string]*DB
 }
 
 //DB ...
-func (c *DownwardConns) DB(ID int) (db *DB) {
+func (c *DownwardConns) DB(ID string) (db *DB) {
 	if c.DBs == nil {
-		c.DBs = map[int]*DB{}
+		c.DBs = map[string]*DB{}
 	}
 	if db = c.DBs[ID]; db == nil {
 		db = &DB{}
@@ -32,13 +32,13 @@ func (c *DownwardConns) DB(ID int) (db *DB) {
 
 //DB ...
 type DB struct {
-	DCs map[int]*DC
+	DCs map[string]*DC
 }
 
 //DC ...
-func (db *DB) DC(ID int) (r *DC) {
+func (db *DB) DC(ID string) (r *DC) {
 	if db.DCs == nil {
-		db.DCs = map[int]*DC{}
+		db.DCs = map[string]*DC{}
 	}
 	if r = db.DCs[ID]; r == nil {
 		r = &DC{}
@@ -49,13 +49,13 @@ func (db *DB) DC(ID int) (r *DC) {
 
 //DC ...
 type DC struct {
-	Shards map[int]*Shard
+	Shards map[string]*Shard
 }
 
 //Shard ...
-func (r *DC) Shard(ID int) (s *Shard) {
+func (r *DC) Shard(ID string) (s *Shard) {
 	if r.Shards == nil {
-		r.Shards = map[int]*Shard{}
+		r.Shards = map[string]*Shard{}
 	}
 	if s = r.Shards[ID]; s == nil {
 		s = &Shard{}
@@ -104,9 +104,9 @@ type QPUConfig struct {
 	Conns   []struct {
 		EndPoint string
 		DataSet  struct {
-			DB    int
-			DC    int
-			Shard int
+			DB    string
+			DC    string
+			Shard string
 		}
 	}
 	IndexConfig struct {
@@ -130,9 +130,9 @@ func NewDConn(conf QPUConfig) (DownwardConns, error) {
 		if err != nil {
 			return DownwardConns{}, err
 		}
-		dConns.DB(int(connConf.GetDataset()[0].GetDb())).
-			DC(int(connConf.GetDataset()[0].GetDc())).
-			Shard(int(connConf.GetDataset()[0].GetShard())).
+		dConns.DB(connConf.GetDataset()[0].GetDb()).
+			DC(connConf.GetDataset()[0].GetDc()).
+			Shard(connConf.GetDataset()[0].GetShard()).
 			QPU(c,
 				connConf.QPUType,
 				connConf.GetSupportedQueries()[0].GetDatatype(),

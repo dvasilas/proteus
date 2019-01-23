@@ -12,6 +12,7 @@ import (
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	cli "github.com/dimitriosvasilas/modqp/qpu/client"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 type query struct {
@@ -22,16 +23,23 @@ type query struct {
 }
 
 func find(q []query, c cli.Client) error {
+	log.Debug("shell:find ", q)
+
 	var query map[string][2]*pbQPU.Value
 	lbound, ubound, err := utils.AttrBoundStrToVal(q[0].datatype, q[0].lbound, q[0].ubound)
 	if err != nil {
 		return errors.New("bound error")
 	}
 	query = map[string][2]*pbQPU.Value{q[0].attribute: {lbound, ubound}}
+
+	log.Debug("shell:find ", query)
+
 	return sendQuery(query, c)
 }
 
 func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
+	log.Debug("shell:sendQuery ", query)
+
 	msg := make(chan *pb.QueryResultStream)
 	done := make(chan bool)
 	errs := make(chan error)
@@ -50,6 +58,9 @@ func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStr
 			errs1 <- err
 		}
 		res := <-msg
+
+		log.Debug("shell:queryConsumer received: ", res)
+
 		displayResults(query, res.GetObject(), res.GetDataset())
 	}
 }
@@ -101,6 +112,8 @@ func initShell(c cli.Client) {
 }
 
 func processQueryString(q string) ([]query, error) {
+	log.Debug("shell:processQueryString: ", q)
+
 	queryProcessed := make([]query, 0)
 	predicate := strings.Split(q, "&")
 
@@ -124,6 +137,9 @@ func processQueryString(q string) ([]query, error) {
 			ubound:    bound[1],
 		})
 	}
+
+	log.Debug("shell:processQueryString: ", queryProcessed)
+
 	return queryProcessed, nil
 }
 
@@ -145,6 +161,20 @@ func main() {
 	}
 	c, conn, err := cli.NewClient(endpoint)
 	defer conn.Close()
+
+	err = viper.BindEnv("DEBUG")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("BindEnv DEBUG failed")
+	}
+	debug := viper.GetBool("DEBUG")
+	if debug {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
 	if err != nil {
 		log.Fatal("failed to create Client %v", err)
 	}

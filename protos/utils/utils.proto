@@ -18,10 +18,25 @@ message Value {
 }
 
 message Operation {
-    string opId = 2;
-    Object object = 3;
-    DataSet dataSet = 4;
-    int64 timestamp = 5;
+    string opId = 1;
+    string key = 2;
+    string bucket = 3;
+    OperationPayload opPayload = 4;
+    DataSet dataSet = 5;
+    int64 timestamp = 6;
+}
+
+message OperationPayload {
+    oneof payload {
+        Object state = 1;
+        Op op = 2;
+    }
+}
+
+message Op {
+    string attrKey = 1;
+    string attrType = 2;
+    string payload = 3;
 }
 
 message FindRequest {
@@ -37,7 +52,7 @@ message Predicate {
 }
 
 message DataSet {
-    int64 db = 1;
-    int64 dc = 2;
-    int64 shard = 3;
+    string db = 1;
+    string dc = 2;
+    string shard = 3;
 }
