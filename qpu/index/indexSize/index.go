@@ -4,6 +4,7 @@ import (
 	utils "github.com/dimitriosvasilas/modqp"
 	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
 	"github.com/google/btree"
+	log "github.com/sirupsen/logrus"
 )
 
 //Entry ...
@@ -23,6 +24,14 @@ func New() *IndexSize {
 
 //FilterIndexable ...
 func (i *IndexSize) FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string) {
+	log.WithFields(log.Fields{
+		"attrKey": attrKey,
+		"attrVal": attrVal,
+		"attr":    attr,
+		"lb":      lb,
+		"ub":      ub,
+	}).Debug("IndexSize:FilterIndexable")
+
 	switch attrVal.Val.(type) {
 	case *pbQPU.Value_Int:
 		if attrKey == attr {

@@ -291,9 +291,9 @@ func (s *Server) catchUpConsumer(streamFrom pbDsQPU.DataStore_GetSnapshotClient,
 			return
 		}
 		op := &pbQPU.Operation{
-			OpId:    "catchUp",
-			Object:  streamMsg.GetObject(),
-			DataSet: streamMsg.GetDataset(),
+			OpId:      "catchUp",
+			OpPayload: &pbQPU.OperationPayload{Payload: &pbQPU.OperationPayload_State{State: streamMsg.GetObject()}},
+			DataSet:   streamMsg.GetDataset(),
 		}
 		if err := index.Update(s.index, op); err != nil {
 			errs <- err
