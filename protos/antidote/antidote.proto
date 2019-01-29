@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package antidotedatastore;
-option go_package = "github.com/dimitriosvasilas/modqp/protos/antidote";
+option go_package = "github.com/dimitriosvasilas/proteus/protos/antidote";
 
 service AntidoteDataStore {
   rpc watchAsync(SubRequest) returns (stream Operation) {}

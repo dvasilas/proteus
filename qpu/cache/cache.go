@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 )
 
 //Cache ...

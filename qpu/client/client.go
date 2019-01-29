@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	"google.golang.org/grpc"
 )
 

@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/abiosoft/ishell"
-	utils "github.com/dimitriosvasilas/modqp"
-	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	utils "github.com/dimitriosvasilas/proteus"
+	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )

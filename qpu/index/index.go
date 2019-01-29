@@ -3,12 +3,12 @@ package index
 import (
 	"errors"
 
-	utils "github.com/dimitriosvasilas/modqp"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-	indexMapCrdtKeys "github.com/dimitriosvasilas/modqp/qpu/index/indexMapCrdt/indexKeys"
-	indexSize "github.com/dimitriosvasilas/modqp/qpu/index/indexSize"
-	indexTagF "github.com/dimitriosvasilas/modqp/qpu/index/indexTagFloat"
-	indexTagStr "github.com/dimitriosvasilas/modqp/qpu/index/indexTagStr"
+	utils "github.com/dimitriosvasilas/proteus"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	indexMapCrdtKeys "github.com/dimitriosvasilas/proteus/qpu/index/indexMapCrdt/indexKeys"
+	indexSize "github.com/dimitriosvasilas/proteus/qpu/index/indexSize"
+	indexTagF "github.com/dimitriosvasilas/proteus/qpu/index/indexTagFloat"
+	indexTagStr "github.com/dimitriosvasilas/proteus/qpu/index/indexTagStr"
 	"github.com/google/btree"
 	log "github.com/sirupsen/logrus"
 )

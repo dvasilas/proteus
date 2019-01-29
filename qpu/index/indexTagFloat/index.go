@@ -3,8 +3,8 @@ package indextagfloat
 import (
 	"strings"
 
-	utils "github.com/dimitriosvasilas/modqp"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	utils "github.com/dimitriosvasilas/proteus"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	"github.com/google/btree"
 )
 

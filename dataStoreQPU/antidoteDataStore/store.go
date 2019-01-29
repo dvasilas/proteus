@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	pb "github.com/dimitriosvasilas/modqp/protos/antidote"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	pb "github.com/dimitriosvasilas/proteus/protos/antidote"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )

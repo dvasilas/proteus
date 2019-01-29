@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package qpu;
-option go_package = "github.com/dimitriosvasilas/modqp/protos/qpu";
+option go_package = "github.com/dimitriosvasilas/proteus/protos/qpu";
 
 import "utils.proto";
 

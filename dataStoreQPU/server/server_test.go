@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	fS "github.com/dimitriosvasilas/modqp/dataStoreQPU/fsDataStore"
-	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
+	fS "github.com/dimitriosvasilas/proteus/dataStoreQPU/fsDataStore"
+	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
