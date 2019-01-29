@@ -43,7 +43,7 @@ build_qpu_server: dep proto
 	go build -o bin/qpu_server -v ./qpu/server/server.go
 
 build_shell: dep proto
-	go build -o bin/shell -v ./qpu/shell/shell.go
+	go build -o bin/shell -v ./shell/shell.go
 
 # Cross compilation
 build_ds_server_linux:
