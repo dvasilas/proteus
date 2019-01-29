@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 )
 
 //Posting ...

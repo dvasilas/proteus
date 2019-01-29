@@ -3,10 +3,10 @@ package dispatch
 import (
 	"errors"
 
-	utils "github.com/dimitriosvasilas/modqp"
-	pb "github.com/dimitriosvasilas/modqp/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
-	cli "github.com/dimitriosvasilas/modqp/qpu/client"
+	utils "github.com/dimitriosvasilas/proteus"
+	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 )
 
 //ForwardResponse sends an object received from downstream as part of query results to an upward stream corresponding to this query.

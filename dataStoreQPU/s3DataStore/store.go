@@ -13,9 +13,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
-	utils "github.com/dimitriosvasilas/modqp"
-	pb "github.com/dimitriosvasilas/modqp/protos/s3"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	utils "github.com/dimitriosvasilas/proteus"
+	pb "github.com/dimitriosvasilas/proteus/protos/s3"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"

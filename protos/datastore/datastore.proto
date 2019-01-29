@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package datastore;
-option go_package = "github.com/dimitriosvasilas/modqp/protos/datastore";
+option go_package = "github.com/dimitriosvasilas/proteus/protos/datastore";
 
 import "utils.proto";
 

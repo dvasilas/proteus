@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
+	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
 	"google.golang.org/grpc"
 )
 

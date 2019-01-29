@@ -1,0 +1,14 @@
+{
+    "qpuType": "index",
+    "port": "50352",
+    "conns": [{
+        "endpoint": "localhost:50152"
+    }],
+    "indexConfig": {
+        "dataType": "float",
+        "attribute": "x-amz-meta",
+        "lBound": "0.0",
+        "uBound": "1.0",
+        "consLevel": "async"
+    }
+}

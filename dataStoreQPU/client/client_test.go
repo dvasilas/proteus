@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	utils "github.com/dimitriosvasilas/modqp"
-	mock "github.com/dimitriosvasilas/modqp/dataStoreQPU/client/mocks"
-	pb "github.com/dimitriosvasilas/modqp/protos/datastore"
-	pbQPU "github.com/dimitriosvasilas/modqp/protos/utils"
+	utils "github.com/dimitriosvasilas/proteus"
+	mock "github.com/dimitriosvasilas/proteus/dataStoreQPU/client/mocks"
+	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
+	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
