@@ -8,12 +8,20 @@ import (
 
 	"github.com/abiosoft/ishell"
 	utils "github.com/dimitriosvasilas/proteus"
+	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 )
+
+type shell struct {
+	flags  flags
+	client cli.Client
+	conn   *grpc.ClientConn
+}
 
 type query struct {
 	datatype  string
@@ -22,22 +30,27 @@ type query struct {
 	ubound    string
 }
 
-func find(q []query, c cli.Client) error {
-	log.Debug("shell:find ", q)
+type flags struct {
+	endpoint string
+	queryIn  string
+	mode     string
+}
 
+func (sh *shell) find(q []query) error {
+	log.Debug("shell:find ", q)
 	var query map[string][2]*pbQPU.Value
+
 	lbound, ubound, err := utils.AttrBoundStrToVal(q[0].datatype, q[0].lbound, q[0].ubound)
 	if err != nil {
 		return errors.New("bound error")
 	}
 	query = map[string][2]*pbQPU.Value{q[0].attribute: {lbound, ubound}}
-
 	log.Debug("shell:find ", query)
 
-	return sendQuery(query, c)
+	return sh.sendQuery(query)
 }
 
-func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
+func (sh *shell) sendQuery(query map[string][2]*pbQPU.Value) error {
 	log.Debug("shell:sendQuery ", query)
 
 	msg := make(chan *pb.QueryResultStream)
@@ -45,84 +58,36 @@ func sendQuery(query map[string][2]*pbQPU.Value, c cli.Client) error {
 	errs := make(chan error)
 	errs1 := make(chan error)
 
-	go queryConsumer(query, msg, done, errs, errs1)
-	c.Find(time.Now().UnixNano(), query, msg, done, errs)
+	go sh.queryConsumer(query, msg, done, errs, errs1)
+	sh.client.Find(time.Now().UnixNano(), query, msg, done, errs)
 	err := <-errs1
 	return err
 }
 
-func queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
+func (sh *shell) queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errs
 			errs1 <- err
 		}
 		res := <-msg
-
 		log.Debug("shell:queryConsumer received: ", res)
 
-		displayResults(query, res.GetObject(), res.GetDataset())
-	}
-}
-
-func displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet) {
-	logMsg := log.Fields{
-		"key":     obj.GetKey(),
-		"dataset": ds,
-	}
-	for qAttr := range query {
-		switch query[qAttr][0].Val.(type) {
-		case *pbQPU.Value_Int:
-			logMsg[qAttr] = obj.GetAttributes()[qAttr].GetInt()
-		case *pbQPU.Value_Flt:
-			attrK := "x-amz-meta-f-" + qAttr
-			logMsg[qAttr] = obj.GetAttributes()[attrK].GetFlt()
-		default:
-			if qAttr == "key" {
-				logMsg[qAttr] = obj.GetKey()
-			} else {
-				attrK := "x-amz-meta-" + qAttr
-				logMsg[qAttr] = obj.GetAttributes()[attrK].GetStr()
-			}
+		err := sh.displayResults(query, res.GetObject(), res.GetDataset())
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
-	log.WithFields(logMsg).Info("result")
-}
-func initShell(c cli.Client) {
-	shell := ishell.New()
-	shell.Println("QPU Shell")
-
-	shell.AddCmd(&ishell.Cmd{
-		Name: "find",
-		Help: "Perform a query on object attribute",
-		Func: func(ctx *ishell.Context) {
-			query, err := processQueryString(ctx.Args[0])
-			if err != nil {
-				ctx.Err(err)
-				return
-			}
-			err = find(query, c)
-			if err != nil {
-				ctx.Err(err)
-				return
-			}
-		},
-	})
-	shell.Run()
 }
 
-func processQueryString(q string) ([]query, error) {
+func (sh *shell) processQueryString(q string) ([]query, error) {
 	log.Debug("shell:processQueryString: ", q)
 
 	queryProcessed := make([]query, 0)
 	predicate := strings.Split(q, "&")
 
 	for _, p := range predicate {
-		datatype := strings.Split(p, "_")
-		if len(datatype) < 2 {
-			return nil, errors.New("Query should have the form predicate[&predicate], where predicate=type_attrKey=lbound/ubound")
-		}
-		attrK := strings.Split(datatype[1], "=")
+		attrK := strings.Split(p, "=")
 		if len(attrK) < 2 {
 			return nil, errors.New("Query should have the form predicate&[predicate], where predicate=type_attrKey=lbound/ubound")
 		}
@@ -130,9 +95,13 @@ func processQueryString(q string) ([]query, error) {
 		if len(bound) < 2 {
 			return nil, errors.New("Query should have the form predicate&[predicate], where predicate=type_attrKey=lbound/ubound")
 		}
+		attr, err := attribute.Attr(attrK[0], nil)
+		if err != nil {
+			return nil, err
+		}
 		queryProcessed = append(queryProcessed, query{
-			datatype:  datatype[0],
-			attribute: attrK[0],
+			datatype:  attr.GetDatatype(),
+			attribute: attr.GetKey(attrK[0]),
 			lbound:    bound[0],
 			ubound:    bound[1],
 		})
@@ -144,29 +113,115 @@ func processQueryString(q string) ([]query, error) {
 }
 
 func main() {
-	var endpoint string
-	flag.StringVar(&endpoint, "endpoint", "noEndpoint", "QPU endpoint to send query")
-	var queryIn string
-	flag.StringVar(&queryIn, "query", "emptyQuery", "Query string")
-	var mode string
-	flag.StringVar(&mode, "mode", "noMode", "Script execution mode: cmd(command) / sh(shell) / http(http server)")
-	flag.Parse()
-	if endpoint == "noEndpoint" || mode == "noMode" || (mode != "cmd" && mode != "sh" && mode != "http") {
-		flag.Usage()
-		return
-	}
-	if mode == "cmd" && queryIn == "emptyQuery" {
-		flag.Usage()
-		return
-	}
-	c, conn, err := cli.NewClient(endpoint)
-	defer conn.Close()
-
-	err = viper.BindEnv("DEBUG")
+	sh, err := newShell()
+	defer sh.conn.Close()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
-		}).Fatal("BindEnv DEBUG failed")
+		}).Fatal("shell failed")
+	}
+}
+
+func (sh *shell) displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
+	logMsg := log.Fields{
+		"key":     obj.GetKey(),
+		"dataset": ds,
+	}
+	for qAttr := range query {
+		attr, err := attribute.Attr(qAttr, obj)
+		if err != nil {
+			return err
+		}
+		logMsg[qAttr] = attr.GetValue(qAttr, obj)
+	}
+	log.WithFields(logMsg).Info("result")
+	return nil
+}
+
+func newShell() (shell, error) {
+	err := initDebug()
+	if err != nil {
+		return shell{}, err
+	}
+	flags, err := getFlags()
+	if err != nil {
+		return shell{}, err
+	}
+	client, conn, err := cli.NewClient(flags.endpoint)
+	if err != nil {
+		return shell{}, err
+	}
+	shell := shell{flags, client, conn}
+	shell.initialize()
+	return shell, nil
+}
+
+func (sh *shell) initialize() error {
+	switch sh.flags.mode {
+	case "cmd":
+		query, err := sh.processQueryString(sh.flags.queryIn)
+		if err != nil {
+			return err
+		}
+		err = sh.find(query)
+		if err != nil {
+			return err
+		}
+	case "sh":
+		sh.initInteractiveShell()
+	case "http":
+		return errors.New("Not implemented")
+	default:
+		return errors.New("unknown shell type")
+	}
+	return nil
+}
+
+func (sh *shell) initInteractiveShell() {
+	shell := ishell.New()
+	shell.Println("QPU Shell")
+
+	shell.AddCmd(&ishell.Cmd{
+		Name: "find",
+		Help: "Perform a query on object attribute",
+		Func: func(ctx *ishell.Context) {
+			query, err := sh.processQueryString(ctx.Args[0])
+			if err != nil {
+				ctx.Err(err)
+				return
+			}
+			err = sh.find(query)
+			if err != nil {
+				ctx.Err(err)
+				return
+			}
+		},
+	})
+	shell.Run()
+}
+
+func getFlags() (flags, error) {
+	var flags flags
+	flag.StringVar(&flags.endpoint, "endpoint", "noEndpoint", "QPU endpoint to send query")
+	flag.StringVar(&flags.queryIn, "query", "emptyQuery", "Query string")
+	flag.StringVar(&flags.mode, "mode", "noMode", "Script execution mode: cmd(command) / sh(shell) / http(http server)")
+
+	flag.Parse()
+	if flags.endpoint == "noEndpoint" || flags.mode == "noMode" || (flags.mode != "cmd" && flags.mode != "sh" && flags.mode != "http") {
+		flag.Usage()
+		return flags, errors.New("flag error")
+	}
+	if flags.mode == "cmd" && flags.queryIn == "emptyQuery" {
+		flag.Usage()
+		return flags, errors.New("flag error")
+	}
+	return flags, nil
+}
+
+func initDebug() error {
+	err := viper.BindEnv("DEBUG")
+	if err != nil {
+		return errors.New("BindEnv DEBUG failed")
 	}
 	debug := viper.GetBool("DEBUG")
 	if debug {
@@ -174,28 +229,5 @@ func main() {
 	} else {
 		log.SetLevel(log.InfoLevel)
 	}
-
-	if err != nil {
-		log.Fatal("failed to create Client %v", err)
-	}
-	if mode == "cmd" {
-		query, err := processQueryString(queryIn)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Fatal("Find failed")
-		}
-		err = find(query, c)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Fatal("Find failed")
-		}
-	} else if mode == "sh" {
-		initShell(c)
-	} else if mode == "http" {
-		log.WithFields(log.Fields{
-			"error": errors.New("Not implemented"),
-		}).Fatal("Find failed")
-	}
+	return nil
 }
