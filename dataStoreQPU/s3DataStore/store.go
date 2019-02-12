@@ -140,10 +140,8 @@ func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP s
 	}
 	debug := viper.GetBool("DEBUG")
 	if debug {
-		fmt.Println("debug")
 		log.SetLevel(log.DebugLevel)
 	} else {
-		fmt.Println("no debug")
 		log.SetLevel(log.InfoLevel)
 	}
 

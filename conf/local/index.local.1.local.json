@@ -5,8 +5,8 @@
         "endpoint": "localhost:50150"
     }],
     "indexConfig": {
-        "dataType": "float",
-        "attribute": "x-amz-meta",
+        "attribute": "tagF",
+        "indexType": "tagF",
         "lBound": "0.0",
         "uBound": "1.0",
         "consLevel": "async"
