@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	utils "github.com/dimitriosvasilas/proteus"
 	mock "github.com/dimitriosvasilas/proteus/dataStoreQPU/client/mocks"
 	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
@@ -15,10 +14,10 @@ import (
 
 var streamMessages = []pb.StateStream{
 	{
-		Object: &pbQPU.Object{Key: "obj1", Attributes: map[string]*pbQPU.Value{"size": utils.ValInt(1)}},
+		Object: &pbQPU.Object{Key: "obj1", Attributes: map[string]*pbQPU.Value{"size": &pbQPU.Value{Val: &pbQPU.Value_Int{Int: 1}}}},
 	},
 	{
-		Object: &pbQPU.Object{Key: "key", Attributes: map[string]*pbQPU.Value{"size": utils.ValInt(2)}},
+		Object: &pbQPU.Object{Key: "key", Attributes: map[string]*pbQPU.Value{"size": &pbQPU.Value{Val: &pbQPU.Value_Int{Int: 2}}}},
 	},
 }
 

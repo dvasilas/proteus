@@ -2,8 +2,10 @@ package attribute
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
+	utils "github.com/dimitriosvasilas/proteus"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 )
 
@@ -13,6 +15,7 @@ type Attribute interface {
 	GetValue(key string, obj *pbQPU.Object) interface{}
 	GetDatatype() string
 	GetKey(key string) string
+	BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error)
 }
 
 //Attr creates a new instance of the Attribute interface
@@ -52,6 +55,21 @@ func (attr *Size) GetKey(key string) string {
 	return key
 }
 
+//BoundStrToVal converts the bounds of a predicate given in string form to pbQPU.Value form
+func (attr *Size) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
+	lbI, err := strconv.ParseInt(lBound, 10, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+	lb := utils.ValInt(lbI)
+	ubI, err := strconv.ParseInt(uBound, 10, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+	ub := utils.ValInt(ubI)
+	return lb, ub, nil
+}
+
 //Key implements a key:string attribute
 type Key struct{}
 
@@ -70,6 +88,13 @@ func (attr *Key) GetKey(key string) string {
 	return key
 }
 
+//BoundStrToVal converts the bounds of a predicate given in string form to pbQPU.Value form
+func (attr *Key) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
+	lb := utils.ValStr(lBound)
+	ub := utils.ValStr(uBound)
+	return lb, ub, nil
+}
+
 //TagF implements a tagF_<key>:float attribute
 type TagF struct{}
 
@@ -86,4 +111,19 @@ func (attr *TagF) GetDatatype() string {
 //GetKey returns the attributes key (name)
 func (attr *TagF) GetKey(key string) string {
 	return strings.Split(key, "_")[1]
+}
+
+//BoundStrToVal converts the bounds of a predicate given in string form to pbQPU.Value form
+func (attr *TagF) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
+	lbF, err := strconv.ParseFloat(lBound, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+	lb := utils.ValFlt(lbF)
+	ubF, err := strconv.ParseFloat(uBound, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+	ub := utils.ValFlt(ubF)
+	return lb, ub, nil
 }

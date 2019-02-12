@@ -1,5 +1,5 @@
 {
-    "qpuType": "dispatch",
+    "qpuType": "partition_manager",
     "port": "50550",
     "conns": [{
             "endpoint": "127.0.0.1:50350"

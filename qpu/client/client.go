@@ -9,20 +9,28 @@ import (
 	"google.golang.org/grpc"
 )
 
+//Predicate ..
+type Predicate struct {
+	Attribute string
+	Datatype  string
+	LBound    *pbQPU.Value
+	UBound    *pbQPU.Value
+}
+
 //Client ...
 type Client struct {
 	cli pb.QPUClient
 }
 
 //Find ...
-func (c *Client) Find(ts int64, predicate map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error) {
+func (c *Client) Find(ts int64, predicate []Predicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	req := new(pb.FindRequest)
 	req.Timestamp = ts
-	for attr, bounds := range predicate {
-		req.Predicate = append(req.Predicate, &pbQPU.Predicate{Attribute: attr, Lbound: bounds[0], Ubound: bounds[1]})
+	for _, p := range predicate {
+		req.Predicate = append(req.Predicate, &pbQPU.Predicate{Datatype: p.Datatype, Attribute: p.Attribute, Lbound: p.LBound, Ubound: p.UBound})
 	}
 
 	stream, err := c.cli.Find(ctx, req)

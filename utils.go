@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	dSQPUcli "github.com/dimitriosvasilas/proteus/dataStoreQPU/client"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 )
@@ -16,7 +17,8 @@ type Posting struct {
 
 //DownwardConns ...
 type DownwardConns struct {
-	DBs map[string]*DB
+	DBs    map[string]*DB
+	DsConn []dSQPUcli.Client
 }
 
 //DB ...
@@ -111,8 +113,8 @@ type QPUConfig struct {
 		}
 	}
 	IndexConfig struct {
-		DataType  string
 		Attribute string
+		IndexType string
 		LBound    string
 		UBound    string
 		ConsLevel string
@@ -157,40 +159,6 @@ func ValStr(s string) *pbQPU.Value {
 //ValFlt ...
 func ValFlt(f float64) *pbQPU.Value {
 	return &pbQPU.Value{Val: &pbQPU.Value_Flt{Flt: f}}
-}
-
-//AttrBoundStrToVal ...
-func AttrBoundStrToVal(dataType string, lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
-	var lb *pbQPU.Value
-	var ub *pbQPU.Value
-	switch dataType {
-	case "int":
-		lbI, err := strconv.ParseInt(lBound, 10, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		lb = ValInt(lbI)
-		ubI, err := strconv.ParseInt(uBound, 10, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		ub = ValInt(ubI)
-	case "float":
-		lbF, err := strconv.ParseFloat(lBound, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		lb = ValFlt(lbF)
-		ubF, err := strconv.ParseFloat(uBound, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		ub = ValFlt(ubF)
-	default:
-		lb = ValStr(lBound)
-		ub = ValStr(uBound)
-	}
-	return lb, ub, nil
 }
 
 //AttrToVal ...

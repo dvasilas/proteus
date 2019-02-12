@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/abiosoft/ishell"
-	utils "github.com/dimitriosvasilas/proteus"
 	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
@@ -38,19 +37,28 @@ type flags struct {
 
 func (sh *shell) find(q []query) error {
 	log.Debug("shell:find ", q)
-	var query map[string][2]*pbQPU.Value
+	query := make([]cli.Predicate, 0)
 
-	lbound, ubound, err := utils.AttrBoundStrToVal(q[0].datatype, q[0].lbound, q[0].ubound)
+	attr, err := attribute.Attr(q[0].attribute, nil)
+	if err != nil {
+		return err
+	}
+	lbound, ubound, err := attr.BoundStrToVal(q[0].lbound, q[0].ubound)
 	if err != nil {
 		return errors.New("bound error")
 	}
-	query = map[string][2]*pbQPU.Value{q[0].attribute: {lbound, ubound}}
+	query = append(query, cli.Predicate{
+		Attribute: attr.GetKey(q[0].attribute),
+		Datatype:  attr.GetDatatype(),
+		LBound:    lbound,
+		UBound:    ubound,
+	})
 	log.Debug("shell:find ", query)
 
 	return sh.sendQuery(query)
 }
 
-func (sh *shell) sendQuery(query map[string][2]*pbQPU.Value) error {
+func (sh *shell) sendQuery(query []cli.Predicate) error {
 	log.Debug("shell:sendQuery ", query)
 
 	msg := make(chan *pb.QueryResultStream)
@@ -64,7 +72,7 @@ func (sh *shell) sendQuery(query map[string][2]*pbQPU.Value) error {
 	return err
 }
 
-func (sh *shell) queryConsumer(query map[string][2]*pbQPU.Value, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
+func (sh *shell) queryConsumer(query []cli.Predicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errs
@@ -101,7 +109,7 @@ func (sh *shell) processQueryString(q string) ([]query, error) {
 		}
 		queryProcessed = append(queryProcessed, query{
 			datatype:  attr.GetDatatype(),
-			attribute: attr.GetKey(attrK[0]),
+			attribute: attrK[0],
 			lbound:    bound[0],
 			ubound:    bound[1],
 		})
@@ -122,17 +130,17 @@ func main() {
 	}
 }
 
-func (sh *shell) displayResults(query map[string][2]*pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
+func (sh *shell) displayResults(query []cli.Predicate, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
 	logMsg := log.Fields{
 		"key":     obj.GetKey(),
 		"dataset": ds,
 	}
-	for qAttr := range query {
-		attr, err := attribute.Attr(qAttr, obj)
+	for _, p := range query {
+		attr, err := attribute.Attr(p.Attribute, obj)
 		if err != nil {
 			return err
 		}
-		logMsg[qAttr] = attr.GetValue(qAttr, obj)
+		logMsg[p.Attribute] = attr.GetValue(p.Attribute, obj)
 	}
 	log.WithFields(logMsg).Info("result")
 	return nil

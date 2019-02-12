@@ -1,5 +1,5 @@
 {
-    "qpuType": "scan",
+    "qpuType": "filter",
     "port": "50251",
     "conns": [
     {
