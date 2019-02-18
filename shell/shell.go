@@ -39,7 +39,7 @@ func (sh *shell) find(q []query) error {
 	log.Debug("shell:find ", q)
 	query := make([]cli.Predicate, 0)
 
-	attr, err := attribute.Attr(q[0].attribute, nil)
+	attr, _, err := attribute.Attr(q[0].attribute, nil)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (sh *shell) processQueryString(q string) ([]query, error) {
 		if len(bound) < 2 {
 			return nil, errors.New("Query should have the form predicate&[predicate], where predicate=type_attrKey=lbound/ubound")
 		}
-		attr, err := attribute.Attr(attrK[0], nil)
+		attr, _, err := attribute.Attr(attrK[0], nil)
 		if err != nil {
 			return nil, err
 		}
@@ -135,12 +135,14 @@ func (sh *shell) displayResults(query []cli.Predicate, obj *pbQPU.Object, ds *pb
 		"key":     obj.GetKey(),
 		"dataset": ds,
 	}
-	for _, p := range query {
-		attr, err := attribute.Attr(p.Attribute, obj)
-		if err != nil {
-			return err
+	if obj.Key != "noResults" {
+		for _, p := range query {
+			attr, _, err := attribute.Attr(p.Attribute, obj)
+			if err != nil {
+				return err
+			}
+			logMsg[p.Attribute] = attr.GetValue(p.Attribute, obj)
 		}
-		logMsg[p.Attribute] = attr.GetValue(p.Attribute, obj)
 	}
 	log.WithFields(logMsg).Info("result")
 	return nil

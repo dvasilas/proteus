@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	config "github.com/dimitriosvasilas/proteus/config"
 	fS "github.com/dimitriosvasilas/proteus/dataStoreQPU/fsDataStore"
 	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
 	"github.com/spf13/viper"
@@ -13,7 +14,7 @@ import (
 )
 
 var s Server
-var conf Config
+var conf config.DSQPUConfig
 
 type mockDataStoreQPUGetSnapshotServer struct {
 	grpc.ServerStream
@@ -36,8 +37,8 @@ func (m *DataStoreQPUSubscribeOpsServer) Send(op *pb.OpStream) error {
 }
 
 func TestMain(m *testing.M) {
-	var err error
-	if conf, err = getConfig("filter.1"); err != nil {
+	var conf config.DSQPUConfig
+	if err := config.GetConfig("filter.1", &conf); err != nil {
 		return
 	}
 	s = Server{ds: fS.New(viper.Get("HOME").(string) + conf.DataStore.DataDir)}

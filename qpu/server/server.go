@@ -6,12 +6,11 @@ import (
 	"errors"
 	"flag"
 	"net"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	utils "github.com/dimitriosvasilas/proteus"
 	attribute "github.com/dimitriosvasilas/proteus/attributes"
+	"github.com/dimitriosvasilas/proteus/config"
 	dSQPUcli "github.com/dimitriosvasilas/proteus/dataStoreQPU/client"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
@@ -33,7 +32,7 @@ type QPU interface {
 //Server implements a generic QPU server
 type Server struct {
 	qpu           QPU
-	config        utils.QPUConfig
+	config        config.QPUConfig
 	downwardConns utils.DownwardConns
 }
 
@@ -77,7 +76,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 			})
 		}
 	case "index":
-		attr, err := attribute.Attr(s.config.IndexConfig.Attribute, nil)
+		attr, _, err := attribute.Attr(s.config.IndexConfig.Attribute, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -124,11 +123,13 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 //---------------- Internal Functions --------------
 
 func server(confArg string) error {
-	conf, err := config(confArg)
+	initDebug()
+
+	var conf config.QPUConfig
+	err := config.GetConfig(confArg, &conf)
 	if err != nil {
 		return err
 	}
-	initDebug()
 
 	var server Server
 	switch conf.QpuType {
@@ -187,7 +188,7 @@ func server(confArg string) error {
 			server.config.Conns[i].DataSet.DC = dSConfig.Dataset.Dc
 			server.config.Conns[i].DataSet.Shard = dSConfig.Dataset.Shard
 		}
-		qpu, err := index.QPU(conf, server.downwardConns)
+		qpu, err := index.QPU(conf.IndexConfig, server.downwardConns)
 		if err != nil {
 			return err
 		}
@@ -233,41 +234,6 @@ func server(confArg string) error {
 }
 
 //---------------- Auxiliary Functions -------------
-
-func config(confArg string) (utils.QPUConfig, error) {
-	var conf utils.QPUConfig
-	viper.AutomaticEnv()
-	err := viper.BindEnv("QPU_CONFIG_FILE")
-	if err != nil {
-		return conf, err
-	}
-	var confFile string
-	if confArg == "noArg" {
-		confF := viper.Get("QPU_CONFIG_FILE")
-		if confF == nil {
-			return conf, errors.New("QPU config file not specified")
-		}
-		confFile = confF.(string)
-	} else {
-		confFile = confArg
-	}
-	viper.SetConfigName(confFile)
-	_, f, _, _ := runtime.Caller(0)
-	basepath := filepath.Dir(f)
-	viper.AddConfigPath(basepath + "/../../conf")
-	viper.AddConfigPath(basepath + "/../../conf/local")
-	viper.AddConfigPath(basepath + "/../../conf/dockerCompose")
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return conf, err
-	}
-	if err := viper.Unmarshal(&conf); err != nil {
-		return conf, err
-	}
-
-	return conf, nil
-}
 
 func initDebug() error {
 	err := viper.BindEnv("DEBUG")
