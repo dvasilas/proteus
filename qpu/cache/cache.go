@@ -2,6 +2,7 @@ package cache
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -9,7 +10,6 @@ import (
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
-	partitionManager "github.com/dimitriosvasilas/proteus/qpu/partition_manager"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,7 +69,7 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		UBound:    in.Predicate[0].Ubound,
 	})
 
-	clients, err := partitionManager.ForwardQuery(conns, in.Predicate)
+	clients, err := forwardQuery(conns, in.Predicate)
 	if err != nil {
 		return err
 	}
@@ -177,6 +177,35 @@ func (c *cache) evict() error {
 }
 
 //---------------- Auxiliary Functions -------------
+
+//forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
+//Returns an array connections for initiating Find queries, and any error encountered.
+func forwardQuery(conns utils.DownwardConns, query []*pbQPU.Predicate) ([]cli.Client, error) {
+	forwardTo := make([]cli.Client, 0)
+	for _, db := range conns.DBs {
+		for _, r := range db.DCs {
+			for _, sh := range r.Shards {
+				for _, q := range sh.QPUs {
+					if (q.QpuType == "index" || q.QpuType == "cache") && utils.CanProcessQuery(q, query) {
+						if utils.QueryInAttrRange(q, query) {
+							forwardTo = append(forwardTo, q.Client)
+						}
+					}
+				}
+				for _, q := range sh.QPUs {
+					if q.QpuType == "filter" {
+						forwardTo = append(forwardTo, q.Client)
+					}
+				}
+			}
+		}
+	}
+	if len(forwardTo) == 0 {
+		return forwardTo, errors.New("dispatch found no QPU to forward query")
+	}
+	return forwardTo, nil
+
+}
 
 //Converts a predicate to a cache entry key
 func predicateToKey(p []*pbQPU.Predicate) string {

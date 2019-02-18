@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	utils "github.com/dimitriosvasilas/proteus"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 )
 
@@ -71,12 +70,12 @@ func (attr *Size) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pb
 	if err != nil {
 		return nil, nil, err
 	}
-	lb := utils.ValInt(lbI)
+	lb := &pbQPU.Value{Val: &pbQPU.Value_Int{Int: lbI}}
 	ubI, err := strconv.ParseInt(uBound, 10, 64)
 	if err != nil {
 		return nil, nil, err
 	}
-	ub := utils.ValInt(ubI)
+	ub := &pbQPU.Value{Val: &pbQPU.Value_Int{Int: ubI}}
 	return lb, ub, nil
 }
 
@@ -100,8 +99,8 @@ func (attr *Key) GetKey(key string) string {
 
 //BoundStrToVal converts the bounds of a predicate given in string form to pbQPU.Value form
 func (attr *Key) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pbQPU.Value, error) {
-	lb := utils.ValStr(lBound)
-	ub := utils.ValStr(uBound)
+	lb := &pbQPU.Value{Val: &pbQPU.Value_Str{Str: lBound}}
+	ub := &pbQPU.Value{Val: &pbQPU.Value_Str{Str: uBound}}
 	return lb, ub, nil
 }
 
@@ -129,11 +128,11 @@ func (attr *TagF) BoundStrToVal(lBound string, uBound string) (*pbQPU.Value, *pb
 	if err != nil {
 		return nil, nil, err
 	}
-	lb := utils.ValFlt(lbF)
+	lb := &pbQPU.Value{Val: &pbQPU.Value_Flt{Flt: lbF}}
 	ubF, err := strconv.ParseFloat(uBound, 64)
 	if err != nil {
 		return nil, nil, err
 	}
-	ub := utils.ValFlt(ubF)
+	ub := &pbQPU.Value{Val: &pbQPU.Value_Flt{Flt: ubF}}
 	return lb, ub, nil
 }
