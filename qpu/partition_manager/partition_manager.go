@@ -145,7 +145,7 @@ func canProcessQuery(conn utils.QPUConn, query []*pbQPU.Predicate) bool {
 		return true
 	}
 	for _, p := range query {
-		attr, err := attribute.Attr(conn.Attribute, nil)
+		attr, _, err := attribute.Attr(conn.Attribute, nil)
 		if err != nil {
 			return false
 		}

@@ -20,19 +20,29 @@ type Attribute interface {
 
 //Attr creates a new instance of the Attribute interface
 //given an attribute key argument
-func Attr(key string, obj *pbQPU.Object) (Attribute, error) {
+func Attr(key string, obj *pbQPU.Object) (Attribute, *pbQPU.Value, error) {
 	switch key {
 	case "size":
-		return new(Size), nil
+		if obj == nil {
+			return new(Size), nil, nil
+		} else if attr, ok := obj.GetAttributes()["size"]; ok {
+			return new(Size), attr, nil
+		}
+		return new(Size), nil, nil
 	case "key":
-		return new(Key), nil
+		return new(Key), nil, nil
 	default:
-		if strings.HasPrefix(key, "tagF") {
-			return new(TagF), nil
-		} else if _, ok := obj.GetAttributes()["x-amz-meta-f-"+key]; ok {
-			return new(TagF), nil
+		if obj == nil {
+			return new(TagF), nil, nil
+		} else if strings.HasPrefix(key, "tagF") {
+			if attr, ok := obj.GetAttributes()["x-amz-meta-f-"+strings.Split(key, "tagF_")[1]]; ok {
+				return new(TagF), attr, nil
+			}
+			return new(TagF), nil, nil
+		} else if attr, ok := obj.GetAttributes()["x-amz-meta-f-"+key]; ok {
+			return new(TagF), attr, nil
 		} else {
-			return nil, errors.New("unknown attribute type")
+			return nil, nil, errors.New("unknown attribute type")
 		}
 	}
 }

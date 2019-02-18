@@ -216,6 +216,7 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs c
 				outObject.Attributes[attrK] = attrV
 			}
 		}
+		outObject.Attributes["x-amz-meta-s3cmd-attrs"] = utils.ValStr(resp.Header["X-Amz-Meta-S3cmd-Attrs"][0])
 		done <- false
 		msg <- outObject
 	}

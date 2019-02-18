@@ -8,14 +8,12 @@ import (
 
 	utils "github.com/dimitriosvasilas/proteus"
 	attribute "github.com/dimitriosvasilas/proteus/attributes"
+	"github.com/dimitriosvasilas/proteus/config"
 	pbDsQPU "github.com/dimitriosvasilas/proteus/protos/datastore"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	indexMapCrdtKeys "github.com/dimitriosvasilas/proteus/qpu/index/indexMapCrdt/indexKeys"
-	indexSize "github.com/dimitriosvasilas/proteus/qpu/index/indexSize"
-	indexTagF "github.com/dimitriosvasilas/proteus/qpu/index/indexTagFloat"
-	indexTagStr "github.com/dimitriosvasilas/proteus/qpu/index/indexTagStr"
-	"github.com/google/btree"
+	antidoteIndex "github.com/dimitriosvasilas/proteus/qpu/index/antidote"
+	inMemIndex "github.com/dimitriosvasilas/proteus/qpu/index/inMem"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -24,31 +22,25 @@ type IQPU struct {
 	index *Index
 }
 
-//Impl specifies the API of an index structure
-type Impl interface {
-	FilterIndexable(attrKey string, attrVal *pbQPU.Value, attr string, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string)
-	OpToEntry(attrKey string, attrVal *pbQPU.Value) btree.Item
-	GetPostings(entry btree.Item) map[string]utils.Posting
-	AppendPostings(entry btree.Item, key string, p utils.Posting) btree.Item
-	BoundToEntry(attrKey string, b *pbQPU.Value) btree.Item
-	ReducedKeyToTagKey(k string) string
+//Store specifies the interface of an index store
+type Store interface {
+	Update(op *pbQPU.Operation, attribute string, lbound *pbQPU.Value, ubound *pbQPU.Value) error
+	Lookup(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error)
 }
 
 //Index implements a generic index structure
 type Index struct {
-	Index     Impl
-	attribute string
-	lbound    *pbQPU.Value
-	ubound    *pbQPU.Value
-	entries   *btree.BTree
-	state     map[string]pbQPU.Object
+	indexstore Store
+	attribute  string
+	lbound     *pbQPU.Value
+	ubound     *pbQPU.Value
 }
 
 //---------------- API Functions -------------------
 
 //QPU creates an index QPU
-func QPU(conf utils.QPUConfig, conns utils.DownwardConns) (*IQPU, error) {
-	index, err := new(conf.IndexConfig.Attribute, conf.IndexConfig.IndexType, conf.IndexConfig.LBound, conf.IndexConfig.UBound)
+func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
+	index, err := new(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -58,14 +50,14 @@ func QPU(conf utils.QPUConfig, conns utils.DownwardConns) (*IQPU, error) {
 	}
 
 	for _, c := range conns.DsConn {
-		if conf.IndexConfig.ConsLevel == "async" {
+		if conf.ConsLevel == "async" {
 			streamIn, cancel, err := c.SubscribeOpsAsync(time.Now().UnixNano())
 			if err != nil {
 				cancel()
 				return nil, err
 			}
 			go qpu.opConsumerAsync(streamIn, cancel)
-		} else if conf.IndexConfig.ConsLevel == "sync" {
+		} else if conf.ConsLevel == "sync" {
 			streamIn, cancel, err := c.SubscribeOpsSync(time.Now().UnixNano())
 			if err != nil {
 				cancel()
@@ -89,15 +81,18 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	log.WithFields(log.Fields{
 		"query": in.Predicate,
 	}).Debug("Index lookup")
-	indexResult, found, err := q.index.get(in.Predicate)
-	if err != nil {
+	indexResult, found, err := q.index.indexstore.Lookup(in.Predicate)
+	if !found {
+		if err := streamOut.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: "noResults"}}); err != nil {
+			return err
+		}
+		return nil
+	} else if err != nil {
 		return err
 	}
-	if found {
-		for _, item := range indexResult {
-			if err := streamOut.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
-				return err
-			}
+	for _, item := range indexResult {
+		if err := streamOut.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -127,7 +122,7 @@ func (q *IQPU) opConsumerAsync(streamIn pbDsQPU.DataStore_SubscribeOpsAsyncClien
 				"operation": streamMsg.GetOperation(),
 			}).Debug("index QPU received operation")
 
-			if err := q.update(streamMsg.GetOperation()); err != nil {
+			if err := q.updateIndex(streamMsg.GetOperation()); err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
 					"op":    streamMsg.Operation,
@@ -159,7 +154,7 @@ func (q *IQPU) opConsumerSync(streamInOut pbDsQPU.DataStore_SubscribeOpsSyncClie
 			log.WithFields(log.Fields{
 				"op": streamMsg.GetOperation(),
 			}).Debug("QPUServer:opConsumerSync:  received op")
-			if err := q.update(streamMsg.GetOperation()); err != nil {
+			if err := q.updateIndex(streamMsg.GetOperation()); err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
 					"op":    streamMsg.Operation,
@@ -192,7 +187,7 @@ func (q *IQPU) catchUpConsumer(streamIn pbDsQPU.DataStore_GetSnapshotClient, err
 			OpPayload: &pbQPU.OperationPayload{Payload: &pbQPU.OperationPayload_State{State: streamMsg.GetObject()}},
 			DataSet:   streamMsg.GetDataset(),
 		}
-		if err := q.update(op); err != nil {
+		if err := q.updateIndex(op); err != nil {
 			errs <- err
 			return
 		}
@@ -202,36 +197,46 @@ func (q *IQPU) catchUpConsumer(streamIn pbDsQPU.DataStore_GetSnapshotClient, err
 //---------------- Internal Functions --------------
 
 //Creates a new index structure
-func new(attrK string, indexType string, lb string, ub string) (*Index, error) {
+func new(conf config.IndexConfig) (*Index, error) {
 	i := &Index{
-		attribute: attrK,
-		entries:   btree.New(2),
-		state:     make(map[string]pbQPU.Object),
+		attribute: conf.Attribute,
 	}
 
-	attr, err := attribute.Attr(attrK, nil)
+	attr, _, err := attribute.Attr(conf.Attribute, nil)
 	if err != nil {
 		return nil, err
 	}
-	lbound, ubound, err := attr.BoundStrToVal(lb, ub)
+	lbound, ubound, err := attr.BoundStrToVal(conf.LBound, conf.UBound)
 	if err != nil {
 		return &Index{}, errors.New("Bounds in index configuration is not the right datatype")
 	}
 	i.lbound = lbound
 	i.ubound = ubound
-	switch indexType {
-	case "tagF":
-		i.Index = indexTagF.New()
-	case "size":
-		i.Index = indexSize.New()
-	case "tagStr":
-		i.Index = indexTagStr.New()
-	case "mapCrdtKeys":
-		i.Index = indexMapCrdtKeys.New()
-	default:
-		return &Index{}, errors.New("index datatype not implemented")
+
+	var indexStore Store
+	switch conf.IndexStore.Store {
+	case "antidote":
+		indexStore, err = antidoteIndex.New(conf.IndexType, conf.IndexStore.Host, conf.IndexStore.Port, conf.IndexStore.Bucket)
+		if err != nil {
+			return nil, err
+		}
+	case "inMem":
+		indexStore, err = inMemIndex.New(conf.IndexType)
+		if err != nil {
+			return nil, err
+		}
 	}
+	i.indexstore = indexStore
 	return i, nil
+}
+
+//Given an operation sent from the data store, updates the index
+func (q *IQPU) updateIndex(op *pbQPU.Operation) error {
+	log.WithFields(log.Fields{
+		"operation": op,
+	}).Debug("index: update")
+
+	return q.index.indexstore.Update(op, q.index.attribute, q.index.lbound, q.index.ubound)
 }
 
 //Performs an index catch-up  operation, initiating an object stream from the data store
@@ -256,67 +261,4 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 		}
 	}
 	return nil
-}
-
-//Updates the index, given an operation
-func (q *IQPU) update(op *pbQPU.Operation) error {
-	log.WithFields(log.Fields{
-		"operation": op,
-	}).Debug("index:Update")
-
-	switch op.GetOpPayload().Payload.(type) {
-	case *pbQPU.OperationPayload_State:
-		for k, v := range op.GetOpPayload().GetState().GetAttributes() {
-			if indexable, k := q.index.Index.FilterIndexable(k, v, q.index.attribute, q.index.lbound, q.index.ubound); indexable {
-				if op.GetOpId() != "catchUp" {
-					removeOldEntry(k, v, op.GetOpPayload().GetState(), q.index)
-				}
-				if err := put(k, v, op.GetOpPayload().GetState(), op.GetDataSet(), q.index); err != nil {
-					return err
-				}
-			}
-		}
-	case *pbQPU.OperationPayload_Op:
-		log.Debug("index:Update: OperationPayload_Op")
-	}
-
-	return nil
-}
-
-//Updates the index, given an object that has been updated
-func put(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet, i *Index) error {
-	entry := i.Index.OpToEntry(attrKey, attrVal)
-	if i.entries.Has(entry) {
-		item := i.entries.Get(entry)
-		item = i.Index.AppendPostings(item, obj.Key, utils.Posting{Object: *obj, Dataset: *ds})
-		i.entries.ReplaceOrInsert(item)
-	} else {
-		entry = i.Index.AppendPostings(entry, obj.Key, utils.Posting{Object: *obj, Dataset: *ds})
-		i.entries.ReplaceOrInsert(entry)
-	}
-	i.state[obj.Key] = *obj
-	return nil
-}
-
-//Performs an index lookup given a predicate
-//Returns aposting list containing the objects that match the given predicate
-func (i *Index) get(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error) {
-	res := make(map[string]utils.Posting)
-	it := func(item btree.Item) bool {
-		for _, p := range i.Index.GetPostings(item) {
-			res[p.Object.GetKey()] = p
-		}
-		return true
-	}
-	i.entries.AscendRange(i.Index.BoundToEntry(p[0].GetAttribute(), p[0].Lbound), i.Index.BoundToEntry(p[0].GetAttribute(), p[0].Ubound), it)
-	return res, true, nil
-}
-
-//Removes an old index entry, given an object that has been updated
-func removeOldEntry(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, i *Index) {
-	if s, ok := i.state[obj.Key]; ok {
-		entry := i.Index.OpToEntry(attrKey, s.Attributes[i.Index.ReducedKeyToTagKey(attrKey)])
-		item := i.entries.Get(entry)
-		delete(i.Index.GetPostings(item), s.Key)
-	}
 }

@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"io"
 	"net"
-	"path/filepath"
-	"runtime"
 	"time"
 
+	config "github.com/dimitriosvasilas/proteus/config"
 	ant "github.com/dimitriosvasilas/proteus/dataStoreQPU/antidoteDataStore"
 	fS "github.com/dimitriosvasilas/proteus/dataStoreQPU/fsDataStore"
 	s3 "github.com/dimitriosvasilas/proteus/dataStoreQPU/s3DataStore"
@@ -28,80 +26,21 @@ type dataStore interface {
 	SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error)
 }
 
-//Config ...
-type Config struct {
-	Port      string
-	DataStore struct {
-		DataSet struct {
-			DB    string
-			DC    string
-			Shard string
-		}
-		Type               string
-		DataDir            string
-		ΑwsAccessKeyID     string
-		AwsSecretAccessKey string
-		Endpoint           string
-		BucketName         string
-		LogStreamEndpoint  string
-	}
-}
-
 //Server ...
 type Server struct {
 	ds     dataStore
-	config Config
-}
-
-func getConfig(confFArg string) (Config, error) {
-	var conf Config
-	viper.AutomaticEnv()
-	err := viper.BindEnv("HOME")
-	if err != nil {
-		return conf, err
-	}
-	var confFile string
-	if confFArg == "noArg" {
-		confF := viper.Get("DS_CONFIG_FILE")
-		if confF == nil {
-			return conf, errors.New("QPU config file not specified")
-		}
-		confFile = confF.(string)
-	} else {
-		confFile = confFArg
-	}
-
-	_, f, _, _ := runtime.Caller(0)
-	basepath := filepath.Dir(f)
-	viper.SetConfigName(confFile)
-	viper.AddConfigPath(basepath + "/../../conf")
-	viper.AddConfigPath(basepath + "/../../conf/local")
-	viper.AddConfigPath(basepath + "/../../conf/dockerCompose")
-	viper.SetConfigType("json")
-	if err = viper.ReadInConfig(); err != nil {
-		return conf, err
-	}
-	if err = viper.Unmarshal(&conf); err != nil {
-		return conf, err
-	}
-
-	confJSON, err := json.Marshal(conf)
-	if err != nil {
-		return conf, err
-	}
-	log.WithFields(log.Fields{
-		"configuration": string(confJSON),
-	}).Info("read configuration")
-	return conf, nil
+	config config.DSQPUConfig
 }
 
 //ΝewServer ...
 func ΝewServer(confFile string) error {
-	conf, err := getConfig(confFile)
+	log.SetLevel(log.DebugLevel)
+
+	var conf config.DSQPUConfig
+	err := config.GetConfig(confFile, &conf)
 	if err != nil {
 		return err
 	}
-	log.SetLevel(log.DebugLevel)
 
 	var server Server
 	if conf.DataStore.Type == "fs" {
@@ -282,7 +221,6 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotS
 
 //GetConfig ...
 func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.ConfigResponse, error) {
-
 	return &pb.ConfigResponse{
 		Dataset: &pbQPU.DataSet{
 			Db:    s.config.DataStore.DataSet.DB,

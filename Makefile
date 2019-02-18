@@ -27,6 +27,7 @@ dep:
 	go get -d github.com/google/btree
 	go get -d github.com/sirupsen/logrus
 	go get -d github.com/aws/aws-sdk-go
+	go get -d github.com/AntidoteDB/antidote-go-client
 
 proto: $(PROTOC_CMD)
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/utils/utils.proto
