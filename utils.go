@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	config "github.com/dimitriosvasilas/proteus/config"
 	dSQPUcli "github.com/dimitriosvasilas/proteus/dataStoreQPU/client"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
@@ -68,6 +69,7 @@ func NewDConn(conf config.QPUConfig) (DownwardConns, error) {
 				connConf.GetSupportedQueries()[0].GetLbound(),
 				connConf.GetSupportedQueries()[0].GetUbound())
 	}
+
 	return dConns, nil
 }
 
@@ -215,4 +217,44 @@ func (r *DC) Shard(ID string) (s *Shard) {
 //Shard ...
 type Shard struct {
 	QPUs []QPUConn
+}
+
+//QueryInAttrRange checks if given predicate can be satisfied by a QPU based on its querable attribute value bounds
+func QueryInAttrRange(conn QPUConn, query []*pbQPU.Predicate) bool {
+	for _, p := range query {
+		switch conn.Lbound.Val.(type) {
+		case *pbQPU.Value_Int:
+			if p.Lbound.GetInt() > conn.Ubound.GetInt() || p.Ubound.GetInt() < conn.Lbound.GetInt() {
+				return false
+			}
+		case *pbQPU.Value_Str:
+			if conn.Ubound.GetStr() != "any" && (p.Lbound.GetStr() > conn.Ubound.GetStr() || p.Ubound.GetStr() < conn.Lbound.GetStr()) {
+				return false
+			}
+		case *pbQPU.Value_Flt:
+			if p.Lbound.GetFlt() > conn.Ubound.GetFlt() || p.Ubound.GetFlt() < conn.Lbound.GetFlt() {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+//CanProcessQuery checks if given predicate can be satisfied by a QPU based on its querable attribute
+func CanProcessQuery(conn QPUConn, query []*pbQPU.Predicate) bool {
+	if conn.Attribute == "any" {
+		return true
+	}
+	for _, p := range query {
+		attr, _, err := attribute.Attr(conn.Attribute, nil)
+		if err != nil {
+			return false
+		}
+		if p.Datatype != attr.GetDatatype() {
+			return false
+		}
+	}
+	return true
 }

@@ -199,7 +199,7 @@ func server(confArg string) error {
 		if err != nil {
 			return err
 		}
-		qpu, err := partitionManager.QPU()
+		qpu, err := partitionManager.QPU(downwardsConns)
 		if err != nil {
 			return err
 		}

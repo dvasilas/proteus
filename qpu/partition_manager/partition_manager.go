@@ -5,7 +5,6 @@ import (
 	"time"
 
 	utils "github.com/dimitriosvasilas/proteus"
-	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
@@ -13,18 +12,32 @@ import (
 
 //PmQPU implements a partition manager QPU
 type PmQPU struct {
+	conns map[string]*utils.Shard
 }
 
 //---------------- API Functions -------------------
 
 //QPU creates a partition manager QPU
-func QPU() (*PmQPU, error) {
-	return &PmQPU{}, nil
+func QPU(downwardsConns utils.DownwardConns) (*PmQPU, error) {
+	if len(downwardsConns.DBs) > 1 {
+		return &PmQPU{}, errors.New("a partition_manager QPU should be connected only to one DB")
+	}
+	for _, db := range downwardsConns.DBs {
+		if len(db.DCs) > 1 {
+			return &PmQPU{}, errors.New("a partition_manager QPU should be connected only to one DC")
+		}
+		for _, r := range db.DCs {
+			return &PmQPU{
+				conns: r.Shards,
+			}, nil
+		}
+	}
+	return &PmQPU{}, errors.New("error in DB/DC/Shard configuration")
 }
 
 //Find implements the Find API for the partition manager QPU
 func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	clients, err := ForwardQuery(conns, in.Predicate)
+	clients, err := q.forwardQuery(in.Predicate)
 	if err != nil {
 		return err
 	}
@@ -85,73 +98,26 @@ func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predica
 	})
 }
 
-//ForwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
+//forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
 //Returns an array connections for initiating Find queries, and any error encountered.
-func ForwardQuery(conns utils.DownwardConns, query []*pbQPU.Predicate) ([]cli.Client, error) {
+func (q *PmQPU) forwardQuery(query []*pbQPU.Predicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
-	for _, db := range conns.DBs {
-		for _, r := range db.DCs {
-			for _, sh := range r.Shards {
-				for _, q := range sh.QPUs {
-					if (q.QpuType == "index" || q.QpuType == "cache") && canProcessQuery(q, query) {
-						if queryInAttrRange(q, query) {
-							forwardTo = append(forwardTo, q.Client)
-						}
-					}
+	for _, sh := range q.conns {
+		for _, q := range sh.QPUs {
+			if (q.QpuType == "index" || q.QpuType == "cache") && utils.CanProcessQuery(q, query) {
+				if utils.QueryInAttrRange(q, query) {
+					forwardTo = append(forwardTo, q.Client)
 				}
-				for _, q := range sh.QPUs {
-					if q.QpuType == "filter" {
-						forwardTo = append(forwardTo, q.Client)
-					}
-				}
+			}
+		}
+		for _, q := range sh.QPUs {
+			if q.QpuType == "filter" {
+				forwardTo = append(forwardTo, q.Client)
 			}
 		}
 	}
 	if len(forwardTo) == 0 {
-		return forwardTo, errors.New("dispatch found no QPU to forward query")
+		return forwardTo, errors.New("partition_manager found no QPU to forward query")
 	}
 	return forwardTo, nil
-
-}
-
-//---------------- Auxiliary Functions -------------
-
-//Checks if given predicate can be satisfied by a QPU based on its querable attribute value bounds
-func queryInAttrRange(conn utils.QPUConn, query []*pbQPU.Predicate) bool {
-	for _, p := range query {
-		switch conn.Lbound.Val.(type) {
-		case *pbQPU.Value_Int:
-			if p.Lbound.GetInt() > conn.Ubound.GetInt() || p.Ubound.GetInt() < conn.Lbound.GetInt() {
-				return false
-			}
-		case *pbQPU.Value_Str:
-			if conn.Ubound.GetStr() != "any" && (p.Lbound.GetStr() > conn.Ubound.GetStr() || p.Ubound.GetStr() < conn.Lbound.GetStr()) {
-				return false
-			}
-		case *pbQPU.Value_Flt:
-			if p.Lbound.GetFlt() > conn.Ubound.GetFlt() || p.Ubound.GetFlt() < conn.Lbound.GetFlt() {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-//Checks if given predicate can be satisfied by a QPU based on its querable attribute
-func canProcessQuery(conn utils.QPUConn, query []*pbQPU.Predicate) bool {
-	if conn.Attribute == "any" {
-		return true
-	}
-	for _, p := range query {
-		attr, _, err := attribute.Attr(conn.Attribute, nil)
-		if err != nil {
-			return false
-		}
-		if p.Datatype != attr.GetDatatype() {
-			return false
-		}
-	}
-	return true
 }
