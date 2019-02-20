@@ -8,6 +8,7 @@ import (
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
+	log "github.com/sirupsen/logrus"
 )
 
 //PmQPU implements a partition manager QPU
@@ -70,6 +71,11 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 		}
 	}
 	return nil
+}
+
+//Cleanup ...
+func (q *PmQPU) Cleanup() {
+	log.Info("partition_manager QPU cleanup")
 }
 
 //----------- Stream Consumer Functions ------------

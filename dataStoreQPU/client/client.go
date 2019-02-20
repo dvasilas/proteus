@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "github.com/dimitriosvasilas/proteus/protos/datastore"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -15,6 +16,7 @@ type activeStreams struct {
 type Client struct {
 	dsClient      pb.DataStoreClient
 	activeStreams activeStreams
+	conn          *grpc.ClientConn
 }
 
 //SubscribeStates ...
@@ -66,6 +68,15 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	return resp, err
 }
 
+//CloseConnection ...
+func (c *Client) CloseConnection() {
+	log.Info("closing connection to data store QPU server")
+	for _, c := range c.activeStreams.opSubStreams {
+		c()
+	}
+	c.conn.Close()
+}
+
 //NewClient ...
 func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
@@ -73,5 +84,5 @@ func NewClient(address string) (Client, *grpc.ClientConn, error) {
 		return Client{}, nil, err
 	}
 	activeStrMap := make(map[int64]context.CancelFunc)
-	return Client{pb.NewDataStoreClient(conn), activeStreams{activeStrMap}}, conn, nil
+	return Client{dsClient: pb.NewDataStoreClient(conn), activeStreams: activeStreams{activeStrMap}, conn: conn}, conn, nil
 }
