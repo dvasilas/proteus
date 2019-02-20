@@ -85,6 +85,11 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	return err
 }
 
+//Cleanup ...
+func (q *CQPU) Cleanup() {
+	log.Info("cache QPU cleanup")
+}
+
 //----------- Stream Consumer Functions ------------
 
 //Receives stream of query results from cache miss

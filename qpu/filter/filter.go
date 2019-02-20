@@ -33,6 +33,11 @@ func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	return err
 }
 
+//Cleanup ...
+func (q *FQPU) Cleanup() {
+	log.Info("filter QPU cleanup")
+}
+
 //----------- Stream Consumer Functions ------------
 
 //Receives and processes an input stream of objects

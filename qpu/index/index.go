@@ -19,7 +19,8 @@ import (
 
 //IQPU implements an index QPU
 type IQPU struct {
-	index *Index
+	index  *Index
+	cancel context.CancelFunc
 }
 
 //Store specifies the interface of an index store
@@ -56,6 +57,7 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 				cancel()
 				return nil, err
 			}
+			qpu.cancel = cancel
 			go qpu.opConsumerAsync(streamIn, cancel)
 		} else if conf.ConsLevel == "sync" {
 			streamIn, cancel, err := c.SubscribeOpsSync(time.Now().UnixNano())
@@ -65,7 +67,7 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 			}
 			go qpu.opConsumerSync(streamIn, cancel)
 		} else {
-			return nil, errors.New("ConsLevel in IndexConfig can be sync/async")
+			return nil, errors.New("unknown consLevel in index QPU configuration")
 		}
 	}
 
@@ -98,6 +100,12 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	return nil
 }
 
+//Cleanup ...
+func (q *IQPU) Cleanup() {
+	log.Info("index QPU cleanup")
+	q.cancel()
+}
+
 //----------- Stream Consumer Functions ------------
 
 //Receives an asynchronous stream of write operations
@@ -110,9 +118,6 @@ func (q *IQPU) opConsumerAsync(streamIn pbDsQPU.DataStore_SubscribeOpsAsyncClien
 			log.Fatal("opConsumer received EOF, which is not expected")
 			return
 		} else if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Fatal("opConsumer: stream.Recv() error")
 			return
 		} else {
 			if streamMsg.Operation.OpId == "no_op" {

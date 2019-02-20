@@ -19,7 +19,8 @@ type Predicate struct {
 
 //Client ...
 type Client struct {
-	cli pb.QPUClient
+	cli  pb.QPUClient
+	conn *grpc.ClientConn
 }
 
 //Find ...
@@ -61,11 +62,16 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	return resp, err
 }
 
+//CloseConnection ...
+func (c *Client) CloseConnection() error {
+	return c.conn.Close()
+}
+
 //NewClient ...
 func NewClient(address string) (Client, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return Client{}, nil, err
 	}
-	return Client{pb.NewQPUClient(conn)}, conn, nil
+	return Client{cli: pb.NewQPUClient(conn), conn: conn}, conn, nil
 }

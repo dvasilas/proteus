@@ -6,6 +6,9 @@ import (
 	"errors"
 	"flag"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	utils "github.com/dimitriosvasilas/proteus"
@@ -27,6 +30,7 @@ import (
 //QPU specifies the API of a QPU
 type QPU interface {
 	Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error
+	Cleanup()
 }
 
 //Server implements a generic QPU server
@@ -205,6 +209,9 @@ func server(confArg string) error {
 		}
 		server = Server{config: conf, downwardConns: downwardsConns, qpu: qpu}
 	}
+
+	setCleanup(server)
+
 	confJSON, err := json.Marshal(server.config)
 	if err != nil {
 		return err
@@ -233,6 +240,18 @@ func server(confArg string) error {
 	return s.Serve(lis)
 }
 
+func (s *Server) cleanup() {
+	log.Info("QPU server received SIGTERM")
+	s.qpu.Cleanup()
+	switch s.config.QpuType {
+	case "index":
+		for _, conn := range s.downwardConns.DsConn {
+			conn.CloseConnection()
+		}
+	default:
+	}
+}
+
 //---------------- Auxiliary Functions -------------
 
 func initDebug() error {
@@ -247,4 +266,16 @@ func initDebug() error {
 		log.SetLevel(log.InfoLevel)
 	}
 	return nil
+}
+
+//setCleanup set a cleanup() fucntion that will be called
+//in case the QPU server process receives a SIGTERM signal
+func setCleanup(server Server) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		server.cleanup()
+		os.Exit(0)
+	}()
 }
