@@ -41,85 +41,82 @@ type S3DataStore struct {
 	logStreamEndpoint  string
 }
 
-func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error) {
-	for {
-		inMsg, err := stream.Recv()
+func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan *pbQPU.Operation, ack chan bool, errs chan error) {
+	go func() {
+		for {
+			inMsg, err := stream.Recv()
 
-		if err == io.EOF {
-			done <- true
-			errs <- nil
-			return
+			if err == io.EOF {
+				errs <- nil
+				return
+			}
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			op := inMsg.GetOperation()
+
+			log.WithFields(log.Fields{
+				"opId":   op.GetOpId(),
+				"key":    op.GetKey(),
+				"bucket": op.GetBucket(),
+				"object": op.GetOpPayload().GetState(),
+			}).Debug("S3DataStore:watchSync received op")
+
+			op, err = formatAttributes(op)
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			log.Debug("S3DataStore:watchSync processed and forwarding operation")
+			msg <- op
+
+			ackMsg := <-ack
+			log.WithFields(log.Fields{
+				"message": ackMsg,
+			}).Debug("S3DataStore:watchSync received ACK, sending ACK to data store")
+			if err := stream.Send(&pb.OpAck{Msg: "ack", OpId: op.GetOpId()}); err != nil {
+				errs <- err
+				return
+			}
 		}
-		if err != nil {
-			done <- true
-			errs <- err
-			return
-		}
-		done <- false
-
-		op := inMsg.GetOperation()
-
-		log.WithFields(log.Fields{
-			"opId":   op.GetOpId(),
-			"key":    op.GetKey(),
-			"bucket": op.GetBucket(),
-			"object": op.GetOpPayload().GetState(),
-		}).Debug("S3DataStore:watchSync received op")
-
-		op, err = formatAttributes(op)
-		if err != nil {
-			done <- true
-			errs <- err
-			return
-		}
-
-		log.Debug("S3DataStore:watchSync processed and forwarding operation")
-		msg <- op
-
-		ackMsg := <-ack
-		log.WithFields(log.Fields{
-			"message": ackMsg,
-		}).Debug("S3DataStore:watchSync received ACK, sending ACK to data store")
-		if err := stream.Send(&pb.OpAck{Msg: "ack", OpId: op.GetOpId()}); err != nil {
-			done <- true
-			errs <- err
-			return
-		}
-	}
+	}()
 }
 
-func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg chan *pbQPU.Operation, done chan bool, errs chan error) {
-	for {
-		inMsg, err := stream.Recv()
+func (ds S3DataStore) watchAsync(stream pb.S3DataStore_WatchAsyncClient, msg chan *pbQPU.Operation, errs chan error) {
+	go func() {
+		for {
+			inMsg, err := stream.Recv()
 
-		if err == io.EOF {
-			done <- true
-			errs <- nil
+			if err == io.EOF {
+				errs <- nil
+				return
+			}
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			op := inMsg.GetOperation()
+
+			log.WithFields(log.Fields{
+				"opId":   op.GetOpId(),
+				"key":    op.GetKey(),
+				"bucket": op.GetBucket(),
+				"object": op.GetOpPayload().GetState(),
+			}).Debug("S3DataStore:watchAsync received op")
+
+			op, err = formatAttributes(op)
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			msg <- op
 		}
-		if err != nil {
-			done <- true
-			errs <- err
-		}
-		done <- false
-
-		op := inMsg.GetOperation()
-
-		log.WithFields(log.Fields{
-			"opId":   op.GetOpId(),
-			"key":    op.GetKey(),
-			"bucket": op.GetBucket(),
-			"object": op.GetOpPayload().GetState(),
-		}).Debug("S3DataStore:watchAsync received op")
-
-		op, err = formatAttributes(op)
-		if err != nil {
-			done <- true
-			errs <- err
-			return
-		}
-
-		msg <- op
-	}
+	}()
 }
 
 //New ...
@@ -149,127 +146,130 @@ func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP s
 }
 
 //GetSnapshot ...
-func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error) {
-	buff := bytes.NewBuffer([]byte{})
-	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, ds.bucketName)
-	request, err := http.NewRequest("GET", requestURL, buff)
-	if err != nil {
-		done <- true
-		errs <- err
-		return
-	}
-	reader := bytes.NewReader(buff.Bytes())
-	credentials := credentials.NewStaticCredentials(ds.awsAccessKeyID,
-		ds.awsSecretAccessKey, "")
-	signer := v4.NewSigner(credentials)
-	signer.Sign(request, reader, "s3", "us-east-1", time.Now())
-	client := &http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		done <- true
-		errs <- err
-		return
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		done <- true
-		errs <- err
-		return
-	}
-	var res listBucketResult
-	xml.Unmarshal(body, &res)
+func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
+	errCh := make(chan error)
 
-	for _, r := range res.Contents {
+	go func() {
 		buff := bytes.NewBuffer([]byte{})
-		requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, ds.bucketName, r.Key)
-		request, err = http.NewRequest("HEAD", requestURL, buff)
+		requestURL := fmt.Sprintf("%s/%s", ds.endpoint, ds.bucketName)
+		request, err := http.NewRequest("GET", requestURL, buff)
 		if err != nil {
-			done <- true
-			errs <- err
+			close(msg)
+			errCh <- err
 			return
 		}
 		reader := bytes.NewReader(buff.Bytes())
+		credentials := credentials.NewStaticCredentials(ds.awsAccessKeyID,
+			ds.awsSecretAccessKey, "")
+		signer := v4.NewSigner(credentials)
 		signer.Sign(request, reader, "s3", "us-east-1", time.Now())
-
-		resp, err = client.Do(request)
+		client := &http.Client{}
+		resp, err := client.Do(request)
 		if err != nil {
-			done <- true
-			errs <- err
+			close(msg)
+			errCh <- err
 			return
 		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			close(msg)
+			errCh <- err
+			return
+		}
+		var res listBucketResult
+		xml.Unmarshal(body, &res)
 
-		outObject := &pbQPU.Object{
-			Key: r.Key,
-			Attributes: map[string]*pbQPU.Value{
-				"size": utils.ValInt(r.Size),
-			},
-		}
-		for k := range resp.Header {
-			if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
-				attrK, attrV, err := utils.AttrToVal(k, resp.Header[k][0])
-				if err != nil {
-					done <- true
-					errs <- err
-					return
-				}
-				outObject.Attributes[attrK] = attrV
+		for _, r := range res.Contents {
+			buff := bytes.NewBuffer([]byte{})
+			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, ds.bucketName, r.Key)
+			request, err = http.NewRequest("HEAD", requestURL, buff)
+			if err != nil {
+				close(msg)
+				errCh <- err
+				return
 			}
+			reader := bytes.NewReader(buff.Bytes())
+			signer.Sign(request, reader, "s3", "us-east-1", time.Now())
+
+			resp, err = client.Do(request)
+			if err != nil {
+				close(msg)
+				errCh <- err
+				return
+			}
+
+			outObject := &pbQPU.Object{
+				Key: r.Key,
+				Attributes: map[string]*pbQPU.Value{
+					"size": utils.ValInt(r.Size),
+				},
+			}
+			for k := range resp.Header {
+				if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
+					attrK, attrV, err := utils.AttrToVal(k, resp.Header[k][0])
+					if err != nil {
+						close(msg)
+						errCh <- err
+						return
+					}
+					outObject.Attributes[attrK] = attrV
+				}
+			}
+			outObject.Attributes["x-amz-meta-s3cmd-attrs"] = utils.ValStr(resp.Header["X-Amz-Meta-S3cmd-Attrs"][0])
+			msg <- outObject
 		}
-		outObject.Attributes["x-amz-meta-s3cmd-attrs"] = utils.ValStr(resp.Header["X-Amz-Meta-S3cmd-Attrs"][0])
-		done <- false
-		msg <- outObject
-	}
-	done <- true
-	errs <- nil
+		close(msg)
+		errCh <- nil
+	}()
+	return errCh
 }
 
 //SubscribeOpsSync ...
-func (ds S3DataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error) {
+func (ds S3DataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error) {
+	errCh := make(chan error)
+
 	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return nil, errCh
 	}
-	defer conn.Close()
-
 	client := pb.NewS3DataStoreClient(conn)
 	stream, err := client.WatchSync(context.Background())
 	ctx := stream.Context()
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return nil, errCh
 	}
-	go ds.watchSync(stream, msg, done, ack, errs)
-
+	ds.watchSync(stream, msg, ack, errCh)
 	go func() {
 		<-ctx.Done()
 		if err := ctx.Err(); err != nil {
-			done <- true
-			errs <- err
+			errCh <- err
+			return
 		}
 	}()
-
-	<-errs
+	return conn, errCh
 }
 
 //SubscribeOpsAsync ...
-func (ds S3DataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
+func (ds S3DataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error) {
+	errCh := make(chan error)
+
 	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return nil, errCh
 	}
-	defer conn.Close()
 	ctx := context.Background()
 	client := pb.NewS3DataStoreClient(conn)
 	stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return conn, errCh
 	}
-	go ds.watchAsync(stream, msg, done, errs)
-	<-errs
+	ds.watchAsync(stream, msg, errCh)
+	return conn, errCh
 }
 
 func formatAttributes(op *pbQPU.Operation) (*pbQPU.Operation, error) {

@@ -21,9 +21,9 @@ import (
 )
 
 type dataStore interface {
-	GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error)
-	SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan bool, errs chan error)
-	SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error)
+	GetSnapshot(msg chan *pbQPU.Object) chan error
+	SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error)
+	SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error)
 }
 
 //Server ...
@@ -68,108 +68,111 @@ func ΝewServer(confFile string) error {
 	return s.Serve(lis)
 }
 
-func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer, msg chan *pbQPU.Object, done chan bool, errsFrom chan error, errs chan error) {
-	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errsFrom
-			errs <- err
-			return
+func (s *Server) snapshotConsumer(stream pb.DataStore_SubscribeStatesServer) (chan *pbQPU.Object, chan error) {
+	errCh := make(chan error)
+	streamCh := make(chan *pbQPU.Object)
+
+	go func() {
+		for obj := range streamCh {
+			toSend := &pb.StateStream{
+				Object: obj,
+				Dataset: &pbQPU.DataSet{
+					Db:    s.config.DataStore.DataSet.DB,
+					Dc:    s.config.DataStore.DataSet.DC,
+					Shard: s.config.DataStore.DataSet.Shard,
+				},
+			}
+			if err := stream.Send(toSend); err != nil {
+				errCh <- err
+				return
+			}
 		}
-		obj := <-msg
-		toSend := &pb.StateStream{
-			Object: obj,
-			Dataset: &pbQPU.DataSet{
-				Db:    s.config.DataStore.DataSet.DB,
-				Dc:    s.config.DataStore.DataSet.DC,
-				Shard: s.config.DataStore.DataSet.Shard,
-			},
-		}
-		if err := stream.Send(toSend); err != nil {
-			errs <- err
-			return
-		}
-	}
+		errCh <- nil
+	}()
+	return streamCh, errCh
 }
 
-func heartbeat(stream pb.DataStore_SubscribeOpsAsyncServer) {
+func heartbeat(stream pb.DataStore_SubscribeOpsAsyncServer, errCh chan error) {
 	opID := &pbQPU.Operation{OpId: "no_op"}
 	if err := stream.Send(&pb.OpStream{Operation: opID}); err != nil {
+		log.Debug("SubscribeOpsAsync client closed connection")
+		errCh <- err
 		return
 	}
-	f := newHeartbeat(stream)
+	f := newHeartbeat(stream, errCh)
 	time.AfterFunc(10*time.Second, f)
 }
 
-func newHeartbeat(stream pb.DataStore_SubscribeOpsAsyncServer) func() {
+func newHeartbeat(stream pb.DataStore_SubscribeOpsAsyncServer, errCh chan error) func() {
 	return func() {
-		heartbeat(stream)
+		heartbeat(stream, errCh)
 	}
 }
 
-func (s *Server) opsConsumerAsync(stream pb.DataStore_SubscribeOpsAsyncServer, msg chan *pbQPU.Operation, done chan bool, errsFrom chan error, errs chan error) {
-	heartbeat(stream)
-	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errsFrom
-			errs <- err
-			return
-		}
-		op := <-msg
-		log.WithFields(log.Fields{
-			"operation": op,
-		}).Debug("datastore QPU received operation")
+func (s *Server) opsConsumerAsync(stream pb.DataStore_SubscribeOpsAsyncServer, opCh chan *pbQPU.Operation) chan error {
+	errCh := make(chan error)
 
-		if s.config.DataStore.Type == "s3" {
+	heartbeat(stream, errCh)
+
+	go func() {
+		for op := range opCh {
+			log.WithFields(log.Fields{
+				"operation": op,
+			}).Debug("datastore QPU received operation")
+
+			if s.config.DataStore.Type == "s3" {
+				ds := &pbQPU.DataSet{
+					Db:    s.config.DataStore.DataSet.DB,
+					Dc:    s.config.DataStore.DataSet.DC,
+					Shard: s.config.DataStore.DataSet.Shard,
+				}
+				op.DataSet = ds
+			}
+			if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+				log.Debug("SubscribeOpsAsync client closed connection")
+				errCh <- err
+				return
+			}
+		}
+	}()
+	return errCh
+}
+
+func (s *Server) opsConsumerSync(stream pb.DataStore_SubscribeOpsSyncServer, opCh chan *pbQPU.Operation, ack chan bool) chan error {
+	errCh := make(chan error)
+
+	heartbeat(stream, errCh)
+
+	go func() {
+		for op := range opCh {
 			ds := &pbQPU.DataSet{
 				Db:    s.config.DataStore.DataSet.DB,
 				Dc:    s.config.DataStore.DataSet.DC,
 				Shard: s.config.DataStore.DataSet.Shard,
 			}
 			op.DataSet = ds
+			log.Debug("DataStoreQPU:opsConsumerSync received op, sending to indexQPU")
+			if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+				errCh <- err
+				return
+			}
+			log.Debug("DataStoreQPU:opsConsumerSync waiting for ACK, ..")
+			ackMsg, err := stream.Recv()
+			if err == io.EOF {
+				errCh <- errors.New("opsConsumerSync reveived nil")
+				return
+			}
+			if err != nil {
+				errCh <- err
+				return
+			}
+			log.WithFields(log.Fields{
+				"message": ackMsg,
+			}).Debug("S3DataStore:watchSync received ACK, forwarding ACK")
+			ack <- true
 		}
-		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
-			errs <- err
-			return
-		}
-	}
-}
-
-func (s *Server) opsConsumerSync(stream pb.DataStore_SubscribeOpsSyncServer, msg chan *pbQPU.Operation, done chan bool, ack chan bool, errsFrom chan error, errs chan error) {
-	heartbeat(stream)
-	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errsFrom
-			errs <- err
-			return
-		}
-		op := <-msg
-
-		ds := &pbQPU.DataSet{
-			Db:    s.config.DataStore.DataSet.DB,
-			Dc:    s.config.DataStore.DataSet.DC,
-			Shard: s.config.DataStore.DataSet.Shard,
-		}
-		op.DataSet = ds
-		log.Debug("DataStoreQPU:opsConsumerSync received op, sending to indexQPU")
-		if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
-			errs <- err
-			return
-		}
-		log.Debug("DataStoreQPU:opsConsumerSync waiting for ACK, ..")
-		ackMsg, err := stream.Recv()
-		if err == io.EOF {
-			errs <- errors.New("opsConsumerSync reveived nil")
-			return
-		}
-		if err != nil {
-			errs <- err
-			return
-		}
-		log.WithFields(log.Fields{
-			"message": ackMsg,
-		}).Debug("S3DataStore:watchSync received ACK, forwarding ACK")
-		ack <- true
-	}
+	}()
+	return errCh
 }
 
 //SubscribeStates ...
@@ -179,44 +182,50 @@ func (s *Server) SubscribeStates(in *pb.SubRequest, stream pb.DataStore_Subscrib
 
 //SubscribeOpsAsync ...
 func (s *Server) SubscribeOpsAsync(in *pb.SubRequest, stream pb.DataStore_SubscribeOpsAsyncServer) error {
-	msg := make(chan *pbQPU.Operation)
-	done := make(chan bool)
-	errs := make(chan error)
-	errs1 := make(chan error)
+	opCh := make(chan *pbQPU.Operation)
 
-	go s.opsConsumerAsync(stream, msg, done, errs, errs1)
-	go s.ds.SubscribeOpsAsync(msg, done, errs)
+	errsConsm := s.opsConsumerAsync(stream, opCh)
+	conn, errsSub := s.ds.SubscribeOpsAsync(opCh)
 
-	err := <-errs1
-	return err
+	select {
+	case err := <-errsConsm:
+		close(errsConsm)
+		conn.Close()
+		return err
+	case err := <-errsSub:
+		return err
+	}
 }
 
 //SubscribeOpsSync ...
 func (s *Server) SubscribeOpsSync(stream pb.DataStore_SubscribeOpsSyncServer) error {
-	msg := make(chan *pbQPU.Operation)
-	done := make(chan bool)
-	errs := make(chan error)
-	errs1 := make(chan error)
+	opCh := make(chan *pbQPU.Operation)
 	ack := make(chan bool)
 
-	go s.opsConsumerSync(stream, msg, done, ack, errs, errs1)
-	go s.ds.SubscribeOpsSync(msg, done, ack, errs)
+	errsConsm := s.opsConsumerSync(stream, opCh, ack)
+	conn, errsSub := s.ds.SubscribeOpsSync(opCh, ack)
 
-	err := <-errs1
-	return err
+	select {
+	case err := <-errsConsm:
+		close(errsConsm)
+		conn.Close()
+		return err
+	case err := <-errsSub:
+		return err
+	}
 }
 
 //GetSnapshot ...
 func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.DataStore_GetSnapshotServer) error {
-	msg := make(chan *pbQPU.Object)
-	done := make(chan bool)
-	errs := make(chan error)
-	errs1 := make(chan error)
-	go s.snapshotConsumer(stream, msg, done, errs, errs1)
-	go s.ds.GetSnapshot(msg, done, errs)
+	streamCh, errsConsm := s.snapshotConsumer(stream)
+	errsGetSn := s.ds.GetSnapshot(streamCh)
 
-	err := <-errs1
-	return err
+	select {
+	case err := <-errsConsm:
+		return err
+	case err := <-errsGetSn:
+		return err
+	}
 }
 
 //GetConfig ...
