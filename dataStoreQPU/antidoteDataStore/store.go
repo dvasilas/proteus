@@ -37,15 +37,20 @@ func New() AntidoteDataStore {
 }
 
 //GetSnapshot ...
-func (ds AntidoteDataStore) GetSnapshot(msg chan *pbQPU.Object, done chan bool, errs chan error) {
-	done <- true
-	errs <- nil
+func (ds AntidoteDataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
+	errCh := make(chan error)
+
+	close(msg)
+	errCh <- nil
+
+	return errCh
 }
 
 //SubscribeOpsSync ...
-func (ds AntidoteDataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, done chan bool, ack chan bool, errs chan error) {
-	done <- true
-	errs <- nil
+func (ds AntidoteDataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error) {
+	errCh := make(chan error)
+	errCh <- nil
+	return nil, errCh
 }
 
 func (ds AntidoteDataStore) formatOperation(crdtOp *pb.Operation) (*pbQPU.Operation, error) {
@@ -69,7 +74,7 @@ func (ds AntidoteDataStore) formatOperation(crdtOp *pb.Operation) (*pbQPU.Operat
 	return op, nil
 }
 
-func (ds AntidoteDataStore) getOperations(stream pb.AntidoteDataStore_WatchAsyncClient, msg chan *pbQPU.Operation, done chan bool) error {
+func (ds AntidoteDataStore) getOperations(stream pb.AntidoteDataStore_WatchAsyncClient, msg chan *pbQPU.Operation) error {
 	for {
 		crdtOp, err := stream.Recv()
 		if err == io.EOF {
@@ -85,27 +90,27 @@ func (ds AntidoteDataStore) getOperations(stream pb.AntidoteDataStore_WatchAsync
 		if err != nil {
 			return err
 		}
-		done <- false
 		msg <- op
 	}
 }
 
 //SubscribeOpsAsync ...
-func (ds AntidoteDataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation, done chan bool, errs chan error) {
+func (ds AntidoteDataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error) {
+	errCh := make(chan error)
+
 	conn, err := grpc.Dial(ds.interDCEndpoint, grpc.WithInsecure())
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return nil, errCh
 	}
-	defer conn.Close()
 	ctx := context.Background()
 	client := pb.NewAntidoteDataStoreClient(conn)
 	stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
 	if err != nil {
-		done <- true
-		errs <- err
+		errCh <- err
+		return nil, errCh
 	}
-	err = ds.getOperations(stream, msg, done)
-	done <- true
-	errs <- err
+	err = ds.getOperations(stream, msg)
+	errCh <- err
+	return conn, errCh
 }
