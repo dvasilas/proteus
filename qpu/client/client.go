@@ -62,6 +62,27 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	return resp, err
 }
 
+// SubscribeOpsAsync ...
+func (c *Client) SubscribeOpsAsync(ts int64) (pb.QPU_SubscribeOpsAsyncClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.SubscribeOpsAsync(ctx, &pb.SubRequest{Timestamp: ts})
+	return stream, cancel, err
+}
+
+// SubscribeOpsSync ...
+func (c *Client) SubscribeOpsSync(ts int64) (pb.QPU_SubscribeOpsSyncClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.SubscribeOpsSync(ctx)
+	return stream, cancel, err
+}
+
+//GetSnapshot ...
+func (c *Client) GetSnapshot(ts int64) (pb.QPU_GetSnapshotClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
+	return stream, cancel, err
+}
+
 //CloseConnection ...
 func (c *Client) CloseConnection() error {
 	return c.conn.Close()

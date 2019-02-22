@@ -1,5 +1,5 @@
 
-all: build_qpu_server build_ds_server build_shell
+all: build_qpu_server build_shell
 
 PROTOC := $(shell which protoc)
 UNAME := $(shell uname)
@@ -31,14 +31,11 @@ dep:
 
 proto: $(PROTOC_CMD)
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/utils/utils.proto
-	protoc --proto_path=./protos/utils/ --proto_path=./protos/datastore/ --go_out=plugins=grpc:$(GOPATH)/src ./protos/datastore/datastore.proto
 	protoc --proto_path=./protos/utils --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
 	protoc --proto_path=./protos/utils --proto_path=./protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./protos/antidote/antidote.proto
 	protoc --proto_path=./protos/qpu --proto_path=./protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/qpu/qpu.proto
 	go generate ./...
 
-build_ds_server: dep proto
-	go build -o bin/ds_server -v ./dataStoreQPU/server/server.go
 
 build_qpu_server: dep proto
 	go build -o bin/qpu_server -v ./qpu/server/server.go
@@ -47,8 +44,6 @@ build_shell: dep proto
 	go build -o bin/shell -v ./shell/shell.go
 
 # Cross compilation
-build_ds_server_linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/ds_server_linux -v ./dataStoreQPU/server/server.go
 build_qpu_server_linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/qpu_server_linux -v ./qpu/server/server.go
 
@@ -67,6 +62,5 @@ test:
 clean:
 	rm ./protos/utils/utils.pb.go ./protos/datastore/datastore.pb.go ./protos/s3/s3.pb.go ./protos/qpu/qpu.pb.go
 	rm -rf ./bin
-	rm -rf ./dataStoreQPU/client/mocks
 
 .PHONY: build_qpu_server build_qpu_server test clean

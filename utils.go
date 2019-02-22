@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	attribute "github.com/dimitriosvasilas/proteus/attributes"
-	config "github.com/dimitriosvasilas/proteus/config"
-	dSQPUcli "github.com/dimitriosvasilas/proteus/dataStoreQPU/client"
+	"github.com/dimitriosvasilas/proteus/attributes"
+	"github.com/dimitriosvasilas/proteus/config"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
 )
@@ -29,28 +28,30 @@ type Posting struct {
 	Dataset pbQPU.DataSet
 }
 
-//QPU ...
-func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pbQPU.Value, ub *pbQPU.Value) {
-	q := QPUConn{
-		Client:    c,
-		QpuType:   qType,
-		DataType:  dt,
-		Attribute: attr,
-		Lbound:    lb,
-		Ubound:    ub,
-	}
-	if sh.QPUs == nil {
-		sh.QPUs = []QPUConn{q}
-	} else {
-		sh.QPUs = append(sh.QPUs, q)
-	}
-	return
+//DownwardConns ...
+type DownwardConns struct {
+	DBs map[string]*DB
+}
+
+//DB ...
+type DB struct {
+	DCs map[string]*DC
+}
+
+//DC ...
+type DC struct {
+	Shards map[string]*Shard
+}
+
+//Shard ...
+type Shard struct {
+	QPUs []QPUConn
 }
 
 //NewDConn ...
 func NewDConn(conf config.QPUConfig) (DownwardConns, error) {
 	var dConns DownwardConns
-	for _, conn := range conf.Conns {
+	for _, conn := range conf.Connections {
 		c, _, err := cli.NewClient(conn.EndPoint)
 		if err != nil {
 			return DownwardConns{}, err
@@ -71,6 +72,60 @@ func NewDConn(conf config.QPUConfig) (DownwardConns, error) {
 	}
 
 	return dConns, nil
+}
+
+//DB ...
+func (c *DownwardConns) DB(ID string) (db *DB) {
+	if c.DBs == nil {
+		c.DBs = map[string]*DB{}
+	}
+	if db = c.DBs[ID]; db == nil {
+		db = &DB{}
+		c.DBs[ID] = db
+	}
+	return
+}
+
+//DC ...
+func (db *DB) DC(ID string) (r *DC) {
+	if db.DCs == nil {
+		db.DCs = map[string]*DC{}
+	}
+	if r = db.DCs[ID]; r == nil {
+		r = &DC{}
+		db.DCs[ID] = r
+	}
+	return
+}
+
+//Shard ...
+func (r *DC) Shard(ID string) (s *Shard) {
+	if r.Shards == nil {
+		r.Shards = map[string]*Shard{}
+	}
+	if s = r.Shards[ID]; s == nil {
+		s = &Shard{}
+		r.Shards[ID] = s
+	}
+	return
+}
+
+//QPU ...
+func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pbQPU.Value, ub *pbQPU.Value) {
+	q := QPUConn{
+		Client:    c,
+		QpuType:   qType,
+		DataType:  dt,
+		Attribute: attr,
+		Lbound:    lb,
+		Ubound:    ub,
+	}
+	if sh.QPUs == nil {
+		sh.QPUs = []QPUConn{q}
+	} else {
+		sh.QPUs = append(sh.QPUs, q)
+	}
+	return
 }
 
 //ValInt ...
@@ -160,63 +215,6 @@ func DecodeIndexEntry(entry []byte) (Posting, error) {
 		return Posting{}, err
 	}
 	return Posting{Object: o, Dataset: ds}, nil
-}
-
-//DownwardConns ...
-type DownwardConns struct {
-	DBs    map[string]*DB
-	DsConn []dSQPUcli.Client
-}
-
-//DB ...
-func (c *DownwardConns) DB(ID string) (db *DB) {
-	if c.DBs == nil {
-		c.DBs = map[string]*DB{}
-	}
-	if db = c.DBs[ID]; db == nil {
-		db = &DB{}
-		c.DBs[ID] = db
-	}
-	return
-}
-
-//DB ...
-type DB struct {
-	DCs map[string]*DC
-}
-
-//DC ...
-func (db *DB) DC(ID string) (r *DC) {
-	if db.DCs == nil {
-		db.DCs = map[string]*DC{}
-	}
-	if r = db.DCs[ID]; r == nil {
-		r = &DC{}
-		db.DCs[ID] = r
-	}
-	return
-}
-
-//DC ...
-type DC struct {
-	Shards map[string]*Shard
-}
-
-//Shard ...
-func (r *DC) Shard(ID string) (s *Shard) {
-	if r.Shards == nil {
-		r.Shards = map[string]*Shard{}
-	}
-	if s = r.Shards[ID]; s == nil {
-		s = &Shard{}
-		r.Shards[ID] = s
-	}
-	return
-}
-
-//Shard ...
-type Shard struct {
-	QPUs []QPUConn
 }
 
 //QueryInAttrRange checks if given predicate can be satisfied by a QPU based on its querable attribute value bounds

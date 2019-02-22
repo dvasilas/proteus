@@ -11,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	utils "github.com/dimitriosvasilas/proteus"
+	"github.com/dimitriosvasilas/proteus"
 	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	"github.com/dimitriosvasilas/proteus/config"
-	dSQPUcli "github.com/dimitriosvasilas/proteus/dataStoreQPU/client"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	"github.com/dimitriosvasilas/proteus/qpu/cache"
+	"github.com/dimitriosvasilas/proteus/qpu/datastore"
 	"github.com/dimitriosvasilas/proteus/qpu/filter"
 	"github.com/dimitriosvasilas/proteus/qpu/index"
 	partitionManager "github.com/dimitriosvasilas/proteus/qpu/partition_manager"
@@ -31,6 +31,9 @@ import (
 type QPU interface {
 	Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error
 	Cleanup()
+	GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error
+	SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error
+	SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error
 }
 
 //Server implements a generic QPU server
@@ -72,7 +75,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 			Lbound:    utils.ValStr("any"),
 			Ubound:    utils.ValStr("any"),
 		})
-		for _, c := range s.config.Conns {
+		for _, c := range s.config.Connections {
 			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
 				Db:    c.DataSet.DB,
 				Dc:    c.DataSet.DC,
@@ -93,13 +96,26 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 			Lbound:    lb,
 			Ubound:    ub,
 		})
-		for _, c := range s.config.Conns {
+		for _, c := range s.config.Connections {
 			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
 				Db:    c.DataSet.DB,
 				Dc:    c.DataSet.DC,
 				Shard: c.DataSet.Shard,
 			})
 		}
+	case "data_store":
+		for _, c := range s.config.Connections {
+			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
+				Db:    c.DataSet.DB,
+				Dc:    c.DataSet.DC,
+				Shard: c.DataSet.Shard,
+			})
+		}
+		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+			Attribute: "none",
+			Lbound:    utils.ValStr("none"),
+			Ubound:    utils.ValStr("none"),
+		})
 	default:
 		for dbID, db := range s.downwardConns.DBs {
 			for rID, r := range db.DCs {
@@ -124,6 +140,21 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 	return &resp, nil
 }
 
+//GetSnapshot ...
+func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
+	return s.qpu.GetSnapshot(in, stream)
+}
+
+//SubscribeOpsAsync ...
+func (s *Server) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
+	return s.qpu.SubscribeOpsAsync(in, stream)
+}
+
+//SubscribeOpsSync ...
+func (s *Server) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
+	return s.qpu.SubscribeOpsSync(stream)
+}
+
 //---------------- Internal Functions --------------
 
 func server(confArg string) error {
@@ -138,24 +169,25 @@ func server(confArg string) error {
 	var server Server
 	switch conf.QpuType {
 	case "filter":
-		c, _, err := dSQPUcli.NewClient(conf.Conns[0].EndPoint)
+		downwardsConn, err := utils.NewDConn(conf)
 		if err != nil {
 			return err
 		}
-		var dConns utils.DownwardConns
-		dConns.DsConn = []dSQPUcli.Client{c}
 		qpu, err := filter.QPU()
 		if err != nil {
 			return err
 		}
-		server = Server{config: conf, downwardConns: dConns, qpu: qpu}
-		dSConfig, err := server.downwardConns.DsConn[0].GetConfig()
-		if err != nil {
-			return err
+		server = Server{config: conf, downwardConns: downwardsConn, qpu: qpu}
+
+		for dbKey, db := range downwardsConn.DBs {
+			server.config.Connections[0].DataSet.DB = dbKey
+			for rKey, r := range db.DCs {
+				server.config.Connections[0].DataSet.DC = rKey
+				for shKey := range r.Shards {
+					server.config.Connections[0].DataSet.Shard = shKey
+				}
+			}
 		}
-		server.config.Conns[0].DataSet.DB = dSConfig.Dataset.Db
-		server.config.Conns[0].DataSet.DC = dSConfig.Dataset.Dc
-		server.config.Conns[0].DataSet.Shard = dSConfig.Dataset.Shard
 		server.config.IndexConfig.Attribute = "any"
 		server.config.IndexConfig.IndexType = "any"
 		server.config.IndexConfig.LBound = "any"
@@ -171,27 +203,13 @@ func server(confArg string) error {
 		}
 		server = Server{config: conf, downwardConns: downwardsConn, qpu: qpu}
 	case "index":
-		var dsConns []dSQPUcli.Client
-		for _, conn := range conf.Conns {
-			c, _, err := dSQPUcli.NewClient(conn.EndPoint)
-			if err != nil {
-				return err
-			}
-			dsConns = append(dsConns, c)
+		downwardsConn, err := utils.NewDConn(conf)
+		if err != nil {
+			return err
 		}
-		var dConns utils.DownwardConns
-		dConns.DsConn = dsConns
 
-		server = Server{config: conf, downwardConns: dConns}
-		for i, c := range server.downwardConns.DsConn {
-			dSConfig, err := c.GetConfig()
-			if err != nil {
-				return err
-			}
-			server.config.Conns[i].DataSet.DB = dSConfig.Dataset.Db
-			server.config.Conns[i].DataSet.DC = dSConfig.Dataset.Dc
-			server.config.Conns[i].DataSet.Shard = dSConfig.Dataset.Shard
-		}
+		server = Server{config: conf, downwardConns: downwardsConn}
+
 		qpu, err := index.QPU(conf.IndexConfig, server.downwardConns)
 		if err != nil {
 			return err
@@ -208,6 +226,12 @@ func server(confArg string) error {
 			return err
 		}
 		server = Server{config: conf, downwardConns: downwardsConns, qpu: qpu}
+	case "data_store":
+		qpu, err := datastore.QPU(conf)
+		if err != nil {
+			return err
+		}
+		server = Server{config: conf, qpu: qpu}
 	}
 
 	setCleanup(server)
@@ -245,8 +269,14 @@ func (s *Server) cleanup() {
 	s.qpu.Cleanup()
 	switch s.config.QpuType {
 	case "index":
-		for _, conn := range s.downwardConns.DsConn {
-			conn.CloseConnection()
+		for _, db := range s.downwardConns.DBs {
+			for _, r := range db.DCs {
+				for _, sh := range r.Shards {
+					for _, q := range sh.QPUs {
+						q.Client.CloseConnection()
+					}
+				}
+			}
 		}
 	default:
 	}

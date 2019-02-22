@@ -1,7 +1,7 @@
 {
     "qpuType": "index",
     "port": "50350",
-    "conns": [{
+    "connections": [{
         "endpoint": "localhost:50150"
     }],
     "indexConfig": {

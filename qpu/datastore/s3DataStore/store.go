@@ -147,11 +147,17 @@ func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP s
 
 //GetSnapshot ...
 func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
+	log.Debug("s3 data store GetSnapshot()")
 	errCh := make(chan error)
 
 	go func() {
 		buff := bytes.NewBuffer([]byte{})
 		requestURL := fmt.Sprintf("%s/%s", ds.endpoint, ds.bucketName)
+
+		log.WithFields(log.Fields{
+			"requestURL": requestURL,
+		}).Debug("requestURL")
+
 		request, err := http.NewRequest("GET", requestURL, buff)
 		if err != nil {
 			close(msg)
