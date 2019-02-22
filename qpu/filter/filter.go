@@ -1,10 +1,10 @@
 package filter
 
 import (
+	"errors"
 	"io"
 
-	utils "github.com/dimitriosvasilas/proteus"
-	pbDsQPU "github.com/dimitriosvasilas/proteus/protos/datastore"
+	"github.com/dimitriosvasilas/proteus"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
@@ -22,15 +22,39 @@ func QPU() (*FQPU, error) {
 
 //Find implements the Find API for the filter QPU
 func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	errs := make(chan error)
-	streamIn, cancel, err := conns.DsConn[0].GetSnapshot(in.Timestamp)
-	defer cancel()
-	if err != nil {
-		return err
+	for _, db := range conns.DBs {
+		for _, r := range db.DCs {
+			for _, sh := range r.Shards {
+				for _, c := range sh.QPUs {
+					errs := make(chan error)
+					streamIn, cancel, err := c.Client.GetSnapshot(in.Timestamp)
+					defer cancel()
+					if err != nil {
+						return err
+					}
+					go q.snapshotConsumer(in.Predicate, streamIn, streamOut, errs, forward)
+					err = <-errs
+					return err
+				}
+			}
+		}
 	}
-	go q.snapshotConsumer(in.Predicate, streamIn, streamOut, errs, forward)
-	err = <-errs
-	return err
+	return errors.New("filter QPU: Find : should not have reached here")
+}
+
+//GetSnapshot ...
+func (q *FQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
+	return errors.New("filter QPU does not support GetSnapshot()")
+}
+
+//SubscribeOpsAsync ...
+func (q *FQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
+	return errors.New("filter QPU does not support SubscribeOpsAsync()")
+}
+
+//SubscribeOpsSync ...
+func (q *FQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
+	return errors.New("filter QPU does not support SubscribeOpsSync()")
 }
 
 //Cleanup ...
@@ -41,7 +65,7 @@ func (q *FQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 //Receives and processes an input stream of objects
-func (q *FQPU) snapshotConsumer(pred []*pbQPU.Predicate, streamIn pbDsQPU.DataStore_GetSnapshotClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (q *FQPU) snapshotConsumer(pred []*pbQPU.Predicate, streamIn pb.QPU_GetSnapshotClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {

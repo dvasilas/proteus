@@ -12,15 +12,16 @@ import (
 
 //QPUConfig specifies the configuration structure of a QPU
 type QPUConfig struct {
-	QpuType string
-	Port    string
-	Conns   []struct {
+	QpuType     string
+	Port        string
+	Connections []struct {
 		EndPoint string
 		DataSet  struct {
 			DB    string
 			DC    string
 			Shard string
 		}
+		DataStoreConfig DataStoreConfig
 	}
 	IndexConfig IndexConfig
 }
@@ -41,24 +42,19 @@ type IndexConfig struct {
 	}
 }
 
-//DSQPUConfig specifies the configuration structure of a data store QPU
-type DSQPUConfig struct {
-	Port      string
-	DataStore struct {
-		DataSet struct {
-			DB    string
-			DC    string
-			Shard string
-		}
-		Type               string
-		DataDir            string
-		ΑwsAccessKeyID     string
-		AwsSecretAccessKey string
-		Endpoint           string
-		BucketName         string
-		LogStreamEndpoint  string
-	}
+//DataStoreConfig specifies the additional parti of the configuration structure
+//of a data store QPU
+type DataStoreConfig struct {
+	Type               string
+	DataDir            string
+	ΑwsAccessKeyID     string
+	AwsSecretAccessKey string
+	Endpoint           string
+	BucketName         string
+	LogStreamEndpoint  string
 }
+
+//---------------- API Functions -------------------
 
 //GetConfig ...
 func GetConfig(configFArg string, conf interface{}) error {

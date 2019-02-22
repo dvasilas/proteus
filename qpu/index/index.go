@@ -9,7 +9,6 @@ import (
 	utils "github.com/dimitriosvasilas/proteus"
 	attribute "github.com/dimitriosvasilas/proteus/attributes"
 	"github.com/dimitriosvasilas/proteus/config"
-	pbDsQPU "github.com/dimitriosvasilas/proteus/protos/datastore"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	antidoteIndex "github.com/dimitriosvasilas/proteus/qpu/index/antidote"
@@ -50,24 +49,30 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 		index: index,
 	}
 
-	for _, c := range conns.DsConn {
-		if conf.ConsLevel == "async" {
-			streamIn, cancel, err := c.SubscribeOpsAsync(time.Now().UnixNano())
-			if err != nil {
-				cancel()
-				return nil, err
+	for _, db := range conns.DBs {
+		for _, r := range db.DCs {
+			for _, sh := range r.Shards {
+				for _, q := range sh.QPUs {
+					if conf.ConsLevel == "async" {
+						streamIn, cancel, err := q.Client.SubscribeOpsAsync(time.Now().UnixNano())
+						if err != nil {
+							cancel()
+							return nil, err
+						}
+						qpu.cancel = cancel
+						go qpu.opConsumerAsync(streamIn, cancel)
+					} else if conf.ConsLevel == "sync" {
+						streamIn, cancel, err := q.Client.SubscribeOpsSync(time.Now().UnixNano())
+						if err != nil {
+							cancel()
+							return nil, err
+						}
+						go qpu.opConsumerSync(streamIn, cancel)
+					} else {
+						return nil, errors.New("unknown consLevel in index QPU configuration")
+					}
+				}
 			}
-			qpu.cancel = cancel
-			go qpu.opConsumerAsync(streamIn, cancel)
-		} else if conf.ConsLevel == "sync" {
-			streamIn, cancel, err := c.SubscribeOpsSync(time.Now().UnixNano())
-			if err != nil {
-				cancel()
-				return nil, err
-			}
-			go qpu.opConsumerSync(streamIn, cancel)
-		} else {
-			return nil, errors.New("unknown consLevel in index QPU configuration")
 		}
 	}
 
@@ -100,6 +105,21 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	return nil
 }
 
+//GetSnapshot ...
+func (q *IQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
+	return errors.New("index QPU does not support GetSnapshot()")
+}
+
+//SubscribeOpsAsync ...
+func (q *IQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
+	return errors.New("index QPU does not support SubscribeOpsAsync()")
+}
+
+//SubscribeOpsSync ...
+func (q *IQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
+	return errors.New("index QPU does not support SubscribeOpsSync()")
+}
+
 //Cleanup ...
 func (q *IQPU) Cleanup() {
 	log.Info("index QPU cleanup")
@@ -111,7 +131,7 @@ func (q *IQPU) Cleanup() {
 //Receives an asynchronous stream of write operations
 //Updates the index for each operation
 //TODO: Find a way to handle an error here
-func (q *IQPU) opConsumerAsync(streamIn pbDsQPU.DataStore_SubscribeOpsAsyncClient, cancel context.CancelFunc) {
+func (q *IQPU) opConsumerAsync(streamIn pb.QPU_SubscribeOpsAsyncClient, cancel context.CancelFunc) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {
@@ -141,7 +161,7 @@ func (q *IQPU) opConsumerAsync(streamIn pbDsQPU.DataStore_SubscribeOpsAsyncClien
 //Receives a synchronous stream of write operations
 //Updates the index for each operation and sends an ACK through the stream
 //TODO: Find a way to handle an error here
-func (q *IQPU) opConsumerSync(streamInOut pbDsQPU.DataStore_SubscribeOpsSyncClient, cancel context.CancelFunc) {
+func (q *IQPU) opConsumerSync(streamInOut pb.QPU_SubscribeOpsSyncClient, cancel context.CancelFunc) {
 	for {
 		streamMsg, err := streamInOut.Recv()
 		if err == io.EOF {
@@ -167,7 +187,7 @@ func (q *IQPU) opConsumerSync(streamInOut pbDsQPU.DataStore_SubscribeOpsSyncClie
 				return
 			}
 			log.Debug("QPUServer:index updated, sending ACK")
-			if err := streamInOut.Send(&pbDsQPU.OpAckStream{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}); err != nil {
+			if err := streamInOut.Send(&pb.OpAckStream{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}); err != nil {
 				log.Fatal("opConsumerSync stream.Send failed")
 				return
 			}
@@ -177,7 +197,7 @@ func (q *IQPU) opConsumerSync(streamInOut pbDsQPU.DataStore_SubscribeOpsSyncClie
 
 //Receives a stream of objects stored in the data store, as a result of a catch-up operation
 //Updates the index for each object
-func (q *IQPU) catchUpConsumer(streamIn pbDsQPU.DataStore_GetSnapshotClient, errs chan error) {
+func (q *IQPU) catchUpConsumer(streamIn pb.QPU_GetSnapshotClient, errs chan error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {
@@ -246,23 +266,28 @@ func (q *IQPU) updateIndex(op *pbQPU.Operation) error {
 
 //Performs an index catch-up  operation, initiating an object stream from the data store
 func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
-	errs := make([]chan error, len(conns.DsConn))
-	for i := range conns.DsConn {
-		errs[i] = make(chan error)
-	}
-
-	for i, c := range conns.DsConn {
-		streamIn, cancel, err := c.GetSnapshot(time.Now().UnixNano())
-		defer cancel()
-		if err != nil {
-			return err
-		}
-		go q.catchUpConsumer(streamIn, errs[i])
-	}
-	for i := range conns.DsConn {
-		err := <-errs[i]
-		if err != nil {
-			return err
+	for _, db := range conns.DBs {
+		for _, r := range db.DCs {
+			for _, sh := range r.Shards {
+				errs := make([]chan error, len(sh.QPUs))
+				for i := range sh.QPUs {
+					errs[i] = make(chan error)
+				}
+				for i, c := range sh.QPUs {
+					streamIn, cancel, err := c.Client.GetSnapshot(time.Now().UnixNano())
+					defer cancel()
+					if err != nil {
+						return err
+					}
+					go q.catchUpConsumer(streamIn, errs[i])
+				}
+				for i := range sh.QPUs {
+					err := <-errs[i]
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 	return nil

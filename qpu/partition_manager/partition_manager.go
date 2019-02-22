@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	utils "github.com/dimitriosvasilas/proteus"
+	"github.com/dimitriosvasilas/proteus"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
@@ -71,6 +71,21 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 		}
 	}
 	return nil
+}
+
+//GetSnapshot ...
+func (q *PmQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
+	return errors.New("partition_manager QPU does not support GetSnapshot()")
+}
+
+//SubscribeOpsAsync ...
+func (q *PmQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
+	return errors.New("partition_manager QPU does not support SubscribeOpsAsync()")
+}
+
+//SubscribeOpsSync ...
+func (q *PmQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
+	return errors.New("partition_manager QPU does not support SubscribeOpsSync()")
 }
 
 //Cleanup ...

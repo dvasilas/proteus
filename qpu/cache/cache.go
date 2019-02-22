@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	utils "github.com/dimitriosvasilas/proteus"
+	"github.com/dimitriosvasilas/proteus"
 	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
 	cli "github.com/dimitriosvasilas/proteus/qpu/client"
@@ -83,6 +83,21 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 
 	err = <-errs
 	return err
+}
+
+//GetSnapshot ...
+func (q *CQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
+	return errors.New("cache QPU does not support GetSnapshot()")
+}
+
+//SubscribeOpsAsync ...
+func (q *CQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
+	return errors.New("cache QPU does not support SubscribeOpsAsync()")
+}
+
+//SubscribeOpsSync ...
+func (q *CQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
+	return errors.New("cache QPU does not support SubscribeOpsSync()")
 }
 
 //Cleanup ...
