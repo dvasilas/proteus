@@ -19,7 +19,7 @@ type AntidoteIndex struct {
 //Implementation ...
 type Implementation interface {
 	Put(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, ds *pbQPU.DataSet, buck antidote.Bucket, tx antidote.Transaction) error
-	Get(p []*pbQPU.Predicate, buck antidote.Bucket, cli *antidote.Client) (map[string]utils.Posting, bool, error)
+	Get(p []*pbQPU.AttributePredicate, buck antidote.Bucket, cli *antidote.Client) (map[string]utils.Posting, bool, error)
 	RemoveOldEntry(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, state map[string]utils.Posting, buck antidote.Bucket, tx antidote.Transaction) error
 	FilterIndexable(attrKey string, attrVal *pbQPU.Value, lb *pbQPU.Value, ub *pbQPU.Value) (bool, string)
 }
@@ -71,6 +71,6 @@ func (i *AntidoteIndex) Update(op *pbQPU.Operation, attribute string, lbound *pb
 }
 
 //Lookup ...
-func (i *AntidoteIndex) Lookup(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error) {
+func (i *AntidoteIndex) Lookup(p []*pbQPU.AttributePredicate) (map[string]utils.Posting, bool, error) {
 	return i.index.Get(p, i.bucket, i.antidoteCli)
 }

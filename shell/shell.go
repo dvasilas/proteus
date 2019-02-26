@@ -37,7 +37,7 @@ type flags struct {
 
 func (sh *shell) find(q []query) error {
 	log.Debug("shell:find ", q)
-	query := make([]cli.Predicate, 0)
+	var query []*pbQPU.AttributePredicate
 
 	attr, _, err := attribute.Attr(q[0].attribute, nil)
 	if err != nil {
@@ -47,32 +47,32 @@ func (sh *shell) find(q []query) error {
 	if err != nil {
 		return errors.New("bound error")
 	}
-	query = append(query, cli.Predicate{
+	query = append(query, &pbQPU.AttributePredicate{
 		Attribute: attr.GetKey(q[0].attribute),
 		Datatype:  attr.GetDatatype(),
-		LBound:    lbound,
-		UBound:    ubound,
+		Lbound:    lbound,
+		Ubound:    ubound,
 	})
 	log.Debug("shell:find ", query)
 
 	return sh.sendQuery(query)
 }
 
-func (sh *shell) sendQuery(query []cli.Predicate) error {
-	log.Debug("shell:sendQuery ", query)
+func (sh *shell) sendQuery(pred []*pbQPU.AttributePredicate) error {
+	log.Debug("shell:sendQuery ", pred)
 
 	msg := make(chan *pb.QueryResultStream)
 	done := make(chan bool)
 	errs := make(chan error)
 	errs1 := make(chan error)
 
-	go sh.queryConsumer(query, msg, done, errs, errs1)
-	sh.client.Find(time.Now().UnixNano(), query, msg, done, errs)
+	go sh.queryConsumer(pred, msg, done, errs, errs1)
+	sh.client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred, msg, done, errs)
 	err := <-errs1
 	return err
 }
 
-func (sh *shell) queryConsumer(query []cli.Predicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
+func (sh *shell) queryConsumer(query []*pbQPU.AttributePredicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errs
@@ -130,7 +130,7 @@ func main() {
 	}
 }
 
-func (sh *shell) displayResults(query []cli.Predicate, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
+func (sh *shell) displayResults(query []*pbQPU.AttributePredicate, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
 	logMsg := log.Fields{
 		"key":     obj.GetKey(),
 		"dataset": ds,

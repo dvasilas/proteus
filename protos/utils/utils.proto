@@ -39,16 +39,20 @@ message Op {
     string payload = 3;
 }
 
-message FindRequest {
-    int64 timestamp = 1;
-    repeated Predicate predicate = 2;
-}
-
-message Predicate {
+message AttributePredicate {
     string datatype = 1;
     string attribute = 2;
     Value lbound = 3;
     Value ubound = 4;
+}
+
+message TimestampPredicate {
+    Timestamp lbound = 1;
+    Timestamp ubound = 2;
+}
+
+message Timestamp {
+    int64 ts = 1;
 }
 
 message DataSet {

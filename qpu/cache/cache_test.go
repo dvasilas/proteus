@@ -11,17 +11,17 @@ import (
 )
 
 var keyTests = []struct {
-	query       []*pbQPU.Predicate
+	query       []*pbQPU.AttributePredicate
 	expectedKey string
 }{
-	{[]*pbQPU.Predicate{
+	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "size",
 			Lbound:    utils.ValInt(0),
 			Ubound:    utils.ValInt(10),
 		},
 	}, "size/0/10"},
-	{[]*pbQPU.Predicate{
+	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "size",
 			Lbound:    utils.ValInt(0),
@@ -36,31 +36,31 @@ var keyTests = []struct {
 }
 
 var getTests = []struct {
-	toAdd       []*pbQPU.Predicate
-	toGet       []*pbQPU.Predicate
+	toAdd       []*pbQPU.AttributePredicate
+	toGet       []*pbQPU.AttributePredicate
 	expectedHit bool
 }{
-	{[]*pbQPU.Predicate{
+	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "hit",
 			Lbound:    utils.ValInt(0),
 			Ubound:    utils.ValInt(1),
 		},
-	}, []*pbQPU.Predicate{
+	}, []*pbQPU.AttributePredicate{
 		{
 			Attribute: "hit",
 			Lbound:    utils.ValInt(0),
 			Ubound:    utils.ValInt(1),
 		},
 	}, true},
-	{[]*pbQPU.Predicate{
+	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "nothit",
 			Lbound:    utils.ValInt(0),
 			Ubound:    utils.ValInt(1),
 		},
 	},
-		[]*pbQPU.Predicate{
+		[]*pbQPU.AttributePredicate{
 			{
 				Attribute: "miss",
 				Lbound:    utils.ValInt(0),
@@ -90,14 +90,14 @@ func TestGet(t *testing.T) {
 }
 
 func TestEvict(t *testing.T) {
-	var evicted [][]*pbQPU.Predicate
-	onEvictF := func(key []*pbQPU.Predicate, value []cachedValue) {
+	var evicted [][]*pbQPU.AttributePredicate
+	onEvictF := func(key []*pbQPU.AttributePredicate, value []cachedValue) {
 		evicted = append(evicted, key)
 	}
 	cache := new(10)
 	cache.OnEvict = onEvictF
 	for i := 0; i < 12; i++ {
-		cache.put([]*pbQPU.Predicate{
+		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
 				Lbound:    utils.ValInt(0),
@@ -110,14 +110,14 @@ func TestEvict(t *testing.T) {
 }
 
 func TestEvictLRU(t *testing.T) {
-	var evicted [][]*pbQPU.Predicate
-	onEvictF := func(key []*pbQPU.Predicate, value []cachedValue) {
+	var evicted [][]*pbQPU.AttributePredicate
+	onEvictF := func(key []*pbQPU.AttributePredicate, value []cachedValue) {
 		evicted = append(evicted, key)
 	}
 	cache := new(10)
 	cache.OnEvict = onEvictF
 	for i := 0; i < 5; i++ {
-		cache.put([]*pbQPU.Predicate{
+		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
 				Lbound:    utils.ValInt(0),
@@ -125,14 +125,14 @@ func TestEvictLRU(t *testing.T) {
 			},
 		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
-	_, _ = cache.get([]*pbQPU.Predicate{
+	_, _ = cache.get([]*pbQPU.AttributePredicate{
 		{
 			Attribute: "attr0",
 			Lbound:    utils.ValInt(0),
 			Ubound:    utils.ValInt(0),
 		},
 	})
-	_, _ = cache.get([]*pbQPU.Predicate{
+	_, _ = cache.get([]*pbQPU.AttributePredicate{
 		{
 			Attribute: "attr1",
 			Lbound:    utils.ValInt(0),
@@ -140,7 +140,7 @@ func TestEvictLRU(t *testing.T) {
 		},
 	})
 	for i := 5; i < 12; i++ {
-		cache.put([]*pbQPU.Predicate{
+		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
 				Lbound:    utils.ValInt(0),

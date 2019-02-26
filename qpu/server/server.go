@@ -70,7 +70,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 
 	switch s.config.QpuType {
 	case "filter":
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
 			Attribute: "any",
 			Lbound:    utils.ValStr("any"),
 			Ubound:    utils.ValStr("any"),
@@ -91,7 +91,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 		if err != nil {
 			return nil, err
 		}
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
 			Attribute: s.config.IndexConfig.Attribute,
 			Lbound:    lb,
 			Ubound:    ub,
@@ -111,7 +111,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 				Shard: c.DataSet.Shard,
 			})
 		}
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
 			Attribute: "none",
 			Lbound:    utils.ValStr("none"),
 			Ubound:    utils.ValStr("none"),
@@ -126,7 +126,7 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 						Shard: shID,
 					})
 					for _, q := range sh.QPUs {
-						resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.Predicate{
+						resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
 							Datatype:  q.DataType,
 							Attribute: q.Attribute,
 							Lbound:    q.Lbound,

@@ -35,7 +35,7 @@ func (i *S3TagF) Put(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object, ds
 }
 
 //Get ...
-func (i *S3TagF) Get(p []*pbQPU.Predicate, buck antidote.Bucket, cli *antidote.Client) (map[string]utils.Posting, bool, error) {
+func (i *S3TagF) Get(p []*pbQPU.AttributePredicate, buck antidote.Bucket, cli *antidote.Client) (map[string]utils.Posting, bool, error) {
 	tx := cli.CreateStaticTransaction()
 	mapVal, err := buck.ReadMap(tx, antidote.Key([]byte(p[0].GetAttribute())))
 	if err != nil {
