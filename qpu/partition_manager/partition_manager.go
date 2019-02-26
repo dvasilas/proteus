@@ -42,13 +42,6 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 	if err != nil {
 		return err
 	}
-	pred := make([]cli.Predicate, 0)
-	pred = append(pred, cli.Predicate{
-		Attribute: in.Predicate[0].Attribute,
-		Datatype:  in.Predicate[0].Datatype,
-		LBound:    in.Predicate[0].Lbound,
-		UBound:    in.Predicate[0].Ubound,
-	})
 
 	msg := make(chan *pb.QueryResultStream)
 	done := make([]chan bool, len(clients))
@@ -61,7 +54,7 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 	}
 	for i, c := range clients {
 		go q.findResultConsumer(in.Predicate, streamOut, msg, done[i], errsFind[i], errs[i], forwardResponse)
-		go c.Find(in.Timestamp, pred, msg, done[i], errsFind[i])
+		go c.Find(in.Timestamp, in.Predicate, msg, done[i], errsFind[i])
 		time.Sleep(time.Millisecond * 100)
 	}
 	for _, e := range errs {
@@ -96,7 +89,7 @@ func (q *PmQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 //Receives stream of query results and forwards upwards
-func (q *PmQPU) findResultConsumer(pred []*pbQPU.Predicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (q *PmQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errFind
@@ -112,7 +105,7 @@ func (q *PmQPU) findResultConsumer(pred []*pbQPU.Predicate, streamOut pb.QPU_Fin
 //---------------- Internal Functions --------------
 
 //Sends an object received from the input stream as part of query results to the output stream corresponding to this query.
-func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predicate, stream pb.QPU_FindServer) error {
+func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, stream pb.QPU_FindServer) error {
 	return stream.Send(&pb.QueryResultStream{
 		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
 		Dataset: ds,
@@ -121,7 +114,7 @@ func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predica
 
 //forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
 //Returns an array connections for initiating Find queries, and any error encountered.
-func (q *PmQPU) forwardQuery(query []*pbQPU.Predicate) ([]cli.Client, error) {
+func (q *PmQPU) forwardQuery(query []*pbQPU.AttributePredicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
 	for _, sh := range q.conns {
 		for _, q := range sh.QPUs {

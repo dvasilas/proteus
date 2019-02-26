@@ -218,7 +218,7 @@ func DecodeIndexEntry(entry []byte) (Posting, error) {
 }
 
 //QueryInAttrRange checks if given predicate can be satisfied by a QPU based on its querable attribute value bounds
-func QueryInAttrRange(conn QPUConn, query []*pbQPU.Predicate) bool {
+func QueryInAttrRange(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
 	for _, p := range query {
 		switch conn.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
@@ -241,7 +241,7 @@ func QueryInAttrRange(conn QPUConn, query []*pbQPU.Predicate) bool {
 }
 
 //CanProcessQuery checks if given predicate can be satisfied by a QPU based on its querable attribute
-func CanProcessQuery(conn QPUConn, query []*pbQPU.Predicate) bool {
+func CanProcessQuery(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
 	if conn.Attribute == "any" {
 		return true
 	}

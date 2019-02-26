@@ -22,11 +22,11 @@ type cache struct {
 	MaxEntries int
 	ll         *list.List
 	items      map[string]*list.Element
-	OnEvict    func(key []*pbQPU.Predicate, value []cachedValue)
+	OnEvict    func(key []*pbQPU.AttributePredicate, value []cachedValue)
 }
 
 type entry struct {
-	key   []*pbQPU.Predicate
+	key   []*pbQPU.AttributePredicate
 	value []cachedValue
 }
 
@@ -61,14 +61,6 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	}
 	log.WithFields(log.Fields{}).Debug("cache miss")
 
-	pred := make([]cli.Predicate, 0)
-	pred = append(pred, cli.Predicate{
-		Attribute: in.Predicate[0].Attribute,
-		Datatype:  in.Predicate[0].Datatype,
-		LBound:    in.Predicate[0].Lbound,
-		UBound:    in.Predicate[0].Ubound,
-	})
-
 	clients, err := forwardQuery(conns, in.Predicate)
 	if err != nil {
 		return err
@@ -79,7 +71,7 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	errsFind := make(chan error)
 
 	go q.findResultConsumer(in.Predicate, streamOut, msg, done, errsFind, errs, q.cache.storeAndRespond)
-	go clients[0].Find(in.Timestamp, pred, msg, done, errsFind)
+	go clients[0].Find(in.Timestamp, in.Predicate, msg, done, errsFind)
 
 	err = <-errs
 	return err
@@ -109,7 +101,7 @@ func (q *CQPU) Cleanup() {
 
 //Receives stream of query results from cache miss
 //Stores objects in cache and forwards upwards
-func (q *CQPU) findResultConsumer(pred []*pbQPU.Predicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (q *CQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
 		if doneMsg := <-done; doneMsg {
 			err := <-errFind
@@ -135,7 +127,7 @@ func new(maxEntries int) *cache {
 }
 
 //Stores an object in the cache and send it upwards through an output stream
-func (c *cache) storeAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQPU.Predicate, streamOut pb.QPU_FindServer) error {
+func (c *cache) storeAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer) error {
 	if err := c.put(in, *obj, *ds); err != nil {
 		return err
 	}
@@ -146,7 +138,7 @@ func (c *cache) storeAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQP
 }
 
 //Stores an object in a cache entry
-func (c *cache) put(query []*pbQPU.Predicate, obj pbQPU.Object, ds pbQPU.DataSet) error {
+func (c *cache) put(query []*pbQPU.AttributePredicate, obj pbQPU.Object, ds pbQPU.DataSet) error {
 	if c.items == nil {
 		c.ll = list.New()
 		c.items = make(map[string]*list.Element)
@@ -166,7 +158,7 @@ func (c *cache) put(query []*pbQPU.Predicate, obj pbQPU.Object, ds pbQPU.DataSet
 }
 
 //Retrieves an enty from the cache
-func (c *cache) get(p []*pbQPU.Predicate) ([]cachedValue, bool) {
+func (c *cache) get(p []*pbQPU.AttributePredicate) ([]cachedValue, bool) {
 	if c.items == nil {
 		return nil, false
 	}
@@ -200,7 +192,7 @@ func (c *cache) evict() error {
 
 //forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
 //Returns an array connections for initiating Find queries, and any error encountered.
-func forwardQuery(conns utils.DownwardConns, query []*pbQPU.Predicate) ([]cli.Client, error) {
+func forwardQuery(conns utils.DownwardConns, query []*pbQPU.AttributePredicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
 	for _, db := range conns.DBs {
 		for _, r := range db.DCs {
@@ -228,7 +220,7 @@ func forwardQuery(conns utils.DownwardConns, query []*pbQPU.Predicate) ([]cli.Cl
 }
 
 //Converts a predicate to a cache entry key
-func predicateToKey(p []*pbQPU.Predicate) string {
+func predicateToKey(p []*pbQPU.AttributePredicate) string {
 	entryKey := ""
 	for i, pp := range p {
 		switch pp.Lbound.Val.(type) {

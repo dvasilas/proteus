@@ -65,7 +65,7 @@ func (q *FQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 //Receives and processes an input stream of objects
-func (q *FQPU) snapshotConsumer(pred []*pbQPU.Predicate, streamIn pb.QPU_GetSnapshotClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.Predicate, pb.QPU_FindServer) error) {
+func (q *FQPU) snapshotConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_GetSnapshotClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {
@@ -86,7 +86,7 @@ func (q *FQPU) snapshotConsumer(pred []*pbQPU.Predicate, streamIn pb.QPU_GetSnap
 
 //Examines whether an object matches a given predicate,
 //Returns a boolean accordingly
-func filter(obj *pbQPU.Object, query []*pbQPU.Predicate) bool {
+func filter(obj *pbQPU.Object, query []*pbQPU.AttributePredicate) bool {
 	for _, q := range query {
 		switch q.Lbound.Val.(type) {
 		case *pbQPU.Value_Int:
@@ -133,7 +133,7 @@ func filter(obj *pbQPU.Object, query []*pbQPU.Predicate) bool {
 }
 
 //Sends an object through an upward stream, if the object matches the given predicate
-func forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.Predicate, streamOut pb.QPU_FindServer) error {
+func forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer) error {
 	if filter(obj, pred) {
 		return streamOut.Send(&pb.QueryResultStream{
 			Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},

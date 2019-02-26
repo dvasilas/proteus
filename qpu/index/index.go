@@ -25,7 +25,7 @@ type IQPU struct {
 //Store specifies the interface of an index store
 type Store interface {
 	Update(op *pbQPU.Operation, attribute string, lbound *pbQPU.Value, ubound *pbQPU.Value) error
-	Lookup(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error)
+	Lookup(p []*pbQPU.AttributePredicate) (map[string]utils.Posting, bool, error)
 }
 
 //Index implements a generic index structure
@@ -54,7 +54,7 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 			for _, sh := range r.Shards {
 				for _, q := range sh.QPUs {
 					if conf.ConsLevel == "async" {
-						streamIn, cancel, err := q.Client.SubscribeOpsAsync(time.Now().UnixNano())
+						streamIn, cancel, err := q.Client.SubscribeOpsAsync(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
 						if err != nil {
 							cancel()
 							return nil, err
@@ -62,7 +62,7 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 						qpu.cancel = cancel
 						go qpu.opConsumerAsync(streamIn, cancel)
 					} else if conf.ConsLevel == "sync" {
-						streamIn, cancel, err := q.Client.SubscribeOpsSync(time.Now().UnixNano())
+						streamIn, cancel, err := q.Client.SubscribeOpsSync(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
 						if err != nil {
 							cancel()
 							return nil, err
@@ -274,7 +274,7 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 					errs[i] = make(chan error)
 				}
 				for i, c := range sh.QPUs {
-					streamIn, cancel, err := c.Client.GetSnapshot(time.Now().UnixNano())
+					streamIn, cancel, err := c.Client.GetSnapshot(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
 					defer cancel()
 					if err != nil {
 						return err

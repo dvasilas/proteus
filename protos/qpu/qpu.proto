@@ -14,15 +14,18 @@ service QPU {
 }
 
 message FindRequest {
-    int64 timestamp = 1;
-    repeated utils.Predicate predicate = 2;
+    //Timestamp is part of the attributes
+    //Desclared explicitly here for easier parsing
+    utils.TimestampPredicate timestamp = 1;
+    repeated utils.AttributePredicate predicate = 2;
 }
 
 message ConfigRequest {
+    utils.TimestampPredicate timestamp = 1;
 }
 
 message SubRequest {
-    int64 timestamp = 1;
+    utils.TimestampPredicate timestamp = 1;
 }
 
 message QueryResultStream {
@@ -33,7 +36,7 @@ message QueryResultStream {
 message ConfigResponse {
     string QPUType = 1;
     repeated utils.DataSet dataset = 2;
-    repeated utils.Predicate supportedQueries = 3;
+    repeated utils.AttributePredicate supportedQueries = 3;
 }
 
 message OpStream {

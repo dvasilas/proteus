@@ -9,14 +9,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-//Predicate ..
-type Predicate struct {
-	Attribute string
-	Datatype  string
-	LBound    *pbQPU.Value
-	UBound    *pbQPU.Value
-}
-
 //Client ...
 type Client struct {
 	cli  pb.QPUClient
@@ -24,15 +16,11 @@ type Client struct {
 }
 
 //Find ...
-func (c *Client) Find(ts int64, predicate []Predicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error) {
+func (c *Client) Find(ts *pbQPU.TimestampPredicate, predicate []*pbQPU.AttributePredicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	req := new(pb.FindRequest)
-	req.Timestamp = ts
-	for _, p := range predicate {
-		req.Predicate = append(req.Predicate, &pbQPU.Predicate{Datatype: p.Datatype, Attribute: p.Attribute, Lbound: p.LBound, Ubound: p.UBound})
-	}
+	req := &pb.FindRequest{Timestamp: ts, Predicate: predicate}
 
 	stream, err := c.cli.Find(ctx, req)
 	if err != nil {
@@ -63,21 +51,21 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 }
 
 // SubscribeOpsAsync ...
-func (c *Client) SubscribeOpsAsync(ts int64) (pb.QPU_SubscribeOpsAsyncClient, context.CancelFunc, error) {
+func (c *Client) SubscribeOpsAsync(ts *pbQPU.TimestampPredicate) (pb.QPU_SubscribeOpsAsyncClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.SubscribeOpsAsync(ctx, &pb.SubRequest{Timestamp: ts})
 	return stream, cancel, err
 }
 
 // SubscribeOpsSync ...
-func (c *Client) SubscribeOpsSync(ts int64) (pb.QPU_SubscribeOpsSyncClient, context.CancelFunc, error) {
+func (c *Client) SubscribeOpsSync(ts *pbQPU.TimestampPredicate) (pb.QPU_SubscribeOpsSyncClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.SubscribeOpsSync(ctx)
 	return stream, cancel, err
 }
 
 //GetSnapshot ...
-func (c *Client) GetSnapshot(ts int64) (pb.QPU_GetSnapshotClient, context.CancelFunc, error) {
+func (c *Client) GetSnapshot(ts *pbQPU.TimestampPredicate) (pb.QPU_GetSnapshotClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.GetSnapshot(ctx, &pb.SubRequest{Timestamp: ts})
 	return stream, cancel, err

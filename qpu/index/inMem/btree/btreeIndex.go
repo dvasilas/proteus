@@ -78,7 +78,7 @@ func (i *BTreeIndex) Put(attrKey string, attrVal *pbQPU.Value, obj *pbQPU.Object
 }
 
 //Get ...
-func (i *BTreeIndex) Get(p []*pbQPU.Predicate) (map[string]utils.Posting, bool, error) {
+func (i *BTreeIndex) Get(p []*pbQPU.AttributePredicate) (map[string]utils.Posting, bool, error) {
 	res := make(map[string]utils.Posting)
 	it := func(item btree.Item) bool {
 		for _, p := range i.impl.getPostings(item) {
