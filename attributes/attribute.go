@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 )
 
 //Attribute interface representing a secondary attribte

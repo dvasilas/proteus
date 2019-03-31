@@ -2,9 +2,9 @@ package antidoteindex
 
 import (
 	antidote "github.com/AntidoteDB/antidote-go-client"
-	utils "github.com/dimitriosvasilas/proteus"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	s3tafg "github.com/dimitriosvasilas/proteus/qpu/index/antidote/s3TagF"
+	utils "github.com/dvasilas/proteus"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	s3tafg "github.com/dvasilas/proteus/qpu/index/antidote/s3TagF"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	utils "github.com/dimitriosvasilas/proteus"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	btreeIndex "github.com/dimitriosvasilas/proteus/qpu/index/inMem/btree"
+	utils "github.com/dvasilas/proteus"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	btreeIndex "github.com/dvasilas/proteus/qpu/index/inMem/btree"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +36,7 @@ func New(indexType string) (*InMemIntex, error) {
 	case "btree":
 		impl, err = btreeIndex.New(indexT[1])
 		if err != nil {
-			return &InMemIntex{}, errors.New("unknown in_mem index type")
+			return &InMemIntex{}, err
 		}
 	default:
 		return &InMemIntex{}, errors.New("unknown in_mem index type")

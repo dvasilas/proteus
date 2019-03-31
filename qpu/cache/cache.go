@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dimitriosvasilas/proteus"
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	cli "github.com/dimitriosvasilas/proteus/qpu/client"
+	"github.com/dvasilas/proteus"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	cli "github.com/dvasilas/proteus/qpu/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -82,14 +82,9 @@ func (q *CQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) e
 	return errors.New("cache QPU does not support GetSnapshot()")
 }
 
-//SubscribeOpsAsync ...
-func (q *CQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
-	return errors.New("cache QPU does not support SubscribeOpsAsync()")
-}
-
-//SubscribeOpsSync ...
-func (q *CQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
-	return errors.New("cache QPU does not support SubscribeOpsSync()")
+//SubscribeOps ...
+func (q *CQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
+	return errors.New("cache QPU does not support SubscribeOps()")
 }
 
 //Cleanup ...

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"os"
 
-	utils "github.com/dimitriosvasilas/proteus"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	utils "github.com/dvasilas/proteus"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"github.com/fsnotify/fsnotify"
 	"google.golang.org/grpc"
 )
@@ -87,30 +87,23 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, er
 	}
 }
 
-//SubscribeOpsAsync ...
-func (ds FSDataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error) {
+//SubscribeOps ...
+func (ds FSDataStore) SubscribeOps(msg chan *pbQPU.Operation, ack chan bool, sync bool) (*grpc.ClientConn, chan error) {
 	errCh := make(chan error)
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		errCh <- err
-		return nil, errCh
+	if sync {
+		errCh <- errors.New("Not supported")
+	} else {
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			errCh <- err
+			return nil, errCh
+		}
+		go ds.watchFS(watcher, msg, errCh)
+		err = watcher.Add(ds.path)
+		if err != nil {
+			errCh <- err
+			return nil, errCh
+		}
 	}
-	//defer watcher.Close()
-
-	go ds.watchFS(watcher, msg, errCh)
-
-	err = watcher.Add(ds.path)
-	if err != nil {
-		errCh <- err
-		return nil, errCh
-	}
-	return nil, errCh
-}
-
-//SubscribeOpsSync ...
-func (ds FSDataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error) {
-	errCh := make(chan error)
-	errCh <- errors.New("Not supported")
 	return nil, errCh
 }

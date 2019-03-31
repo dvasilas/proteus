@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/AntidoteDB/antidote-go-client"
+  packages = ["."]
+  revision = "cbe18517fda925c5e2e8ed77d3aa331386a0febd"
+
+[[projects]]
   name = "github.com/abiosoft/ishell"
   packages = ["."]
   revision = "0a6b1640e32638dd433ee7e57ec325a7bdd79561"
@@ -63,16 +69,15 @@
   version = "v1.38.2"
 
 [[projects]]
-  name = "github.com/golang/mock"
-  packages = ["gomock"]
-  revision = "c34cdb4725f4c3844d095133c6e40e448b86589b"
-  version = "v1.1.1"
-
-[[projects]]
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
+    "protoc-gen-go",
     "protoc-gen-go/descriptor",
+    "protoc-gen-go/generator",
+    "protoc-gen-go/generator/internal/remap",
+    "protoc-gen-go/grpc",
+    "protoc-gen-go/plugin",
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
@@ -287,6 +292,12 @@
   version = "v1.13.0"
 
 [[projects]]
+  name = "gopkg.in/fatih/pool.v2"
+  packages = ["."]
+  revision = "010e0b745d12eaf8426c95f9c3924d81dd0b668f"
+  version = "v2.0.0"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -295,6 +306,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ac845db15f99910696299e1062300d8958d2362f8ca784e33798c9a298184ceb"
+  inputs-digest = "2036caf7bf7de0e3bb23e92091ca0ef0bf6cfa3d747e512480ff2e1db83448a1"
   solver-name = "gps-cdcl"
   solver-version = 1

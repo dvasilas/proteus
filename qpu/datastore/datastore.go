@@ -5,13 +5,13 @@ import (
 	"io"
 	"time"
 
-	"github.com/dimitriosvasilas/proteus"
-	"github.com/dimitriosvasilas/proteus/config"
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	ant "github.com/dimitriosvasilas/proteus/qpu/datastore/antidoteDataStore"
-	fS "github.com/dimitriosvasilas/proteus/qpu/datastore/fsDataStore"
-	s3ds "github.com/dimitriosvasilas/proteus/qpu/datastore/s3DataStore"
+	"github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/config"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	ant "github.com/dvasilas/proteus/qpu/datastore/antidoteDataStore"
+	fS "github.com/dvasilas/proteus/qpu/datastore/fsDataStore"
+	s3ds "github.com/dvasilas/proteus/qpu/datastore/s3DataStore"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -25,8 +25,7 @@ type DsQPU struct {
 
 type dataStore interface {
 	GetSnapshot(msg chan *pbQPU.Object) chan error
-	SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error)
-	SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error)
+	SubscribeOps(msg chan *pbQPU.Operation, ack chan bool, sync bool) (*grpc.ClientConn, chan error)
 }
 
 //---------------- API Functions -------------------
@@ -66,30 +65,28 @@ func (q *DsQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) 
 	}
 }
 
-//SubscribeOpsAsync ...
-func (q *DsQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
-	opCh := make(chan *pbQPU.Operation)
-
-	errsConsm := q.opsConsumerAsync(stream, opCh)
-	conn, errsSub := q.ds.SubscribeOpsAsync(opCh)
-
-	select {
-	case err := <-errsConsm:
-		close(errsConsm)
-		conn.Close()
-		return err
-	case err := <-errsSub:
+//SubscribeOps ...
+func (q *DsQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
+	msg, err := stream.Recv()
+	if err == io.EOF {
+		return errors.New("SubscribeOpsAsync received EOF")
+	}
+	if err != nil {
 		return err
 	}
-}
+	req := msg.GetRequest()
+	log.WithFields(log.Fields{
+		"req": req,
+	}).Debug("SubscribeOpsAsync request")
 
-//SubscribeOpsSync ...
-func (q *DsQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
 	opCh := make(chan *pbQPU.Operation)
+	errsConsm := make(chan error)
+	errsSub := make(chan error)
+	var conn *grpc.ClientConn
 	ack := make(chan bool)
 
-	errsConsm := q.opsConsumerSync(stream, opCh, ack)
-	conn, errsSub := q.ds.SubscribeOpsSync(opCh, ack)
+	errsConsm = q.opsConsumer(stream, opCh, ack, req.GetSync())
+	conn, errsSub = q.ds.SubscribeOps(opCh, ack, req.GetSync())
 
 	select {
 	case err := <-errsConsm:
@@ -132,36 +129,7 @@ func (q *DsQPU) snapshotConsumer(stream pb.QPU_GetSnapshotServer) (chan *pbQPU.O
 	return streamCh, errCh
 }
 
-func (q *DsQPU) opsConsumerAsync(stream pb.QPU_SubscribeOpsAsyncServer, opCh chan *pbQPU.Operation) chan error {
-	errCh := make(chan error)
-
-	heartbeat(stream, errCh)
-
-	go func() {
-		for op := range opCh {
-			log.WithFields(log.Fields{
-				"operation": op,
-			}).Debug("datastore QPU received operation")
-
-			if q.config.Connections[0].DataStoreConfig.Type == "s3" {
-				ds := &pbQPU.DataSet{
-					Db:    q.config.Connections[0].DataSet.DB,
-					Dc:    q.config.Connections[0].DataSet.DC,
-					Shard: q.config.Connections[0].DataSet.Shard,
-				}
-				op.DataSet = ds
-			}
-			if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
-				log.Debug("SubscribeOpsAsync client closed connection")
-				errCh <- err
-				return
-			}
-		}
-	}()
-	return errCh
-}
-
-func (q *DsQPU) opsConsumerSync(stream pb.QPU_SubscribeOpsSyncServer, opCh chan *pbQPU.Operation, ack chan bool) chan error {
+func (q *DsQPU) opsConsumer(stream pb.QPU_SubscribeOpsServer, opCh chan *pbQPU.Operation, ack chan bool, sync bool) chan error {
 	errCh := make(chan error)
 
 	heartbeat(stream, errCh)
@@ -174,25 +142,27 @@ func (q *DsQPU) opsConsumerSync(stream pb.QPU_SubscribeOpsSyncServer, opCh chan 
 				Shard: q.config.Connections[0].DataSet.Shard,
 			}
 			op.DataSet = ds
-			log.Debug("DataStoreQPU:opsConsumerSync received op, sending to indexQPU")
+			log.Debug("DataStoreQPU:opsConsumer received op, forwarding")
 			if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
 				errCh <- err
 				return
 			}
-			log.Debug("DataStoreQPU:opsConsumerSync waiting for ACK, ..")
-			ackMsg, err := stream.Recv()
-			if err == io.EOF {
-				errCh <- errors.New("opsConsumerSync reveived nil")
-				return
+			if sync {
+				log.Debug("DataStoreQPU:opsConsumer waiting for ACK, ")
+				ackMsg, err := stream.Recv()
+				if err == io.EOF {
+					errCh <- errors.New("DataStoreQPU:opsConsumer reveived nil")
+					return
+				}
+				if err != nil {
+					errCh <- err
+					return
+				}
+				log.WithFields(log.Fields{
+					"message": ackMsg,
+				}).Debug("DataStoreQPU:opsConsumer received ACK, forwarding")
+				ack <- true
 			}
-			if err != nil {
-				errCh <- err
-				return
-			}
-			log.WithFields(log.Fields{
-				"message": ackMsg,
-			}).Debug("S3DataStore:watchSync received ACK, forwarding ACK")
-			ack <- true
 		}
 	}()
 	return errCh
@@ -200,10 +170,10 @@ func (q *DsQPU) opsConsumerSync(stream pb.QPU_SubscribeOpsSyncServer, opCh chan 
 
 //---------------- Internal Functions --------------
 
-func heartbeat(stream pb.QPU_SubscribeOpsAsyncServer, errCh chan error) {
+func heartbeat(stream pb.QPU_SubscribeOpsServer, errCh chan error) {
 	opID := &pbQPU.Operation{OpId: "no_op"}
 	if err := stream.Send(&pb.OpStream{Operation: opID}); err != nil {
-		log.Debug("SubscribeOpsAsync client closed connection")
+		log.Debug("heartbeat:stream.Send error - Connection closed")
 		errCh <- err
 		return
 	}
@@ -211,7 +181,7 @@ func heartbeat(stream pb.QPU_SubscribeOpsAsyncServer, errCh chan error) {
 	time.AfterFunc(10*time.Second, f)
 }
 
-func newHeartbeat(stream pb.QPU_SubscribeOpsAsyncServer, errCh chan error) func() {
+func newHeartbeat(stream pb.QPU_SubscribeOpsServer, errCh chan error) func() {
 	return func() {
 		heartbeat(stream, errCh)
 	}

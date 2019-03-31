@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"google.golang.org/grpc"
 )
 
@@ -50,17 +50,14 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	return resp, err
 }
 
-// SubscribeOpsAsync ...
-func (c *Client) SubscribeOpsAsync(ts *pbQPU.TimestampPredicate) (pb.QPU_SubscribeOpsAsyncClient, context.CancelFunc, error) {
+//SubscribeOps ...
+func (c *Client) SubscribeOps(ts *pbQPU.TimestampPredicate, sync bool) (pb.QPU_SubscribeOpsClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := c.cli.SubscribeOpsAsync(ctx, &pb.SubRequest{Timestamp: ts})
-	return stream, cancel, err
-}
-
-// SubscribeOpsSync ...
-func (c *Client) SubscribeOpsSync(ts *pbQPU.TimestampPredicate) (pb.QPU_SubscribeOpsSyncClient, context.CancelFunc, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := c.cli.SubscribeOpsSync(ctx)
+	stream, err := c.cli.SubscribeOps(ctx)
+	if err != nil {
+		return nil, cancel, nil
+	}
+	err = stream.Send(&pb.ReqStream{Payload: &pb.ReqStream_Request{Request: &pb.SubRequest{Timestamp: ts, Sync: sync}}})
 	return stream, cancel, err
 }
 

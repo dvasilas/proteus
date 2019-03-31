@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dimitriosvasilas/proteus/attributes"
-	"github.com/dimitriosvasilas/proteus/config"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	cli "github.com/dimitriosvasilas/proteus/qpu/client"
+	"github.com/dvasilas/proteus/attributes"
+	"github.com/dvasilas/proteus/config"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	cli "github.com/dvasilas/proteus/qpu/client"
 )
 
 //QPUConn ...

@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	pb "github.com/dimitriosvasilas/proteus/protos/antidote"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	pb "github.com/dvasilas/proteus/protos/antidote"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -44,13 +44,6 @@ func (ds AntidoteDataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 	errCh <- nil
 
 	return errCh
-}
-
-//SubscribeOpsSync ...
-func (ds AntidoteDataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error) {
-	errCh := make(chan error)
-	errCh <- nil
-	return nil, errCh
 }
 
 func (ds AntidoteDataStore) formatOperation(crdtOp *pb.Operation) (*pbQPU.Operation, error) {
@@ -94,10 +87,14 @@ func (ds AntidoteDataStore) getOperations(stream pb.AntidoteDataStore_WatchAsync
 	}
 }
 
-//SubscribeOpsAsync ...
-func (ds AntidoteDataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error) {
+//SubscribeOps ...
+func (ds AntidoteDataStore) SubscribeOps(msg chan *pbQPU.Operation, ack chan bool, sync bool) (*grpc.ClientConn, chan error) {
 	errCh := make(chan error)
 
+	if sync {
+		errCh <- nil
+		return nil, errCh
+	}
 	conn, err := grpc.Dial(ds.interDCEndpoint, grpc.WithInsecure())
 	if err != nil {
 		errCh <- err

@@ -11,16 +11,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dimitriosvasilas/proteus"
-	attribute "github.com/dimitriosvasilas/proteus/attributes"
-	"github.com/dimitriosvasilas/proteus/config"
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	"github.com/dimitriosvasilas/proteus/qpu/cache"
-	"github.com/dimitriosvasilas/proteus/qpu/datastore"
-	"github.com/dimitriosvasilas/proteus/qpu/filter"
-	"github.com/dimitriosvasilas/proteus/qpu/index"
-	partitionManager "github.com/dimitriosvasilas/proteus/qpu/partition_manager"
+	"github.com/dvasilas/proteus"
+	attribute "github.com/dvasilas/proteus/attributes"
+	"github.com/dvasilas/proteus/config"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	"github.com/dvasilas/proteus/qpu/cache"
+	"github.com/dvasilas/proteus/qpu/datastore"
+	"github.com/dvasilas/proteus/qpu/filter"
+	"github.com/dvasilas/proteus/qpu/index"
+	partitionManager "github.com/dvasilas/proteus/qpu/partition_manager"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -32,8 +32,7 @@ type QPU interface {
 	Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error
 	Cleanup()
 	GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error
-	SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error
-	SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error
+	SubscribeOps(stream pb.QPU_SubscribeOpsServer) error
 }
 
 //Server implements a generic QPU server
@@ -145,14 +144,9 @@ func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer)
 	return s.qpu.GetSnapshot(in, stream)
 }
 
-//SubscribeOpsAsync ...
-func (s *Server) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
-	return s.qpu.SubscribeOpsAsync(in, stream)
-}
-
-//SubscribeOpsSync ...
-func (s *Server) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
-	return s.qpu.SubscribeOpsSync(stream)
+//SubscribeOps ...
+func (s *Server) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
+	return s.qpu.SubscribeOps(stream)
 }
 
 //---------------- Internal Functions --------------
