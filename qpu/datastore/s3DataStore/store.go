@@ -13,9 +13,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
-	utils "github.com/dimitriosvasilas/proteus"
-	pb "github.com/dimitriosvasilas/proteus/protos/s3"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	utils "github.com/dvasilas/proteus"
+	pb "github.com/dvasilas/proteus/protos/s3"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -231,8 +231,8 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 	return errCh
 }
 
-//SubscribeOpsSync ...
-func (ds S3DataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool) (*grpc.ClientConn, chan error) {
+//SubscribeOps ...
+func (ds S3DataStore) SubscribeOps(msg chan *pbQPU.Operation, ack chan bool, sync bool) (*grpc.ClientConn, chan error) {
 	errCh := make(chan error)
 
 	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
@@ -241,40 +241,30 @@ func (ds S3DataStore) SubscribeOpsSync(msg chan *pbQPU.Operation, ack chan bool)
 		return nil, errCh
 	}
 	client := pb.NewS3DataStoreClient(conn)
-	stream, err := client.WatchSync(context.Background())
-	ctx := stream.Context()
-	if err != nil {
-		errCh <- err
-		return nil, errCh
-	}
-	ds.watchSync(stream, msg, ack, errCh)
-	go func() {
-		<-ctx.Done()
-		if err := ctx.Err(); err != nil {
+	if !sync {
+		ctx := context.Background()
+		stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
+		if err != nil {
 			errCh <- err
-			return
+			return conn, errCh
 		}
-	}()
-	return conn, errCh
-}
-
-//SubscribeOpsAsync ...
-func (ds S3DataStore) SubscribeOpsAsync(msg chan *pbQPU.Operation) (*grpc.ClientConn, chan error) {
-	errCh := make(chan error)
-
-	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
-	if err != nil {
-		errCh <- err
-		return nil, errCh
+		ds.watchAsync(stream, msg, errCh)
+	} else {
+		stream, err := client.WatchSync(context.Background())
+		ctx := stream.Context()
+		if err != nil {
+			errCh <- err
+			return nil, errCh
+		}
+		ds.watchSync(stream, msg, ack, errCh)
+		go func() {
+			<-ctx.Done()
+			if err := ctx.Err(); err != nil {
+				errCh <- err
+				return
+			}
+		}()
 	}
-	ctx := context.Background()
-	client := pb.NewS3DataStoreClient(conn)
-	stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
-	if err != nil {
-		errCh <- err
-		return conn, errCh
-	}
-	ds.watchAsync(stream, msg, errCh)
 	return conn, errCh
 }
 

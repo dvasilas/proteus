@@ -4,9 +4,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/dimitriosvasilas/proteus"
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	"github.com/dvasilas/proteus"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,14 +47,9 @@ func (q *FQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) e
 	return errors.New("filter QPU does not support GetSnapshot()")
 }
 
-//SubscribeOpsAsync ...
-func (q *FQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
-	return errors.New("filter QPU does not support SubscribeOpsAsync()")
-}
-
-//SubscribeOpsSync ...
-func (q *FQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
-	return errors.New("filter QPU does not support SubscribeOpsSync()")
+//SubscribeOps ...
+func (q *FQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
+	return errors.New("filter QPU does not support SubscribeOps()")
 }
 
 //Cleanup ...

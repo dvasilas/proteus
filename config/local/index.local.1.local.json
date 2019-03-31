@@ -6,12 +6,12 @@
     }],
     "indexConfig": {
         "attribute": "tagF",
-        "indexType": "naive_s3tagF",
+        "indexType": "btree_s3tagF",
         "lBound": "0.0",
         "uBound": "1.0",
         "consLevel": "async",
         "indexStore": {
-            "store": "antidote",
+            "store": "inMem",
             "host": "127.0.0.1",
             "port": 8087,
             "bucket": "indexQPU0"

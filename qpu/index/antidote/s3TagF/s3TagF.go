@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	antidote "github.com/AntidoteDB/antidote-go-client"
-	utils "github.com/dimitriosvasilas/proteus"
-	attribute "github.com/dimitriosvasilas/proteus/attributes"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	utils "github.com/dvasilas/proteus"
+	attribute "github.com/dvasilas/proteus/attributes"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
 )
 

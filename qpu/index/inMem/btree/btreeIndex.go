@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strings"
 
-	utils "github.com/dimitriosvasilas/proteus"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
+	utils "github.com/dvasilas/proteus"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"github.com/google/btree"
 	log "github.com/sirupsen/logrus"
 )

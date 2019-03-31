@@ -1,6 +1,6 @@
 FROM golang
 
-COPY . /go/src/github.com/dimitriosvasilas/proteus/
+COPY . /go/src/github.com/dvasilas/proteus/
 
-WORKDIR $GOPATH/src/github.com/dimitriosvasilas/proteus/qpu/server
+WORKDIR $GOPATH/src/github.com/dvasilas/proteus/qpu/server
 

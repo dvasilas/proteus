@@ -1,15 +1,14 @@
 syntax = "proto3";
 
 package qpu;
-option go_package = "github.com/dimitriosvasilas/proteus/protos/qpu";
+option go_package = "github.com/dvasilas/proteus/protos/qpu";
 
 import "utils.proto";
 
 service QPU {
     rpc Find(FindRequest) returns (stream QueryResultStream) {}
     rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
-    rpc SubscribeOpsSync(stream OpAckStream) returns (stream OpStream) {}
-    rpc SubscribeOpsAsync(SubRequest) returns (stream OpStream) {}
+    rpc SubscribeOps(stream ReqStream) returns (stream OpStream) {}
     rpc GetSnapshot(SubRequest) returns (stream StateStream) {}
 }
 
@@ -26,6 +25,7 @@ message ConfigRequest {
 
 message SubRequest {
     utils.TimestampPredicate timestamp = 1;
+    bool sync = 2;
 }
 
 message QueryResultStream {
@@ -50,7 +50,14 @@ message StateStream {
     utils.DataSet dataset = 2;
 }
 
-message OpAckStream {
+message AckMsg {
     string msg = 1;
     string opId = 2;
+}
+
+message ReqStream {
+    oneof payload {
+        SubRequest request = 1;
+        AckMsg ack = 2;
+    }
 }

@@ -6,13 +6,13 @@ import (
 	"io"
 	"time"
 
-	utils "github.com/dimitriosvasilas/proteus"
-	attribute "github.com/dimitriosvasilas/proteus/attributes"
-	"github.com/dimitriosvasilas/proteus/config"
-	pb "github.com/dimitriosvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dimitriosvasilas/proteus/protos/utils"
-	antidoteIndex "github.com/dimitriosvasilas/proteus/qpu/index/antidote"
-	inMemIndex "github.com/dimitriosvasilas/proteus/qpu/index/inMem"
+	utils "github.com/dvasilas/proteus"
+	attribute "github.com/dvasilas/proteus/attributes"
+	"github.com/dvasilas/proteus/config"
+	pb "github.com/dvasilas/proteus/protos/qpu"
+	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	antidoteIndex "github.com/dvasilas/proteus/qpu/index/antidote"
+	inMemIndex "github.com/dvasilas/proteus/qpu/index/inMem"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,24 +53,17 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 		for _, r := range db.DCs {
 			for _, sh := range r.Shards {
 				for _, q := range sh.QPUs {
-					if conf.ConsLevel == "async" {
-						streamIn, cancel, err := q.Client.SubscribeOpsAsync(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
-						if err != nil {
-							cancel()
-							return nil, err
-						}
-						qpu.cancel = cancel
-						go qpu.opConsumerAsync(streamIn, cancel)
-					} else if conf.ConsLevel == "sync" {
-						streamIn, cancel, err := q.Client.SubscribeOpsSync(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
-						if err != nil {
-							cancel()
-							return nil, err
-						}
-						go qpu.opConsumerSync(streamIn, cancel)
-					} else {
-						return nil, errors.New("unknown consLevel in index QPU configuration")
+					sync := false
+					if conf.ConsLevel == "sync" {
+						sync = true
 					}
+					streamIn, cancel, err := q.Client.SubscribeOps(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, sync)
+					if err != nil {
+						cancel()
+						return nil, err
+					}
+					qpu.cancel = cancel
+					go qpu.opConsumer(streamIn, cancel, sync)
 				}
 			}
 		}
@@ -110,14 +103,9 @@ func (q *IQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) e
 	return errors.New("index QPU does not support GetSnapshot()")
 }
 
-//SubscribeOpsAsync ...
-func (q *IQPU) SubscribeOpsAsync(in *pb.SubRequest, stream pb.QPU_SubscribeOpsAsyncServer) error {
-	return errors.New("index QPU does not support SubscribeOpsAsync()")
-}
-
-//SubscribeOpsSync ...
-func (q *IQPU) SubscribeOpsSync(stream pb.QPU_SubscribeOpsSyncServer) error {
-	return errors.New("index QPU does not support SubscribeOpsSync()")
+//SubscribeOps ...
+func (q *IQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
+	return errors.New("index QPU does not support SubscribeOps()")
 }
 
 //Cleanup ...
@@ -128,16 +116,17 @@ func (q *IQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-//Receives an asynchronous stream of write operations
+//Receives an stream of write operations
 //Updates the index for each operation
 //TODO: Find a way to handle an error here
-func (q *IQPU) opConsumerAsync(streamIn pb.QPU_SubscribeOpsAsyncClient, cancel context.CancelFunc) {
+func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.CancelFunc, sync bool) {
 	for {
-		streamMsg, err := streamIn.Recv()
+		streamMsg, err := stream.Recv()
 		if err == io.EOF {
 			log.Fatal("opConsumer received EOF, which is not expected")
 			return
 		} else if err != nil {
+			log.Fatal("opConsumer err", err)
 			return
 		} else {
 			if streamMsg.Operation.OpId == "no_op" {
@@ -154,42 +143,12 @@ func (q *IQPU) opConsumerAsync(streamIn pb.QPU_SubscribeOpsAsyncClient, cancel c
 				}).Fatal("opConsumer: index Update failed")
 				return
 			}
-		}
-	}
-}
-
-//Receives a synchronous stream of write operations
-//Updates the index for each operation and sends an ACK through the stream
-//TODO: Find a way to handle an error here
-func (q *IQPU) opConsumerSync(streamInOut pb.QPU_SubscribeOpsSyncClient, cancel context.CancelFunc) {
-	for {
-		streamMsg, err := streamInOut.Recv()
-		if err == io.EOF {
-			log.Fatal("opConsumer received EOF, which is not expected")
-			return
-		} else if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Fatal("opConsumer: stream.Recv() error")
-			return
-		} else {
-			if streamMsg.Operation.OpId == "no_op" {
-				continue
-			}
-			log.WithFields(log.Fields{
-				"op": streamMsg.GetOperation(),
-			}).Debug("QPUServer:opConsumerSync:  received op")
-			if err := q.updateIndex(streamMsg.GetOperation()); err != nil {
-				log.WithFields(log.Fields{
-					"error": err,
-					"op":    streamMsg.Operation,
-				}).Fatal("opConsumer: index Update failed")
-				return
-			}
-			log.Debug("QPUServer:index updated, sending ACK")
-			if err := streamInOut.Send(&pb.OpAckStream{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}); err != nil {
-				log.Fatal("opConsumerSync stream.Send failed")
-				return
+			if sync {
+				log.Debug("QPUServer:index updated, sending ACK")
+				if err := stream.Send(&pb.ReqStream{Payload: &pb.ReqStream_Ack{Ack: &pb.AckMsg{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}}}); err != nil {
+					log.Fatal("opConsumer stream.Send failed")
+					return
+				}
 			}
 		}
 	}

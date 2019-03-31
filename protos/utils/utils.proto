@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package utils;
-option go_package = "github.com/dimitriosvasilas/proteus/protos/utils";
+option go_package = "github.com/dvasilas/proteus/protos/utils";
 
 message Object {
     string key = 1;
