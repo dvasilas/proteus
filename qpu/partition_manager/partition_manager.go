@@ -2,6 +2,7 @@ package partitionΜanager
 
 import (
 	"errors"
+	"io"
 	"time"
 
 	"github.com/dvasilas/proteus"
@@ -42,19 +43,18 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 	if err != nil {
 		return err
 	}
-
-	msg := make(chan *pb.QueryResultStream)
-	done := make([]chan bool, len(clients))
 	errs := make([]chan error, len(clients))
-	errsFind := make([]chan error, len(clients))
 	for i := range clients {
-		done[i] = make(chan bool)
 		errs[i] = make(chan error)
-		errsFind[i] = make(chan error)
 	}
 	for i, c := range clients {
-		go q.findResultConsumer(in.Predicate, streamOut, msg, done[i], errsFind[i], errs[i], forwardResponse)
-		go c.Find(in.Timestamp, in.Predicate, msg, done[i], errsFind[i])
+
+		streamIn, _, err := c.Find(in.Timestamp, in.Predicate)
+		if err != nil {
+			return err
+		}
+		go q.findResultConsumer(in.Predicate, streamIn, streamOut, errs[i], forwardResponse)
+
 		time.Sleep(time.Millisecond * 100)
 	}
 	for _, e := range errs {
@@ -64,11 +64,6 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 		}
 	}
 	return nil
-}
-
-//GetSnapshot ...
-func (q *PmQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	return errors.New("partition_manager QPU does not support GetSnapshot()")
 }
 
 //SubscribeOps ...
@@ -84,15 +79,19 @@ func (q *PmQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 //Receives stream of query results and forwards upwards
-func (q *PmQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
+func (q *PmQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errFind
+		streamMsg, err := streamIn.Recv()
+		if err == io.EOF {
+			errs <- nil
+			return
+		} else if err != nil {
 			errs <- err
+			return
 		}
-		streamMsg := <-msg
-		if err := process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
+		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
 			errs <- err
+			return
 		}
 	}
 }
@@ -101,7 +100,7 @@ func (q *PmQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamOut p
 
 //Sends an object received from the input stream as part of query results to the output stream corresponding to this query.
 func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, stream pb.QPU_FindServer) error {
-	return stream.Send(&pb.QueryResultStream{
+	return stream.Send(&pb.FindResponseStream{
 		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
 		Dataset: ds,
 	})

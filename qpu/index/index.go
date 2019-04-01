@@ -83,7 +83,7 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	}).Debug("Index lookup")
 	indexResult, found, err := q.index.indexstore.Lookup(in.Predicate)
 	if !found {
-		if err := streamOut.Send(&pb.QueryResultStream{Object: &pbQPU.Object{Key: "noResults"}}); err != nil {
+		if err := streamOut.Send(&pb.FindResponseStream{Object: &pbQPU.Object{Key: "noResults"}}); err != nil {
 			return err
 		}
 		return nil
@@ -91,16 +91,11 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		return err
 	}
 	for _, item := range indexResult {
-		if err := streamOut.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
+		if err := streamOut.Send(&pb.FindResponseStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-//GetSnapshot ...
-func (q *IQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	return errors.New("index QPU does not support GetSnapshot()")
 }
 
 //SubscribeOps ...
@@ -156,7 +151,7 @@ func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.Cance
 
 //Receives a stream of objects stored in the data store, as a result of a catch-up operation
 //Updates the index for each object
-func (q *IQPU) catchUpConsumer(streamIn pb.QPU_GetSnapshotClient, errs chan error) {
+func (q *IQPU) catchUpConsumer(streamIn pb.QPU_FindClient, errs chan error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {
@@ -233,7 +228,8 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 					errs[i] = make(chan error)
 				}
 				for i, c := range sh.QPUs {
-					streamIn, cancel, err := c.Client.GetSnapshot(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}})
+					pred := make([]*pbQPU.AttributePredicate, 0)
+					streamIn, cancel, err := c.Client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred)
 					defer cancel()
 					if err != nil {
 						return err
