@@ -149,28 +149,13 @@ func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.Cance
 	}
 }
 
-//Receives a stream of objects stored in the data store, as a result of a catch-up operation
-//Updates the index for each object
-func (q *IQPU) catchUpConsumer(streamIn pb.QPU_FindClient, errs chan error) {
-	for {
-		streamMsg, err := streamIn.Recv()
-		if err == io.EOF {
-			errs <- nil
-			return
-		} else if err != nil {
-			errs <- err
-			return
-		}
-		op := &pbQPU.Operation{
-			OpId:      "catchUp",
-			OpPayload: &pbQPU.OperationPayload{Payload: &pbQPU.OperationPayload_State{State: streamMsg.GetObject()}},
-			DataSet:   streamMsg.GetDataset(),
-		}
-		if err := q.updateIndex(op); err != nil {
-			errs <- err
-			return
-		}
+func (q *IQPU) stateToOp(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
+	op := &pbQPU.Operation{
+		OpId:      "catchUp",
+		OpPayload: &pbQPU.OperationPayload{Payload: &pbQPU.OperationPayload_State{State: streamMsg.GetObject()}},
+		DataSet:   streamMsg.GetDataset(),
 	}
+	return q.updateIndex(op)
 }
 
 //---------------- Internal Functions --------------
@@ -234,7 +219,7 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 					if err != nil {
 						return err
 					}
-					go q.catchUpConsumer(streamIn, errs[i])
+					go utils.FindResponseConsumer(pred, streamIn, nil, errs[i], q.stateToOp)
 				}
 				for i := range sh.QPUs {
 					err := <-errs[i]

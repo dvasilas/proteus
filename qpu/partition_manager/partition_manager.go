@@ -2,7 +2,6 @@ package partitionΜanager
 
 import (
 	"errors"
-	"io"
 	"time"
 
 	"github.com/dvasilas/proteus"
@@ -53,7 +52,7 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 		if err != nil {
 			return err
 		}
-		go q.findResultConsumer(in.Predicate, streamIn, streamOut, errs[i], forwardResponse)
+		go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs[i], forwardResponse)
 
 		time.Sleep(time.Millisecond * 100)
 	}
@@ -78,31 +77,13 @@ func (q *PmQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-//Receives stream of query results and forwards upwards
-func (q *PmQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
-	for {
-		streamMsg, err := streamIn.Recv()
-		if err == io.EOF {
-			errs <- nil
-			return
-		} else if err != nil {
-			errs <- err
-			return
-		}
-		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
-			errs <- err
-			return
-		}
-	}
-}
-
 //---------------- Internal Functions --------------
 
 //Sends an object received from the input stream as part of query results to the output stream corresponding to this query.
-func forwardResponse(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, stream pb.QPU_FindServer) error {
+func forwardResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
 	return stream.Send(&pb.FindResponseStream{
-		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
-		Dataset: ds,
+		Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
+		Dataset: streamMsg.GetDataset(),
 	})
 }
 

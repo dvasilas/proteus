@@ -3,12 +3,14 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	"github.com/dvasilas/proteus/attributes"
 	"github.com/dvasilas/proteus/config"
-	pbQPU "github.com/dvasilas/proteus/protos/utils"
+	pbQPU "github.com/dvasilas/proteus/protos/qpu"
+	pb "github.com/dvasilas/proteus/protos/utils"
 	cli "github.com/dvasilas/proteus/qpu/client"
 )
 
@@ -18,14 +20,14 @@ type QPUConn struct {
 	QpuType   string
 	DataType  string
 	Attribute string
-	Lbound    *pbQPU.Value
-	Ubound    *pbQPU.Value
+	Lbound    *pb.Value
+	Ubound    *pb.Value
 }
 
 //Posting ...
 type Posting struct {
-	Object  pbQPU.Object
-	Dataset pbQPU.DataSet
+	Object  pb.Object
+	Dataset pb.DataSet
 }
 
 //DownwardConns ...
@@ -111,7 +113,7 @@ func (r *DC) Shard(ID string) (s *Shard) {
 }
 
 //QPU ...
-func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pbQPU.Value, ub *pbQPU.Value) {
+func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pb.Value, ub *pb.Value) {
 	q := QPUConn{
 		Client:    c,
 		QpuType:   qType,
@@ -129,22 +131,22 @@ func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pbQ
 }
 
 //ValInt ...
-func ValInt(i int64) *pbQPU.Value {
-	return &pbQPU.Value{Val: &pbQPU.Value_Int{Int: i}}
+func ValInt(i int64) *pb.Value {
+	return &pb.Value{Val: &pb.Value_Int{Int: i}}
 }
 
 //ValStr ...
-func ValStr(s string) *pbQPU.Value {
-	return &pbQPU.Value{Val: &pbQPU.Value_Str{Str: s}}
+func ValStr(s string) *pb.Value {
+	return &pb.Value{Val: &pb.Value_Str{Str: s}}
 }
 
 //ValFlt ...
-func ValFlt(f float64) *pbQPU.Value {
-	return &pbQPU.Value{Val: &pbQPU.Value_Flt{Flt: f}}
+func ValFlt(f float64) *pb.Value {
+	return &pb.Value{Val: &pb.Value_Flt{Flt: f}}
 }
 
 //AttrToVal ...
-func AttrToVal(k string, v string) (string, *pbQPU.Value, error) {
+func AttrToVal(k string, v string) (string, *pb.Value, error) {
 	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
@@ -154,7 +156,7 @@ func AttrToVal(k string, v string) (string, *pbQPU.Value, error) {
 	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
 		i, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return "", &pbQPU.Value{}, err
+			return "", &pb.Value{}, err
 		}
 		return strings.ToLower(k), ValInt(i), nil
 	} else {
@@ -162,23 +164,23 @@ func AttrToVal(k string, v string) (string, *pbQPU.Value, error) {
 	}
 }
 
-//ValToString converts a *pbQPU.Value to string
-func ValToString(val *pbQPU.Value) string {
+//ValToString converts a Value to string
+func ValToString(val *pb.Value) string {
 	switch val.Val.(type) {
-	case *pbQPU.Value_Int:
+	case *pb.Value_Int:
 		return strconv.Itoa(int(val.GetInt()))
-	case *pbQPU.Value_Flt:
+	case *pb.Value_Flt:
 		return fmt.Sprintf("%f", val.GetFlt())
-	case *pbQPU.Value_Str:
+	case *pb.Value_Str:
 		return val.GetStr()
 	default:
 		return ""
 	}
 }
 
-//EncodeIndexEntry encodes an pbQPU.Object and a pbQPU.DataSet
+//EncodeIndexEntry encodes an Object and a DataSet
 //to an index entry (byte slice) containing in the form object_dataset
-func EncodeIndexEntry(obj pbQPU.Object, ds pbQPU.DataSet) ([]byte, error) {
+func EncodeIndexEntry(obj pb.Object, ds pb.DataSet) ([]byte, error) {
 	buff := make([]byte, 0)
 
 	objMarshaled, err := obj.XXX_Marshal(buff, true)
@@ -200,8 +202,8 @@ func EncodeIndexEntry(obj pbQPU.Object, ds pbQPU.DataSet) ([]byte, error) {
 //DecodeIndexEntry decodes an index entry (byte slice) of the form object_dataset
 //to a Posting containing corresponding the object and dataset
 func DecodeIndexEntry(entry []byte) (Posting, error) {
-	var o pbQPU.Object
-	var ds pbQPU.DataSet
+	var o pb.Object
+	var ds pb.DataSet
 	objDs := bytes.Split(entry, []byte("_"))
 
 	err := o.XXX_Unmarshal(objDs[0])
@@ -218,18 +220,18 @@ func DecodeIndexEntry(entry []byte) (Posting, error) {
 }
 
 //QueryInAttrRange checks if given predicate can be satisfied by a QPU based on its querable attribute value bounds
-func QueryInAttrRange(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
+func QueryInAttrRange(conn QPUConn, query []*pb.AttributePredicate) bool {
 	for _, p := range query {
 		switch conn.Lbound.Val.(type) {
-		case *pbQPU.Value_Int:
+		case *pb.Value_Int:
 			if p.Lbound.GetInt() > conn.Ubound.GetInt() || p.Ubound.GetInt() < conn.Lbound.GetInt() {
 				return false
 			}
-		case *pbQPU.Value_Str:
+		case *pb.Value_Str:
 			if conn.Ubound.GetStr() != "any" && (p.Lbound.GetStr() > conn.Ubound.GetStr() || p.Ubound.GetStr() < conn.Lbound.GetStr()) {
 				return false
 			}
-		case *pbQPU.Value_Flt:
+		case *pb.Value_Flt:
 			if p.Lbound.GetFlt() > conn.Ubound.GetFlt() || p.Ubound.GetFlt() < conn.Lbound.GetFlt() {
 				return false
 			}
@@ -241,7 +243,7 @@ func QueryInAttrRange(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
 }
 
 //CanProcessQuery checks if given predicate can be satisfied by a QPU based on its querable attribute
-func CanProcessQuery(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
+func CanProcessQuery(conn QPUConn, query []*pb.AttributePredicate) bool {
 	if conn.Attribute == "any" {
 		return true
 	}
@@ -255,4 +257,24 @@ func CanProcessQuery(conn QPUConn, query []*pbQPU.AttributePredicate) bool {
 		}
 	}
 	return true
+}
+
+//----------- Stream Consumer Functions ------------
+
+//FindResponseConsumer receives a QueryResponseStream, iteratively reads from the stream, and processes each input element based on a given function
+func FindResponseConsumer(pred []*pb.AttributePredicate, streamIn pbQPU.QPU_FindClient, streamOut pbQPU.QPU_FindServer, errs chan error, process func([]*pb.AttributePredicate, *pbQPU.FindResponseStream, pbQPU.QPU_FindServer) error) {
+	for {
+		streamMsg, err := streamIn.Recv()
+		if err == io.EOF {
+			errs <- nil
+			return
+		} else if err != nil {
+			errs <- err
+			return
+		}
+		if err = process(pred, streamMsg, streamOut); err != nil {
+			errs <- err
+			return
+		}
+	}
 }
