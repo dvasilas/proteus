@@ -49,12 +49,7 @@ func QPU(conf config.QPUConfig) (*DsQPU, error) {
 
 //Find implements the Find API for the data store QPU
 func (q *DsQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	return errors.New("data Store QPU does not support Find()")
-}
-
-//GetSnapshot ...
-func (q *DsQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	streamCh, errsConsm := q.snapshotConsumer(stream)
+	streamCh, errsConsm := q.snapshotConsumer(streamOut)
 	errsGetSn := q.ds.GetSnapshot(streamCh)
 
 	select {
@@ -105,13 +100,13 @@ func (q *DsQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *DsQPU) snapshotConsumer(stream pb.QPU_GetSnapshotServer) (chan *pbQPU.Object, chan error) {
+func (q *DsQPU) snapshotConsumer(stream pb.QPU_FindServer) (chan *pbQPU.Object, chan error) {
 	errCh := make(chan error)
 	streamCh := make(chan *pbQPU.Object)
 
 	go func() {
 		for obj := range streamCh {
-			toSend := &pb.StateStream{
+			toSend := &pb.FindResponseStream{
 				Object: obj,
 				Dataset: &pbQPU.DataSet{
 					Db:    q.config.Connections[0].DataSet.DB,

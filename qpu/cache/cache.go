@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/dvasilas/proteus"
@@ -53,7 +54,7 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		}).Debug("cache hit, responding")
 
 		for _, item := range cachedResult {
-			if err := streamOut.Send(&pb.QueryResultStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
+			if err := streamOut.Send(&pb.FindResponseStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
 				return err
 			}
 		}
@@ -65,21 +66,18 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	if err != nil {
 		return err
 	}
-	msg := make(chan *pb.QueryResultStream)
-	done := make(chan bool)
-	errs := make(chan error)
-	errsFind := make(chan error)
 
-	go q.findResultConsumer(in.Predicate, streamOut, msg, done, errsFind, errs, q.cache.storeAndRespond)
-	go clients[0].Find(in.Timestamp, in.Predicate, msg, done, errsFind)
+	errs := make(chan error)
+
+	streamIn, _, err := clients[0].Find(in.Timestamp, in.Predicate)
+	if err != nil {
+		return err
+	}
+
+	go q.findResultConsumer(in.Predicate, streamIn, streamOut, errs, q.cache.storeAndRespond)
 
 	err = <-errs
 	return err
-}
-
-//GetSnapshot ...
-func (q *CQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	return errors.New("cache QPU does not support GetSnapshot()")
 }
 
 //SubscribeOps ...
@@ -96,15 +94,19 @@ func (q *CQPU) Cleanup() {
 
 //Receives stream of query results from cache miss
 //Stores objects in cache and forwards upwards
-func (q *CQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer, msg chan *pb.QueryResultStream, done chan bool, errFind chan error, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
+func (q *CQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errFind
+		streamMsg, err := streamIn.Recv()
+		if err == io.EOF {
+			errs <- nil
+			return
+		} else if err != nil {
 			errs <- err
+			return
 		}
-		streamMsg := <-msg
-		if err := process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
+		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
 			errs <- err
+			return
 		}
 	}
 }
@@ -126,7 +128,7 @@ func (c *cache) storeAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQP
 	if err := c.put(in, *obj, *ds); err != nil {
 		return err
 	}
-	return streamOut.Send(&pb.QueryResultStream{
+	return streamOut.Send(&pb.FindResponseStream{
 		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
 		Dataset: ds,
 	})

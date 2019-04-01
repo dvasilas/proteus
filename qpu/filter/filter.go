@@ -27,8 +27,8 @@ func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 			for _, sh := range r.Shards {
 				for _, c := range sh.QPUs {
 					errs := make(chan error)
-					streamIn, cancel, err := c.Client.GetSnapshot(in.Timestamp)
-					defer cancel()
+					pred := make([]*pbQPU.AttributePredicate, 0)
+					streamIn, _, err := c.Client.Find(in.Timestamp, pred)
 					if err != nil {
 						return err
 					}
@@ -40,11 +40,6 @@ func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		}
 	}
 	return errors.New("filter QPU: Find : should not have reached here")
-}
-
-//GetSnapshot ...
-func (q *FQPU) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	return errors.New("filter QPU does not support GetSnapshot()")
 }
 
 //SubscribeOps ...
@@ -60,7 +55,7 @@ func (q *FQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 //Receives and processes an input stream of objects
-func (q *FQPU) snapshotConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_GetSnapshotClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
+func (q *FQPU) snapshotConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {
@@ -130,7 +125,7 @@ func filter(obj *pbQPU.Object, query []*pbQPU.AttributePredicate) bool {
 //Sends an object through an upward stream, if the object matches the given predicate
 func forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer) error {
 	if filter(obj, pred) {
-		return streamOut.Send(&pb.QueryResultStream{
+		return streamOut.Send(&pb.FindResponseStream{
 			Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
 			Dataset: ds,
 		})

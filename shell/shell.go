@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"io"
 	"strings"
 	"time"
 
@@ -61,29 +62,31 @@ func (sh *shell) find(q []query) error {
 func (sh *shell) sendQuery(pred []*pbQPU.AttributePredicate) error {
 	log.Debug("shell:sendQuery ", pred)
 
-	msg := make(chan *pb.QueryResultStream)
-	done := make(chan bool)
 	errs := make(chan error)
-	errs1 := make(chan error)
 
-	go sh.queryConsumer(pred, msg, done, errs, errs1)
-	sh.client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred, msg, done, errs)
-	err := <-errs1
+	streamIn, _, err := sh.client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred)
+	go sh.queryConsumer(pred, streamIn, errs)
+	err = <-errs
 	return err
 }
 
-func (sh *shell) queryConsumer(query []*pbQPU.AttributePredicate, msg chan *pb.QueryResultStream, done chan bool, errs chan error, errs1 chan error) {
+func (sh *shell) queryConsumer(query []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, errs chan error) {
 	for {
-		if doneMsg := <-done; doneMsg {
-			err := <-errs
-			errs1 <- err
+		streamMsg, err := streamIn.Recv()
+		if err == io.EOF {
+			errs <- nil
+			return
 		}
-		res := <-msg
-		log.Debug("shell:queryConsumer received: ", res)
-
-		err := sh.displayResults(query, res.GetObject(), res.GetDataset())
 		if err != nil {
-			log.Fatal(err)
+			errs <- err
+			return
+		}
+		log.Debug("shell:queryConsumer received: ", streamMsg)
+
+		err = sh.displayResults(query, streamMsg.GetObject(), streamMsg.GetDataset())
+		if err != nil {
+			errs <- err
+			return
 		}
 	}
 }

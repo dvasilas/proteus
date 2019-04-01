@@ -31,7 +31,6 @@ import (
 type QPU interface {
 	Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error
 	Cleanup()
-	GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error
 	SubscribeOps(stream pb.QPU_SubscribeOpsServer) error
 }
 
@@ -137,11 +136,6 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 		}
 	}
 	return &resp, nil
-}
-
-//GetSnapshot ...
-func (s *Server) GetSnapshot(in *pb.SubRequest, stream pb.QPU_GetSnapshotServer) error {
-	return s.qpu.GetSnapshot(in, stream)
 }
 
 //SubscribeOps ...
