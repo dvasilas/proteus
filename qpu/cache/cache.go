@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 
 	"github.com/dvasilas/proteus"
@@ -74,7 +73,7 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		return err
 	}
 
-	go q.findResultConsumer(in.Predicate, streamIn, streamOut, errs, q.cache.storeAndRespond)
+	go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs, q.cache.storeAndRespond)
 
 	err = <-errs
 	return err
@@ -92,25 +91,6 @@ func (q *CQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-//Receives stream of query results from cache miss
-//Stores objects in cache and forwards upwards
-func (q *CQPU) findResultConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
-	for {
-		streamMsg, err := streamIn.Recv()
-		if err == io.EOF {
-			errs <- nil
-			return
-		} else if err != nil {
-			errs <- err
-			return
-		}
-		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
-			errs <- err
-			return
-		}
-	}
-}
-
 //---------------- Internal Functions --------------
 
 //Create new cache instance
@@ -124,13 +104,13 @@ func new(maxEntries int) *cache {
 }
 
 //Stores an object in the cache and send it upwards through an output stream
-func (c *cache) storeAndRespond(obj *pbQPU.Object, ds *pbQPU.DataSet, in []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer) error {
-	if err := c.put(in, *obj, *ds); err != nil {
+func (c *cache) storeAndRespond(in []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, streamOut pb.QPU_FindServer) error {
+	if err := c.put(in, *streamMsg.GetObject(), *streamMsg.GetDataset()); err != nil {
 		return err
 	}
 	return streamOut.Send(&pb.FindResponseStream{
-		Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
-		Dataset: ds,
+		Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
+		Dataset: streamMsg.GetDataset(),
 	})
 }
 

@@ -3,11 +3,11 @@ package main
 import (
 	"errors"
 	"flag"
-	"io"
 	"strings"
 	"time"
 
 	"github.com/abiosoft/ishell"
+	"github.com/dvasilas/proteus"
 	attribute "github.com/dvasilas/proteus/attributes"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
@@ -65,30 +65,14 @@ func (sh *shell) sendQuery(pred []*pbQPU.AttributePredicate) error {
 	errs := make(chan error)
 
 	streamIn, _, err := sh.client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred)
-	go sh.queryConsumer(pred, streamIn, errs)
+	go utils.FindResponseConsumer(pred, streamIn, nil, errs, displayResponse)
 	err = <-errs
 	return err
 }
 
-func (sh *shell) queryConsumer(query []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, errs chan error) {
-	for {
-		streamMsg, err := streamIn.Recv()
-		if err == io.EOF {
-			errs <- nil
-			return
-		}
-		if err != nil {
-			errs <- err
-			return
-		}
-		log.Debug("shell:queryConsumer received: ", streamMsg)
-
-		err = sh.displayResults(query, streamMsg.GetObject(), streamMsg.GetDataset())
-		if err != nil {
-			errs <- err
-			return
-		}
-	}
+func displayResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
+	log.Debug("shell:queryConsumer received: ", streamMsg)
+	return printResponse(pred, streamMsg.GetObject(), streamMsg.GetDataset())
 }
 
 func (sh *shell) processQueryString(q string) ([]query, error) {
@@ -133,7 +117,7 @@ func main() {
 	}
 }
 
-func (sh *shell) displayResults(query []*pbQPU.AttributePredicate, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
+func printResponse(query []*pbQPU.AttributePredicate, obj *pbQPU.Object, ds *pbQPU.DataSet) error {
 	logMsg := log.Fields{
 		"key":     obj.GetKey(),
 		"dataset": ds,

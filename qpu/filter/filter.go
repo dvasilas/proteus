@@ -2,7 +2,6 @@ package filter
 
 import (
 	"errors"
-	"io"
 
 	"github.com/dvasilas/proteus"
 	pb "github.com/dvasilas/proteus/protos/qpu"
@@ -32,7 +31,7 @@ func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 					if err != nil {
 						return err
 					}
-					go q.snapshotConsumer(in.Predicate, streamIn, streamOut, errs, forward)
+					go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs, forward)
 					err = <-errs
 					return err
 				}
@@ -53,24 +52,6 @@ func (q *FQPU) Cleanup() {
 }
 
 //----------- Stream Consumer Functions ------------
-
-//Receives and processes an input stream of objects
-func (q *FQPU) snapshotConsumer(pred []*pbQPU.AttributePredicate, streamIn pb.QPU_FindClient, streamOut pb.QPU_FindServer, errs chan error, process func(*pbQPU.Object, *pbQPU.DataSet, []*pbQPU.AttributePredicate, pb.QPU_FindServer) error) {
-	for {
-		streamMsg, err := streamIn.Recv()
-		if err == io.EOF {
-			errs <- nil
-			return
-		} else if err != nil {
-			errs <- err
-			return
-		}
-		if err = process(streamMsg.GetObject(), streamMsg.GetDataset(), pred, streamOut); err != nil {
-			errs <- err
-			return
-		}
-	}
-}
 
 //---------------- Internal Functions --------------
 
@@ -123,11 +104,11 @@ func filter(obj *pbQPU.Object, query []*pbQPU.AttributePredicate) bool {
 }
 
 //Sends an object through an upward stream, if the object matches the given predicate
-func forward(obj *pbQPU.Object, ds *pbQPU.DataSet, pred []*pbQPU.AttributePredicate, streamOut pb.QPU_FindServer) error {
-	if filter(obj, pred) {
+func forward(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, streamOut pb.QPU_FindServer) error {
+	if filter(streamMsg.GetObject(), pred) {
 		return streamOut.Send(&pb.FindResponseStream{
-			Object:  &pbQPU.Object{Key: obj.Key, Attributes: obj.Attributes, Timestamp: obj.Timestamp},
-			Dataset: ds,
+			Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
+			Dataset: streamMsg.GetDataset(),
 		})
 	}
 	return nil
