@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	utils "github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,20 +17,20 @@ var keyTests = []struct {
 	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "size",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(10),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(10),
 		},
 	}, "size/0/10"},
 	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "size",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(10),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(10),
 		},
 		{
 			Attribute: "type",
-			Lbound:    utils.ValInt(1),
-			Ubound:    utils.ValInt(2),
+			Lbound:    protoutils.ValueInt(1),
+			Ubound:    protoutils.ValueInt(2),
 		},
 	}, "size/0/10&type/1/2"},
 }
@@ -43,28 +43,28 @@ var getTests = []struct {
 	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "hit",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(1),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(1),
 		},
 	}, []*pbQPU.AttributePredicate{
 		{
 			Attribute: "hit",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(1),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(1),
 		},
 	}, true},
 	{[]*pbQPU.AttributePredicate{
 		{
 			Attribute: "nothit",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(1),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(1),
 		},
 	},
 		[]*pbQPU.AttributePredicate{
 			{
 				Attribute: "miss",
-				Lbound:    utils.ValInt(0),
-				Ubound:    utils.ValInt(0),
+				Lbound:    protoutils.ValueInt(0),
+				Ubound:    protoutils.ValueInt(0),
 			},
 		}, false},
 }
@@ -100,8 +100,8 @@ func TestEvict(t *testing.T) {
 		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
-				Lbound:    utils.ValInt(0),
-				Ubound:    utils.ValInt(0),
+				Lbound:    protoutils.ValueInt(0),
+				Ubound:    protoutils.ValueInt(0),
 			},
 		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
@@ -120,31 +120,31 @@ func TestEvictLRU(t *testing.T) {
 		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
-				Lbound:    utils.ValInt(0),
-				Ubound:    utils.ValInt(0),
+				Lbound:    protoutils.ValueInt(0),
+				Ubound:    protoutils.ValueInt(0),
 			},
 		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}
 	_, _ = cache.get([]*pbQPU.AttributePredicate{
 		{
 			Attribute: "attr0",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(0),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(0),
 		},
 	})
 	_, _ = cache.get([]*pbQPU.AttributePredicate{
 		{
 			Attribute: "attr1",
-			Lbound:    utils.ValInt(0),
-			Ubound:    utils.ValInt(0),
+			Lbound:    protoutils.ValueInt(0),
+			Ubound:    protoutils.ValueInt(0),
 		},
 	})
 	for i := 5; i < 12; i++ {
 		cache.put([]*pbQPU.AttributePredicate{
 			{
 				Attribute: "attr" + strconv.Itoa(i),
-				Lbound:    utils.ValInt(0),
-				Ubound:    utils.ValInt(0),
+				Lbound:    protoutils.ValueInt(0),
+				Ubound:    protoutils.ValueInt(0),
 			},
 		}, pbQPU.Object{}, pbQPU.DataSet{})
 	}

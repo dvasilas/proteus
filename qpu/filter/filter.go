@@ -2,8 +2,10 @@ package filter
 
 import (
 	"errors"
+	"io"
 
 	"github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
@@ -19,31 +21,39 @@ func QPU() (*FQPU, error) {
 	return &FQPU{}, nil
 }
 
-//Find implements the Find API for the filter QPU
-func (q *FQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
+//Query implements the Query API for the filter QPU
+func (q *FQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
+	msg, err := streamOut.Recv()
+	if err == io.EOF {
+		return errors.New("Query received EOF")
+	}
+	if err != nil {
+		return err
+	}
+	req := msg.GetRequest()
+
+	if req.GetOps() {
+		return errors.New("not supported")
+	}
+
 	for _, db := range conns.DBs {
 		for _, r := range db.DCs {
 			for _, sh := range r.Shards {
 				for _, c := range sh.QPUs {
 					errs := make(chan error)
-					pred := make([]*pbQPU.AttributePredicate, 0)
-					streamIn, _, err := c.Client.Find(in.Timestamp, pred)
+					emptyPred := make([]*pbQPU.AttributePredicate, 0)
+					streamIn, _, err := c.Client.Query(emptyPred, req.GetTimestamp(), false, false)
 					if err != nil {
 						return err
 					}
-					go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs, forward)
+					go utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, errs, forward)
 					err = <-errs
 					return err
 				}
 			}
 		}
 	}
-	return errors.New("filter QPU: Find : should not have reached here")
-}
-
-//SubscribeOps ...
-func (q *FQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	return errors.New("filter QPU does not support SubscribeOps()")
+	return errors.New("filter QPU: Query : should not have reached here")
 }
 
 //Cleanup ...
@@ -104,12 +114,13 @@ func filter(obj *pbQPU.Object, query []*pbQPU.AttributePredicate) bool {
 }
 
 //Sends an object through an upward stream, if the object matches the given predicate
-func forward(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, streamOut pb.QPU_FindServer) error {
-	if filter(streamMsg.GetObject(), pred) {
-		return streamOut.Send(&pb.FindResponseStream{
-			Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
-			Dataset: streamMsg.GetDataset(),
-		})
+func forward(pred []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, streamOut pb.QPU_QueryServer) error {
+	log.WithFields(log.Fields{
+		"elemnt": streamMsg,
+	}).Debug("filterQPU: received input stream element")
+
+	if filter(streamMsg.GetState().GetObject(), pred) {
+		return streamOut.Send(protoutils.QueryResponseStreamState(streamMsg.GetState().GetObject(), streamMsg.GetState().GetDataset()))
 	}
 	return nil
 }

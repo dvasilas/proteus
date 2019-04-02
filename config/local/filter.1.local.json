@@ -1,7 +1,7 @@
 {
     "qpuType": "filter",
     "port": "50250",
-    "conns": [
+    "connections": [
     {
         "endpoint": "localhost:50150"
     }]

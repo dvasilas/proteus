@@ -4,9 +4,11 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	cli "github.com/dvasilas/proteus/qpu/client"
@@ -44,16 +46,29 @@ func QPU() (*CQPU, error) {
 	}, nil
 }
 
-//Find implements the Find API for the cache QPU
-func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	cachedResult, hit := q.cache.get(in.Predicate)
+//Query implements the Query API for the cache QPU
+func (q *CQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
+	msg, err := streamOut.Recv()
+	if err == io.EOF {
+		return errors.New("Query received EOF")
+	}
+	if err != nil {
+		return err
+	}
+	req := msg.GetRequest()
+
+	if req.GetOps() {
+		return errors.New("not supported")
+	}
+
+	cachedResult, hit := q.cache.get(req.GetPredicate())
 	if hit {
 		log.WithFields(log.Fields{
 			"cache entry": cachedResult,
 		}).Debug("cache hit, responding")
 
 		for _, item := range cachedResult {
-			if err := streamOut.Send(&pb.FindResponseStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
+			if err := streamOut.Send(protoutils.QueryResponseStreamState(&item.Object, &item.Dataset)); err != nil {
 				return err
 			}
 		}
@@ -61,27 +76,22 @@ func (q *CQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 	}
 	log.WithFields(log.Fields{}).Debug("cache miss")
 
-	clients, err := forwardQuery(conns, in.Predicate)
+	clients, err := forwardQuery(conns, req.GetPredicate())
 	if err != nil {
 		return err
 	}
 
 	errs := make(chan error)
 
-	streamIn, _, err := clients[0].Find(in.Timestamp, in.Predicate)
+	streamIn, _, err := clients[0].Query(req.GetPredicate(), req.GetTimestamp(), false, false)
 	if err != nil {
 		return err
 	}
 
-	go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs, q.cache.storeAndRespond)
+	go utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, errs, q.cache.storeAndRespond)
 
 	err = <-errs
 	return err
-}
-
-//SubscribeOps ...
-func (q *CQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	return errors.New("cache QPU does not support SubscribeOps()")
 }
 
 //Cleanup ...
@@ -104,14 +114,11 @@ func new(maxEntries int) *cache {
 }
 
 //Stores an object in the cache and send it upwards through an output stream
-func (c *cache) storeAndRespond(in []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, streamOut pb.QPU_FindServer) error {
-	if err := c.put(in, *streamMsg.GetObject(), *streamMsg.GetDataset()); err != nil {
+func (c *cache) storeAndRespond(in []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, streamOut pb.QPU_QueryServer) error {
+	if err := c.put(in, *streamMsg.GetState().GetObject(), *streamMsg.GetState().GetDataset()); err != nil {
 		return err
 	}
-	return streamOut.Send(&pb.FindResponseStream{
-		Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
-		Dataset: streamMsg.GetDataset(),
-	})
+	return streamOut.Send(protoutils.QueryResponseStreamState(streamMsg.GetState().GetObject(), streamMsg.GetState().GetDataset()))
 }
 
 //Stores an object in a cache entry
@@ -168,7 +175,7 @@ func (c *cache) evict() error {
 //---------------- Auxiliary Functions -------------
 
 //forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
-//Returns an array connections for initiating Find queries, and any error encountered.
+//Returns an array connections for initiating Query queries, and any error encountered.
 func forwardQuery(conns utils.DownwardConns, query []*pbQPU.AttributePredicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
 	for _, db := range conns.DBs {

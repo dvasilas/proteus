@@ -7,6 +7,7 @@ import (
 
 	"github.com/dvasilas/proteus"
 	"github.com/dvasilas/proteus/config"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	ant "github.com/dvasilas/proteus/qpu/datastore/antidoteDataStore"
@@ -47,22 +48,9 @@ func QPU(conf config.QPUConfig) (*DsQPU, error) {
 	return &qpu, nil
 }
 
-//Find implements the Find API for the data store QPU
-func (q *DsQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	streamCh, errsConsm := q.snapshotConsumer(streamOut)
-	errsGetSn := q.ds.GetSnapshot(streamCh)
-
-	select {
-	case err := <-errsConsm:
-		return err
-	case err := <-errsGetSn:
-		return err
-	}
-}
-
-//SubscribeOps ...
-func (q *DsQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	msg, err := stream.Recv()
+//Query implements the Query API for the data store QPU
+func (q *DsQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
+	msg, err := streamOut.Recv()
 	if err == io.EOF {
 		return errors.New("SubscribeOpsAsync received EOF")
 	}
@@ -72,23 +60,36 @@ func (q *DsQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
 	req := msg.GetRequest()
 	log.WithFields(log.Fields{
 		"req": req,
-	}).Debug("SubscribeOpsAsync request")
+	}).Debug("Query request")
 
-	opCh := make(chan *pbQPU.Operation)
-	errsConsm := make(chan error)
-	errsSub := make(chan error)
-	var conn *grpc.ClientConn
-	ack := make(chan bool)
+	if req.GetOps() {
+		opCh := make(chan *pbQPU.Operation)
+		errsConsm := make(chan error)
+		errsSub := make(chan error)
+		var conn *grpc.ClientConn
+		ack := make(chan bool)
 
-	errsConsm = q.opsConsumer(stream, opCh, ack, req.GetSync())
-	conn, errsSub = q.ds.SubscribeOps(opCh, ack, req.GetSync())
+		errsConsm = q.opsConsumer(streamOut, opCh, ack, req.GetSync())
+		conn, errsSub = q.ds.SubscribeOps(opCh, ack, req.GetSync())
 
-	select {
-	case err := <-errsConsm:
-		close(errsConsm)
-		conn.Close()
-		return err
-	case err := <-errsSub:
+		select {
+		case err := <-errsConsm:
+			close(errsConsm)
+			conn.Close()
+			return err
+		case err := <-errsSub:
+			return err
+		}
+	} else {
+		streamCh, errsConsm := q.snapshotConsumer(streamOut)
+		errsGetSn := q.ds.GetSnapshot(streamCh)
+
+		err := <-errsGetSn
+		if err != nil {
+			close(errsConsm)
+			return err
+		}
+		err = <-errsConsm
 		return err
 	}
 }
@@ -100,21 +101,27 @@ func (q *DsQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *DsQPU) snapshotConsumer(stream pb.QPU_FindServer) (chan *pbQPU.Object, chan error) {
+func (q *DsQPU) snapshotConsumer(stream pb.QPU_QueryServer) (chan *pbQPU.Object, chan error) {
 	errCh := make(chan error)
 	streamCh := make(chan *pbQPU.Object)
 
 	go func() {
 		for obj := range streamCh {
-			toSend := &pb.FindResponseStream{
-				Object: obj,
-				Dataset: &pbQPU.DataSet{
-					Db:    q.config.Connections[0].DataSet.DB,
-					Dc:    q.config.Connections[0].DataSet.DC,
-					Shard: q.config.Connections[0].DataSet.Shard,
-				},
-			}
+
+			log.WithFields(log.Fields{
+				"object": obj,
+			}).Debug("dataStoreQPU: received object")
+
+			toSend := protoutils.QueryResponseStreamState(
+				obj,
+				protoutils.DataSet(q.config.Connections[0].DataSet.DB, q.config.Connections[0].DataSet.DC, q.config.Connections[0].DataSet.Shard),
+			)
+
 			if err := stream.Send(toSend); err != nil {
+				log.WithFields(log.Fields{
+					"err": err,
+				}).Debug("dataStoreQPU: strea.Send()")
+
 				errCh <- err
 				return
 			}
@@ -124,21 +131,16 @@ func (q *DsQPU) snapshotConsumer(stream pb.QPU_FindServer) (chan *pbQPU.Object, 
 	return streamCh, errCh
 }
 
-func (q *DsQPU) opsConsumer(stream pb.QPU_SubscribeOpsServer, opCh chan *pbQPU.Operation, ack chan bool, sync bool) chan error {
+func (q *DsQPU) opsConsumer(stream pb.QPU_QueryServer, opCh chan *pbQPU.Operation, ack chan bool, sync bool) chan error {
 	errCh := make(chan error)
 
 	heartbeat(stream, errCh)
 
 	go func() {
 		for op := range opCh {
-			ds := &pbQPU.DataSet{
-				Db:    q.config.Connections[0].DataSet.DB,
-				Dc:    q.config.Connections[0].DataSet.DC,
-				Shard: q.config.Connections[0].DataSet.Shard,
-			}
-			op.DataSet = ds
+			op.DataSet = protoutils.DataSet(q.config.Connections[0].DataSet.DB, q.config.Connections[0].DataSet.DC, q.config.Connections[0].DataSet.Shard)
 			log.Debug("DataStoreQPU:opsConsumer received op, forwarding")
-			if err := stream.Send(&pb.OpStream{Operation: op}); err != nil {
+			if err := stream.Send(protoutils.QueryResponseStreamOperation(op)); err != nil {
 				errCh <- err
 				return
 			}
@@ -165,9 +167,9 @@ func (q *DsQPU) opsConsumer(stream pb.QPU_SubscribeOpsServer, opCh chan *pbQPU.O
 
 //---------------- Internal Functions --------------
 
-func heartbeat(stream pb.QPU_SubscribeOpsServer, errCh chan error) {
-	opID := &pbQPU.Operation{OpId: "no_op"}
-	if err := stream.Send(&pb.OpStream{Operation: opID}); err != nil {
+func heartbeat(stream pb.QPU_QueryServer, errCh chan error) {
+	op := protoutils.OperationOp("no_op", "", "", "", "", "", nil)
+	if err := stream.Send(protoutils.QueryResponseStreamOperation(op)); err != nil {
 		log.Debug("heartbeat:stream.Send error - Connection closed")
 		errCh <- err
 		return
@@ -176,7 +178,7 @@ func heartbeat(stream pb.QPU_SubscribeOpsServer, errCh chan error) {
 	time.AfterFunc(10*time.Second, f)
 }
 
-func newHeartbeat(stream pb.QPU_SubscribeOpsServer, errCh chan error) func() {
+func newHeartbeat(stream pb.QPU_QueryServer, errCh chan error) func() {
 	return func() {
 		heartbeat(stream, errCh)
 	}

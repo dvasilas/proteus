@@ -9,6 +9,7 @@ import (
 	utils "github.com/dvasilas/proteus"
 	attribute "github.com/dvasilas/proteus/attributes"
 	"github.com/dvasilas/proteus/config"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	antidoteIndex "github.com/dvasilas/proteus/qpu/index/antidote"
@@ -57,7 +58,8 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 					if conf.ConsLevel == "sync" {
 						sync = true
 					}
-					streamIn, cancel, err := q.Client.SubscribeOps(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, sync)
+					emptyPred := make([]*pbQPU.AttributePredicate, 0)
+					streamIn, cancel, err := q.Client.Query(emptyPred, protoutils.TimestampPredicate(time.Now().UnixNano(), time.Now().UnixNano()), true, sync)
 					if err != nil {
 						cancel()
 						return nil, err
@@ -76,14 +78,27 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 	return qpu, nil
 }
 
-//Find implements the Find API for the index QPU
-func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
+//Query implements the Query API for the index QPU
+func (q *IQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
+	msg, err := streamOut.Recv()
+	if err == io.EOF {
+		return errors.New("Query received EOF")
+	}
+	if err != nil {
+		return err
+	}
+	req := msg.GetRequest()
+
+	if req.GetOps() {
+		return errors.New("not supported")
+	}
+
 	log.WithFields(log.Fields{
-		"query": in.Predicate,
+		"query": req.GetPredicate(),
 	}).Debug("Index lookup")
-	indexResult, found, err := q.index.indexstore.Lookup(in.Predicate)
+	indexResult, found, err := q.index.indexstore.Lookup(req.GetPredicate())
 	if !found {
-		if err := streamOut.Send(&pb.FindResponseStream{Object: &pbQPU.Object{Key: "noResults"}}); err != nil {
+		if err := streamOut.Send(protoutils.QueryResponseStreamState(&pbQPU.Object{Key: "noResults"}, nil)); err != nil {
 			return err
 		}
 		return nil
@@ -91,16 +106,11 @@ func (q *IQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils
 		return err
 	}
 	for _, item := range indexResult {
-		if err := streamOut.Send(&pb.FindResponseStream{Object: &item.Object, Dataset: &item.Dataset}); err != nil {
+		if err := streamOut.Send(protoutils.QueryResponseStreamState(&item.Object, &item.Dataset)); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-//SubscribeOps ...
-func (q *IQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	return errors.New("index QPU does not support SubscribeOps()")
 }
 
 //Cleanup ...
@@ -113,8 +123,8 @@ func (q *IQPU) Cleanup() {
 
 //Receives an stream of write operations
 //Updates the index for each operation
-//TODO: Find a way to handle an error here
-func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.CancelFunc, sync bool) {
+//TODO: Query a way to handle an error here
+func (q *IQPU) opConsumer(stream pb.QPU_QueryClient, cancel context.CancelFunc, sync bool) {
 	for {
 		streamMsg, err := stream.Recv()
 		if err == io.EOF {
@@ -124,7 +134,7 @@ func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.Cance
 			log.Fatal("opConsumer err", err)
 			return
 		} else {
-			if streamMsg.Operation.OpId == "no_op" {
+			if streamMsg.GetOperation().GetOpId() == "no_op" {
 				continue
 			}
 			log.WithFields(log.Fields{
@@ -134,13 +144,13 @@ func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.Cance
 			if err := q.updateIndex(streamMsg.GetOperation()); err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
-					"op":    streamMsg.Operation,
+					"op":    streamMsg.GetOperation(),
 				}).Fatal("opConsumer: index Update failed")
 				return
 			}
 			if sync {
 				log.Debug("QPUServer:index updated, sending ACK")
-				if err := stream.Send(&pb.ReqStream{Payload: &pb.ReqStream_Ack{Ack: &pb.AckMsg{Msg: "ack", OpId: streamMsg.GetOperation().GetOpId()}}}); err != nil {
+				if err := stream.Send(protoutils.RequestStreamAck("ack", streamMsg.GetOperation().GetOpId())); err != nil {
 					log.Fatal("opConsumer stream.Send failed")
 					return
 				}
@@ -149,12 +159,12 @@ func (q *IQPU) opConsumer(stream pb.QPU_SubscribeOpsClient, cancel context.Cance
 	}
 }
 
-func (q *IQPU) stateToOp(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
-	op := &pbQPU.Operation{
-		OpId:      "catchUp",
-		OpPayload: &pbQPU.OperationPayload{Payload: &pbQPU.OperationPayload_State{State: streamMsg.GetObject()}},
-		DataSet:   streamMsg.GetDataset(),
-	}
+func (q *IQPU) stateToOp(pred []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, stream pb.QPU_QueryServer) error {
+	op := protoutils.OperationState(
+		"catchUp",
+		streamMsg.GetState().GetObject(),
+		streamMsg.GetState().GetDataset(),
+	)
 	return q.updateIndex(op)
 }
 
@@ -213,13 +223,13 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 					errs[i] = make(chan error)
 				}
 				for i, c := range sh.QPUs {
-					pred := make([]*pbQPU.AttributePredicate, 0)
-					streamIn, cancel, err := c.Client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred)
+					emptyPred := make([]*pbQPU.AttributePredicate, 0)
+					streamIn, cancel, err := c.Client.Query(emptyPred, protoutils.TimestampPredicate(0, time.Now().UnixNano()), false, false)
 					defer cancel()
 					if err != nil {
 						return err
 					}
-					go utils.FindResponseConsumer(pred, streamIn, nil, errs[i], q.stateToOp)
+					go utils.QueryResponseConsumer(emptyPred, streamIn, nil, errs[i], q.stateToOp)
 				}
 				for i := range sh.QPUs {
 					err := <-errs[i]

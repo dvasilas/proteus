@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	utils "github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/s3"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
@@ -77,7 +78,7 @@ func (ds S3DataStore) watchSync(stream pb.S3DataStore_WatchSyncClient, msg chan 
 			log.WithFields(log.Fields{
 				"message": ackMsg,
 			}).Debug("S3DataStore:watchSync received ACK, sending ACK to data store")
-			if err := stream.Send(&pb.OpAck{Msg: "ack", OpId: op.GetOpId()}); err != nil {
+			if err := stream.Send(protoutils.OpAckS3("ack", op.GetOpId())); err != nil {
 				errs <- err
 				return
 			}
@@ -147,16 +148,12 @@ func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP s
 
 //GetSnapshot ...
 func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
-	log.Debug("s3 data store GetSnapshot()")
+	log.Debug("s3DataStore: GetSnapshot()")
 	errCh := make(chan error)
 
 	go func() {
 		buff := bytes.NewBuffer([]byte{})
 		requestURL := fmt.Sprintf("%s/%s", ds.endpoint, ds.bucketName)
-
-		log.WithFields(log.Fields{
-			"requestURL": requestURL,
-		}).Debug("requestURL")
 
 		request, err := http.NewRequest("GET", requestURL, buff)
 		if err != nil {
@@ -186,6 +183,10 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 		var res listBucketResult
 		xml.Unmarshal(body, &res)
 
+		log.WithFields(log.Fields{
+			"contents": res.Contents,
+		}).Debug("s3DataStore: response")
+
 		for _, r := range res.Contents {
 			buff := bytes.NewBuffer([]byte{})
 			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, ds.bucketName, r.Key)
@@ -205,12 +206,12 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 				return
 			}
 
-			outObject := &pbQPU.Object{
-				Key: r.Key,
-				Attributes: map[string]*pbQPU.Value{
-					"size": utils.ValInt(r.Size),
+			outObject := protoutils.Object(
+				r.Key,
+				map[string]*pbQPU.Value{
+					"size": protoutils.ValueInt(r.Size),
 				},
-			}
+			)
 			for k := range resp.Header {
 				if strings.HasPrefix(k, "X-Amz-Meta") && k != "X-Amz-Meta-S3cmd-Attrs" {
 					attrK, attrV, err := utils.AttrToVal(k, resp.Header[k][0])
@@ -222,7 +223,12 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 					outObject.Attributes[attrK] = attrV
 				}
 			}
-			outObject.Attributes["x-amz-meta-s3cmd-attrs"] = utils.ValStr(resp.Header["X-Amz-Meta-S3cmd-Attrs"][0])
+			outObject.Attributes["x-amz-meta-s3cmd-attrs"] = protoutils.ValueStr(resp.Header["X-Amz-Meta-S3cmd-Attrs"][0])
+
+			log.WithFields(log.Fields{
+				"object": outObject,
+			}).Debug("s3DataStore: snapshot")
+
 			msg <- outObject
 		}
 		close(msg)
@@ -243,7 +249,7 @@ func (ds S3DataStore) SubscribeOps(msg chan *pbQPU.Operation, ack chan bool, syn
 	client := pb.NewS3DataStoreClient(conn)
 	if !sync {
 		ctx := context.Background()
-		stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
+		stream, err := client.WatchAsync(ctx, protoutils.SubRequestS3(time.Now().UnixNano()))
 		if err != nil {
 			errCh <- err
 			return conn, errCh

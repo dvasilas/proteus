@@ -14,8 +14,8 @@ import (
 	"github.com/dvasilas/proteus"
 	attribute "github.com/dvasilas/proteus/attributes"
 	"github.com/dvasilas/proteus/config"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"github.com/dvasilas/proteus/qpu/cache"
 	"github.com/dvasilas/proteus/qpu/datastore"
 	"github.com/dvasilas/proteus/qpu/filter"
@@ -29,9 +29,8 @@ import (
 
 //QPU specifies the API of a QPU
 type QPU interface {
-	Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error
+	Query(stream pb.QPU_QueryServer, conns utils.DownwardConns) error
 	Cleanup()
-	SubscribeOps(stream pb.QPU_SubscribeOpsServer) error
 }
 
 //Server implements a generic QPU server
@@ -56,10 +55,10 @@ func main() {
 
 //---------------- API Functions -------------------
 
-//Find implements the Find method of a generic QPU
-//Calls specific implementations of the Find method
-func (s *Server) Find(in *pb.FindRequest, streamTo pb.QPU_FindServer) error {
-	return s.qpu.Find(in, streamTo, s.downwardConns)
+//Query implements the Query method of a generic QPU
+//Calls specific implementations of the Query method
+func (s *Server) Query(stream pb.QPU_QueryServer) error {
+	return s.qpu.Query(stream, s.downwardConns)
 }
 
 //GetConfig constructs and returns a structure describing the configuration of a QPU
@@ -68,17 +67,9 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 
 	switch s.config.QpuType {
 	case "filter":
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
-			Attribute: "any",
-			Lbound:    utils.ValStr("any"),
-			Ubound:    utils.ValStr("any"),
-		})
+		resp.SupportedQueries = append(resp.SupportedQueries, protoutils.AttributePredicate("any", "any", protoutils.ValueStr("any"), protoutils.ValueStr("any")))
 		for _, c := range s.config.Connections {
-			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-				Db:    c.DataSet.DB,
-				Dc:    c.DataSet.DC,
-				Shard: c.DataSet.Shard,
-			})
+			resp.Dataset = append(resp.Dataset, protoutils.DataSet(c.DataSet.DB, c.DataSet.DC, c.DataSet.Shard))
 		}
 	case "index":
 		attr, _, err := attribute.Attr(s.config.IndexConfig.Attribute, nil)
@@ -89,58 +80,33 @@ func (s *Server) GetConfig(ctx context.Context, in *pb.ConfigRequest) (*pb.Confi
 		if err != nil {
 			return nil, err
 		}
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
-			Attribute: s.config.IndexConfig.Attribute,
-			Lbound:    lb,
-			Ubound:    ub,
-		})
+		resp.SupportedQueries = append(resp.SupportedQueries, protoutils.AttributePredicate(
+			attr.GetDatatype(),
+			s.config.IndexConfig.Attribute,
+			lb,
+			ub,
+		))
 		for _, c := range s.config.Connections {
-			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-				Db:    c.DataSet.DB,
-				Dc:    c.DataSet.DC,
-				Shard: c.DataSet.Shard,
-			})
+			resp.Dataset = append(resp.Dataset, protoutils.DataSet(c.DataSet.DB, c.DataSet.DC, c.DataSet.Shard))
 		}
 	case "data_store":
 		for _, c := range s.config.Connections {
-			resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-				Db:    c.DataSet.DB,
-				Dc:    c.DataSet.DC,
-				Shard: c.DataSet.Shard,
-			})
+			resp.Dataset = append(resp.Dataset, protoutils.DataSet(c.DataSet.DB, c.DataSet.DC, c.DataSet.Shard))
 		}
-		resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
-			Attribute: "none",
-			Lbound:    utils.ValStr("none"),
-			Ubound:    utils.ValStr("none"),
-		})
+		resp.SupportedQueries = append(resp.SupportedQueries, protoutils.AttributePredicate("none", "none", protoutils.ValueStr("none"), protoutils.ValueStr("none")))
 	default:
 		for dbID, db := range s.downwardConns.DBs {
 			for rID, r := range db.DCs {
 				for shID, sh := range r.Shards {
-					resp.Dataset = append(resp.Dataset, &pbQPU.DataSet{
-						Db:    dbID,
-						Dc:    rID,
-						Shard: shID,
-					})
+					resp.Dataset = append(resp.Dataset, protoutils.DataSet(dbID, rID, shID))
 					for _, q := range sh.QPUs {
-						resp.SupportedQueries = append(resp.SupportedQueries, &pbQPU.AttributePredicate{
-							Datatype:  q.DataType,
-							Attribute: q.Attribute,
-							Lbound:    q.Lbound,
-							Ubound:    q.Ubound,
-						})
+						resp.SupportedQueries = append(resp.SupportedQueries, protoutils.AttributePredicate(q.DataType, q.Attribute, q.Lbound, q.Ubound))
 					}
 				}
 			}
 		}
 	}
 	return &resp, nil
-}
-
-//SubscribeOps ...
-func (s *Server) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	return s.qpu.SubscribeOps(stream)
 }
 
 //---------------- Internal Functions --------------

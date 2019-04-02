@@ -9,6 +9,7 @@ import (
 
 	"github.com/dvasilas/proteus/attributes"
 	"github.com/dvasilas/proteus/config"
+	"github.com/dvasilas/proteus/protos"
 	pbQPU "github.com/dvasilas/proteus/protos/qpu"
 	pb "github.com/dvasilas/proteus/protos/utils"
 	cli "github.com/dvasilas/proteus/qpu/client"
@@ -130,21 +131,6 @@ func (sh *Shard) QPU(c cli.Client, qType string, dt string, attr string, lb *pb.
 	return
 }
 
-//ValInt ...
-func ValInt(i int64) *pb.Value {
-	return &pb.Value{Val: &pb.Value_Int{Int: i}}
-}
-
-//ValStr ...
-func ValStr(s string) *pb.Value {
-	return &pb.Value{Val: &pb.Value_Str{Str: s}}
-}
-
-//ValFlt ...
-func ValFlt(f float64) *pb.Value {
-	return &pb.Value{Val: &pb.Value_Flt{Flt: f}}
-}
-
 //AttrToVal ...
 func AttrToVal(k string, v string) (string, *pb.Value, error) {
 	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
@@ -152,15 +138,15 @@ func AttrToVal(k string, v string) (string, *pb.Value, error) {
 		if err != nil {
 
 		}
-		return strings.ToLower(k), ValFlt(f), nil
+		return strings.ToLower(k), protoutils.ValueFlt(f), nil
 	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
 		i, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			return "", &pb.Value{}, err
 		}
-		return strings.ToLower(k), ValInt(i), nil
+		return strings.ToLower(k), protoutils.ValueInt(i), nil
 	} else {
-		return strings.ToLower(k), ValStr(v), nil
+		return strings.ToLower(k), protoutils.ValueStr(v), nil
 	}
 }
 
@@ -261,8 +247,8 @@ func CanProcessQuery(conn QPUConn, query []*pb.AttributePredicate) bool {
 
 //----------- Stream Consumer Functions ------------
 
-//FindResponseConsumer receives a QueryResponseStream, iteratively reads from the stream, and processes each input element based on a given function
-func FindResponseConsumer(pred []*pb.AttributePredicate, streamIn pbQPU.QPU_FindClient, streamOut pbQPU.QPU_FindServer, errs chan error, process func([]*pb.AttributePredicate, *pbQPU.FindResponseStream, pbQPU.QPU_FindServer) error) {
+//QueryResponseConsumer receives a QueryResponseStream, iteratively reads from the stream, and processes each input element based on a given function
+func QueryResponseConsumer(pred []*pb.AttributePredicate, streamIn pbQPU.QPU_QueryClient, streamOut pbQPU.QPU_QueryServer, errs chan error, process func([]*pb.AttributePredicate, *pbQPU.QueryResponseStream, pbQPU.QPU_QueryServer) error) {
 	for {
 		streamMsg, err := streamIn.Recv()
 		if err == io.EOF {

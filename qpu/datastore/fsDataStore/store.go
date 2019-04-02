@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	utils "github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"github.com/fsnotify/fsnotify"
 	"google.golang.org/grpc"
@@ -41,14 +41,14 @@ func (ds FSDataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 			return
 		}
 		for _, file := range files {
-			msg <- &pbQPU.Object{
-				Key: file.Name(),
-				Attributes: map[string]*pbQPU.Value{
-					"size":    utils.ValInt(file.Size()),
-					"mode":    utils.ValInt(int64(file.Mode())),
-					"modTime": utils.ValInt(file.ModTime().UnixNano()),
+			msg <- protoutils.Object(
+				file.Name(),
+				map[string]*pbQPU.Value{
+					"size":    protoutils.ValueInt(file.Size()),
+					"mode":    protoutils.ValueInt(int64(file.Mode())),
+					"modTime": protoutils.ValueInt(file.ModTime().UnixNano()),
 				},
-			}
+			)
 		}
 		close(msg)
 		errCh <- nil
@@ -65,21 +65,18 @@ func (ds FSDataStore) watchFS(w *fsnotify.Watcher, msg chan *pbQPU.Operation, er
 				errs <- err
 				break
 			}
-			msg <- &pbQPU.Operation{
-				OpId: "noId",
-				OpPayload: &pbQPU.OperationPayload{
-					Payload: &pbQPU.OperationPayload_State{
-						State: &pbQPU.Object{
-							Key: f.Name(),
-							Attributes: map[string]*pbQPU.Value{
-								"size":    utils.ValInt(f.Size()),
-								"mode":    utils.ValInt(int64(f.Mode())),
-								"modTime": utils.ValInt(f.ModTime().UnixNano()),
-							},
-						},
+			msg <- protoutils.OperationState(
+				"noId",
+				protoutils.Object(
+					f.Name(),
+					map[string]*pbQPU.Value{
+						"size":    protoutils.ValueInt(f.Size()),
+						"mode":    protoutils.ValueInt(int64(f.Mode())),
+						"modTime": protoutils.ValueInt(f.ModTime().UnixNano()),
 					},
-				},
-			}
+				),
+				nil,
+			)
 		case err := <-w.Errors:
 			errs <- err
 			break

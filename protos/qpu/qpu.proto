@@ -6,42 +6,24 @@ option go_package = "github.com/dvasilas/proteus/protos/qpu";
 import "utils.proto";
 
 service QPU {
-    rpc Find(FindRequest) returns (stream FindResponseStream) {}
+    rpc Query(stream RequestStream) returns (stream QueryResponseStream) {}
     rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
-    rpc SubscribeOps(stream ReqStream) returns (stream OpStream) {}
 }
 
-message FindRequest {
+message RequestStream {
+    oneof payload {
+        QueryRequest request = 1;
+        AckMsg ack = 2;
+    }
+}
+
+message QueryRequest {
     //Timestamp is part of the attributes
     //Desclared explicitly here for easier parsing
     utils.TimestampPredicate timestamp = 1;
     repeated utils.AttributePredicate predicate = 2;
-}
-
-message ConfigRequest {
-    utils.TimestampPredicate timestamp = 1;
-}
-
-message SubRequest {
-    utils.TimestampPredicate timestamp = 1;
-    bool sync = 2;
-}
-
-message FindResponseStream {
-    utils.Object object = 1;
-    utils.DataSet dataset = 2;
-}
-
-message ConfigResponse {
-    string QPUType = 1;
-    repeated utils.DataSet dataset = 2;
-    repeated utils.AttributePredicate supportedQueries = 3;
-}
-
-message OpStream {
-    string type = 1;
-    utils.Object state = 2;
-    utils.Operation operation = 3;
+    bool ops = 3;
+    bool sync = 4;
 }
 
 message AckMsg {
@@ -49,9 +31,24 @@ message AckMsg {
     string opId = 2;
 }
 
-message ReqStream {
+message QueryResponseStream {
     oneof payload {
-        SubRequest request = 1;
-        AckMsg ack = 2;
+        State state = 2;
+        utils.Operation operation = 3;
     }
+}
+
+message State {
+    utils.Object object = 1;
+    utils.DataSet dataset = 2;
+}
+
+message ConfigRequest {
+    utils.TimestampPredicate timestamp = 1;
+}
+
+message ConfigResponse {
+    string QPUType = 1;
+    repeated utils.DataSet dataset = 2;
+    repeated utils.AttributePredicate supportedQueries = 3;
 }
