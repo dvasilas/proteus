@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	"google.golang.org/grpc"
@@ -15,29 +16,21 @@ type Client struct {
 }
 
 //Find ...
-func (c *Client) Find(ts *pbQPU.TimestampPredicate, predicate []*pbQPU.AttributePredicate) (pb.QPU_FindClient, context.CancelFunc, error) {
+func (c *Client) Query(predicate []*pbQPU.AttributePredicate, ts *pbQPU.TimestampPredicate, ops bool, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	req := &pb.FindRequest{Timestamp: ts, Predicate: predicate}
-	stream, err := c.cli.Find(ctx, req)
+	stream, err := c.cli.Query(ctx)
+	if err != nil {
+		return nil, cancel, nil
+	}
+	err = stream.Send(protoutils.RequestStreamRequest(ts, predicate, ops, sync))
 	return stream, cancel, err
 }
 
 //GetConfig ...
 func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	ctx := context.TODO()
-	resp, err := c.cli.GetConfig(ctx, &pb.ConfigRequest{})
+	resp, err := c.cli.GetConfig(ctx, protoutils.ConfigRequest())
 	return resp, err
-}
-
-//SubscribeOps ...
-func (c *Client) SubscribeOps(ts *pbQPU.TimestampPredicate, sync bool) (pb.QPU_SubscribeOpsClient, context.CancelFunc, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := c.cli.SubscribeOps(ctx)
-	if err != nil {
-		return nil, cancel, nil
-	}
-	err = stream.Send(&pb.ReqStream{Payload: &pb.ReqStream_Request{Request: &pb.SubRequest{Timestamp: ts, Sync: sync}}})
-	return stream, cancel, err
 }
 
 //CloseConnection ...

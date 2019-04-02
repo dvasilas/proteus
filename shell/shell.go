@@ -9,6 +9,7 @@ import (
 	"github.com/abiosoft/ishell"
 	"github.com/dvasilas/proteus"
 	attribute "github.com/dvasilas/proteus/attributes"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	cli "github.com/dvasilas/proteus/qpu/client"
@@ -48,12 +49,7 @@ func (sh *shell) find(q []query) error {
 	if err != nil {
 		return errors.New("bound error")
 	}
-	query = append(query, &pbQPU.AttributePredicate{
-		Attribute: attr.GetKey(q[0].attribute),
-		Datatype:  attr.GetDatatype(),
-		Lbound:    lbound,
-		Ubound:    ubound,
-	})
+	query = append(query, protoutils.AttributePredicate(attr.GetDatatype(), attr.GetKey(q[0].attribute), lbound, ubound))
 	log.Debug("shell:find ", query)
 
 	return sh.sendQuery(query)
@@ -64,15 +60,15 @@ func (sh *shell) sendQuery(pred []*pbQPU.AttributePredicate) error {
 
 	errs := make(chan error)
 
-	streamIn, _, err := sh.client.Find(&pbQPU.TimestampPredicate{Lbound: &pbQPU.Timestamp{Ts: time.Now().UnixNano()}}, pred)
-	go utils.FindResponseConsumer(pred, streamIn, nil, errs, displayResponse)
+	streamIn, _, err := sh.client.Query(pred, protoutils.TimestampPredicate(0, time.Now().UnixNano()), false, false)
+	go utils.QueryResponseConsumer(pred, streamIn, nil, errs, displayResponse)
 	err = <-errs
 	return err
 }
 
-func displayResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
+func displayResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, stream pb.QPU_QueryServer) error {
 	log.Debug("shell:queryConsumer received: ", streamMsg)
-	return printResponse(pred, streamMsg.GetObject(), streamMsg.GetDataset())
+	return printResponse(pred, streamMsg.GetState().GetObject(), streamMsg.GetState().GetDataset())
 }
 
 func (sh *shell) processQueryString(q string) ([]query, error) {

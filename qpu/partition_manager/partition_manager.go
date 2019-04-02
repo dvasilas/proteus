@@ -2,9 +2,11 @@ package partitionΜanager
 
 import (
 	"errors"
+	"io"
 	"time"
 
 	"github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/qpu"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	cli "github.com/dvasilas/proteus/qpu/client"
@@ -36,9 +38,22 @@ func QPU(downwardsConns utils.DownwardConns) (*PmQPU, error) {
 	return &PmQPU{}, errors.New("error in DB/DC/Shard configuration")
 }
 
-//Find implements the Find API for the partition manager QPU
-func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns utils.DownwardConns) error {
-	clients, err := q.forwardQuery(in.Predicate)
+//Query implements the Query API for the partition manager QPU
+func (q *PmQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
+	msg, err := streamOut.Recv()
+	if err == io.EOF {
+		return errors.New("Query received EOF")
+	}
+	if err != nil {
+		return err
+	}
+	req := msg.GetRequest()
+
+	if req.GetOps() {
+		return errors.New("not supported")
+	}
+
+	clients, err := q.forwardQuery(req.GetPredicate())
 	if err != nil {
 		return err
 	}
@@ -48,11 +63,11 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 	}
 	for i, c := range clients {
 
-		streamIn, _, err := c.Find(in.Timestamp, in.Predicate)
+		streamIn, _, err := c.Query(req.GetPredicate(), req.GetTimestamp(), false, false)
 		if err != nil {
 			return err
 		}
-		go utils.FindResponseConsumer(in.Predicate, streamIn, streamOut, errs[i], forwardResponse)
+		go utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, errs[i], forwardResponse)
 
 		time.Sleep(time.Millisecond * 100)
 	}
@@ -65,11 +80,6 @@ func (q *PmQPU) Find(in *pb.FindRequest, streamOut pb.QPU_FindServer, conns util
 	return nil
 }
 
-//SubscribeOps ...
-func (q *PmQPU) SubscribeOps(stream pb.QPU_SubscribeOpsServer) error {
-	return errors.New("partition_manager QPU does not support SubscribeOps()")
-}
-
 //Cleanup ...
 func (q *PmQPU) Cleanup() {
 	log.Info("partition_manager QPU cleanup")
@@ -80,15 +90,12 @@ func (q *PmQPU) Cleanup() {
 //---------------- Internal Functions --------------
 
 //Sends an object received from the input stream as part of query results to the output stream corresponding to this query.
-func forwardResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.FindResponseStream, stream pb.QPU_FindServer) error {
-	return stream.Send(&pb.FindResponseStream{
-		Object:  &pbQPU.Object{Key: streamMsg.GetObject().GetKey(), Attributes: streamMsg.GetObject().GetAttributes(), Timestamp: streamMsg.GetObject().GetTimestamp()},
-		Dataset: streamMsg.GetDataset(),
-	})
+func forwardResponse(pred []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, stream pb.QPU_QueryServer) error {
+	return stream.Send(protoutils.QueryResponseStreamState(streamMsg.GetState().GetObject(), streamMsg.GetState().GetDataset()))
 }
 
 //forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
-//Returns an array connections for initiating Find queries, and any error encountered.
+//Returns an array connections for initiating Query queries, and any error encountered.
 func (q *PmQPU) forwardQuery(query []*pbQPU.AttributePredicate) ([]cli.Client, error) {
 	forwardTo := make([]cli.Client, 0)
 	for _, sh := range q.conns {

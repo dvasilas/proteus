@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/dvasilas/proteus/protos"
 	pb "github.com/dvasilas/proteus/protos/antidote"
 	pbQPU "github.com/dvasilas/proteus/protos/utils"
 	log "github.com/sirupsen/logrus"
@@ -47,23 +48,15 @@ func (ds AntidoteDataStore) GetSnapshot(msg chan *pbQPU.Object) chan error {
 }
 
 func (ds AntidoteDataStore) formatOperation(crdtOp *pb.Operation) (*pbQPU.Operation, error) {
-	op := &pbQPU.Operation{}
-	op.Key = crdtOp.GetCrdtType() + "__" + crdtOp.GetKey()
-	op.Bucket = crdtOp.GetBucket()
-	op.OpPayload = &pbQPU.OperationPayload{
-		Payload: &pbQPU.OperationPayload_Op{
-			Op: &pbQPU.Op{
-				AttrKey:  crdtOp.GetOp().GetMapKey(),
-				AttrType: crdtOp.GetOp().GetMapType(),
-				Payload:  crdtOp.GetOp().GetMapVal(),
-			},
-		},
-	}
-	op.DataSet = &pbQPU.DataSet{
-		Db:    "Antidote",
-		Dc:    crdtOp.GetDcID(),
-		Shard: crdtOp.GetPartitionID(),
-	}
+	op := protoutils.OperationOp(
+		"fixThis",
+		crdtOp.GetCrdtType()+"__"+crdtOp.GetKey(),
+		crdtOp.GetBucket(),
+		crdtOp.GetOp().GetMapKey(),
+		crdtOp.GetOp().GetMapType(),
+		crdtOp.GetOp().GetMapVal(),
+		protoutils.DataSet("Antidote", crdtOp.GetDcID(), crdtOp.GetPartitionID()),
+	)
 	return op, nil
 }
 
@@ -102,7 +95,7 @@ func (ds AntidoteDataStore) SubscribeOps(msg chan *pbQPU.Operation, ack chan boo
 	}
 	ctx := context.Background()
 	client := pb.NewAntidoteDataStoreClient(conn)
-	stream, err := client.WatchAsync(ctx, &pb.SubRequest{Timestamp: time.Now().UnixNano()})
+	stream, err := client.WatchAsync(ctx, protoutils.SubRequestAntidote(time.Now().UnixNano()))
 	if err != nil {
 		errCh <- err
 		return nil, errCh

@@ -56,6 +56,10 @@ serve_scan_qpu:
 serve_index_qpu:
 	$(PWD)/bin/qpu_server -qpu=indexQPU
 
+local: proto
+	go build -o bin/qpu_server -v ./qpu/server/server.go
+	go build -o bin/shell -v ./shell/shell.go
+
 test:
 	go test -v ./...
 
@@ -63,4 +67,4 @@ clean:
 	rm ./protos/utils/utils.pb.go ./protos/datastore/datastore.pb.go ./protos/s3/s3.pb.go ./protos/qpu/qpu.pb.go
 	rm -rf ./bin
 
-.PHONY: build_qpu_server build_qpu_server test clean
+.PHONY: build_qpu_server build_qpu_server test clean local
