@@ -3,6 +3,26 @@ syntax = "proto3";
 package utils;
 option go_package = "github.com/dvasilas/proteus/protos/utils";
 
+message SnapshotTimePredicate {
+    SnapshotTime lbound = 1;
+    SnapshotTime ubound = 2;
+}
+
+message SnapshotTime {
+    enum SnapshotTimeType {
+        LATEST = 0;
+        ZERO = 1;
+        INF = 2;
+        VECTORCLOCK = 3;
+    }
+    SnapshotTimeType type = 1;
+    Vectorclock value = 2;
+}
+
+message Vectorclock {
+    map<string, uint64> vc = 1;
+}
+
 message Object {
     string key = 1;
     map<string, Value> attributes = 2;
@@ -44,15 +64,6 @@ message AttributePredicate {
     string attribute = 2;
     Value lbound = 3;
     Value ubound = 4;
-}
-
-message TimestampPredicate {
-    Timestamp lbound = 1;
-    Timestamp ubound = 2;
-}
-
-message Timestamp {
-    int64 ts = 1;
 }
 
 message DataSet {

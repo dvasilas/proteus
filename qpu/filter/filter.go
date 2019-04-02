@@ -35,6 +35,9 @@ func (q *FQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) er
 	if req.GetOps() {
 		return errors.New("not supported")
 	}
+	if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_LATEST {
+		return errors.New("not supported")
+	}
 
 	for _, db := range conns.DBs {
 		for _, r := range db.DCs {
@@ -42,7 +45,7 @@ func (q *FQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) er
 				for _, c := range sh.QPUs {
 					errs := make(chan error)
 					emptyPred := make([]*pbQPU.AttributePredicate, 0)
-					streamIn, _, err := c.Client.Query(emptyPred, req.GetTimestamp(), false, false)
+					streamIn, _, err := c.Client.Query(emptyPred, req.GetClock(), false, false)
 					if err != nil {
 						return err
 					}

@@ -63,7 +63,7 @@ func (q *PmQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) e
 	}
 	for i, c := range clients {
 
-		streamIn, _, err := c.Query(req.GetPredicate(), req.GetTimestamp(), false, false)
+		streamIn, _, err := c.Query(req.GetPredicate(), req.GetClock(), false, false)
 		if err != nil {
 			return err
 		}

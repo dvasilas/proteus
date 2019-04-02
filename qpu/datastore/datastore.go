@@ -63,6 +63,10 @@ func (q *DsQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) e
 	}).Debug("Query request")
 
 	if req.GetOps() {
+		if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_INF {
+			return errors.New("not supported")
+		}
+
 		opCh := make(chan *pbQPU.Operation)
 		errsConsm := make(chan error)
 		errsSub := make(chan error)
@@ -81,6 +85,10 @@ func (q *DsQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) e
 			return err
 		}
 	} else {
+		if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_LATEST {
+			return errors.New("not supported")
+		}
+
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
 		errsGetSn := q.ds.GetSnapshot(streamCh)
 
