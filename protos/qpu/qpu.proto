@@ -20,7 +20,7 @@ message RequestStream {
 message QueryRequest {
     //Timestamp is part of the attributes
     //Desclared explicitly here for easier parsing
-    utils.TimestampPredicate timestamp = 1;
+    utils.SnapshotTimePredicate clock = 1;
     repeated utils.AttributePredicate predicate = 2;
     bool ops = 3;
     bool sync = 4;
@@ -44,7 +44,7 @@ message State {
 }
 
 message ConfigRequest {
-    utils.TimestampPredicate timestamp = 1;
+    utils.SnapshotTimePredicate clock = 1;
 }
 
 message ConfigResponse {

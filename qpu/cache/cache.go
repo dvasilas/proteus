@@ -60,6 +60,9 @@ func (q *CQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) er
 	if req.GetOps() {
 		return errors.New("not supported")
 	}
+	if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_LATEST {
+		return errors.New("not supported")
+	}
 
 	cachedResult, hit := q.cache.get(req.GetPredicate())
 	if hit {
@@ -83,7 +86,7 @@ func (q *CQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) er
 
 	errs := make(chan error)
 
-	streamIn, _, err := clients[0].Query(req.GetPredicate(), req.GetTimestamp(), false, false)
+	streamIn, _, err := clients[0].Query(req.GetPredicate(), req.GetClock(), false, false)
 	if err != nil {
 		return err
 	}

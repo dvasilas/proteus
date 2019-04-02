@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"time"
 
 	utils "github.com/dvasilas/proteus"
 	attribute "github.com/dvasilas/proteus/attributes"
@@ -59,7 +58,15 @@ func QPU(conf config.IndexConfig, conns utils.DownwardConns) (*IQPU, error) {
 						sync = true
 					}
 					emptyPred := make([]*pbQPU.AttributePredicate, 0)
-					streamIn, cancel, err := q.Client.Query(emptyPred, protoutils.TimestampPredicate(time.Now().UnixNano(), time.Now().UnixNano()), true, sync)
+					streamIn, cancel, err := q.Client.Query(
+						emptyPred,
+						protoutils.SnapshotTimePredicate(
+							protoutils.SnapshotTime("latest", nil),
+							protoutils.SnapshotTime("inf", nil),
+						),
+						true,
+						sync,
+					)
 					if err != nil {
 						cancel()
 						return nil, err
@@ -90,6 +97,9 @@ func (q *IQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) er
 	req := msg.GetRequest()
 
 	if req.GetOps() {
+		return errors.New("not supported")
+	}
+	if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_LATEST {
 		return errors.New("not supported")
 	}
 
@@ -224,7 +234,15 @@ func (q *IQPU) indexCatchUp(conns utils.DownwardConns) error {
 				}
 				for i, c := range sh.QPUs {
 					emptyPred := make([]*pbQPU.AttributePredicate, 0)
-					streamIn, cancel, err := c.Client.Query(emptyPred, protoutils.TimestampPredicate(0, time.Now().UnixNano()), false, false)
+					streamIn, cancel, err := c.Client.Query(
+						emptyPred,
+						protoutils.SnapshotTimePredicate(
+							protoutils.SnapshotTime("zero", nil),
+							protoutils.SnapshotTime("latest", nil),
+						),
+						false,
+						false,
+					)
 					defer cancel()
 					if err != nil {
 						return err

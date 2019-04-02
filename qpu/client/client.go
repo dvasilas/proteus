@@ -15,8 +15,8 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
-//Find ...
-func (c *Client) Query(predicate []*pbQPU.AttributePredicate, ts *pbQPU.TimestampPredicate, ops bool, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+//Query ...
+func (c *Client) Query(predicate []*pbQPU.AttributePredicate, ts *pbQPU.SnapshotTimePredicate, ops bool, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {

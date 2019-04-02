@@ -1,6 +1,8 @@
 package protoutils
 
 import (
+	"log"
+
 	antidote "github.com/dvasilas/proteus/protos/antidote"
 	pbQPU "github.com/dvasilas/proteus/protos/qpu"
 	s3 "github.com/dvasilas/proteus/protos/s3"
@@ -34,11 +36,11 @@ func State(obj *pb.Object, ds *pb.DataSet) *pbQPU.State {
 }
 
 //RequestStreamRequest creates a protos/qpu/RequestStream{Request} object
-func RequestStreamRequest(ts *pb.TimestampPredicate, predicate []*pb.AttributePredicate, ops bool, sync bool) *pbQPU.RequestStream {
+func RequestStreamRequest(ts *pb.SnapshotTimePredicate, predicate []*pb.AttributePredicate, ops bool, sync bool) *pbQPU.RequestStream {
 	return &pbQPU.RequestStream{
 		Payload: &pbQPU.RequestStream_Request{
 			Request: &pbQPU.QueryRequest{
-				Timestamp: ts,
+				Clock:     ts,
 				Predicate: predicate,
 				Ops:       ops,
 				Sync:      sync,
@@ -123,16 +125,38 @@ func OperationState(OpID string, obj *pb.Object, ds *pb.DataSet) *pb.Operation {
 	}
 }
 
-//TimestampPredicate creates a protos/utils/TimestampPredicate object
-func TimestampPredicate(lb int64, ub int64) *pb.TimestampPredicate {
-	return &pb.TimestampPredicate{
-		Lbound: &pb.Timestamp{
-			Ts: lb,
-		},
-		Ubound: &pb.Timestamp{
-			Ts: ub,
-		},
+//SnapshotTimePredicate create a protos/utils/SnapshotTimePredicate object
+func SnapshotTimePredicate(lb *pb.SnapshotTime, ub *pb.SnapshotTime) *pb.SnapshotTimePredicate {
+	return &pb.SnapshotTimePredicate{
+		Lbound: lb,
+		Ubound: ub,
 	}
+}
+
+//SnapshotTime creates a protos/utils/SnapshotTime object
+func SnapshotTime(value string, vectorClock map[string]uint64) *pb.SnapshotTime {
+	if value == "latest" {
+		return &pb.SnapshotTime{
+			Type: pb.SnapshotTime_LATEST,
+		}
+	} else if value == "zero" {
+		return &pb.SnapshotTime{
+			Type: pb.SnapshotTime_ZERO,
+		}
+	} else if value == "inf" {
+		return &pb.SnapshotTime{
+			Type: pb.SnapshotTime_INF,
+		}
+	} else if value == "vectorclock" {
+		return &pb.SnapshotTime{
+			Type: pb.SnapshotTime_VECTORCLOCK,
+			Value: &pb.Vectorclock{
+				Vc: vectorClock,
+			},
+		}
+	}
+	log.Fatal("protoutils:SnapshotTime invalid SnapshotTime type")
+	return nil
 }
 
 //SubRequestAntidote creates a protos/qpu/antidote/SubRequest object

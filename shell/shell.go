@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"strings"
-	"time"
 
 	"github.com/abiosoft/ishell"
 	"github.com/dvasilas/proteus"
@@ -60,7 +59,15 @@ func (sh *shell) sendQuery(pred []*pbQPU.AttributePredicate) error {
 
 	errs := make(chan error)
 
-	streamIn, _, err := sh.client.Query(pred, protoutils.TimestampPredicate(0, time.Now().UnixNano()), false, false)
+	streamIn, _, err := sh.client.Query(
+		pred,
+		protoutils.SnapshotTimePredicate(
+			protoutils.SnapshotTime("zero", nil),
+			protoutils.SnapshotTime("latest", nil),
+		),
+		false,
+		false,
+	)
 	go utils.QueryResponseConsumer(pred, streamIn, nil, errs, displayResponse)
 	err = <-errs
 	return err
