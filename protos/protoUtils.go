@@ -1,63 +1,123 @@
 package protoutils
 
 import (
-	"log"
-
 	antidote "github.com/dvasilas/proteus/protos/antidote"
 	pbQPU "github.com/dvasilas/proteus/protos/qpu"
-	s3 "github.com/dvasilas/proteus/protos/s3"
-	pb "github.com/dvasilas/proteus/protos/utils"
+	pbUtils "github.com/dvasilas/proteus/protos/utils"
 )
 
-//QueryResponseStreamState creates a protos/qpu/QueryResponseStream{State} object
-func QueryResponseStreamState(obj *pb.Object, ds *pb.DataSet) *pbQPU.QueryResponseStream {
-	return &pbQPU.QueryResponseStream{
-		Payload: &pbQPU.QueryResponseStream_State{
-			State: State(obj, ds),
+// ResponseStreamRecord ...
+func ResponseStreamRecord(sID int64, t pbQPU.ResponseStreamRecord_StreamRecordType, logOp *pbUtils.LogOperation) *pbQPU.ResponseStreamRecord {
+	return &pbQPU.ResponseStreamRecord{
+		SequenceId: sID,
+		Type:       t,
+		LogOp:      logOp,
+	}
+}
+
+//LogOperation creates a protos/utils/LogOperation object
+func LogOperation(key, buck string, t pbUtils.LogOperation_ObjectType, ts *pbUtils.Vectorclock, payload *pbUtils.Payload) *pbUtils.LogOperation {
+	return &pbUtils.LogOperation{
+		ObjectId:   key,
+		ObjectType: t,
+		Bucket:     buck,
+		Timestamp:  ts,
+		Payload:    payload,
+	}
+}
+
+// PayloadState ...
+func PayloadState(state *pbUtils.ObjectState) *pbUtils.Payload {
+	return &pbUtils.Payload{
+		Val: &pbUtils.Payload_State{
+			State: state,
 		},
 	}
 }
 
-//QueryResponseStreamOperation a protos/qpu/QueryResponseStream{Operation} object
-func QueryResponseStreamOperation(op *pb.Operation) *pbQPU.QueryResponseStream {
-	return &pbQPU.QueryResponseStream{
-		Payload: &pbQPU.QueryResponseStream_Operation{
-			Operation: op,
+// PayloadOp ...
+func PayloadOp(attr []*pbUtils.Attribute, updates []*pbUtils.Operation_Update) *pbUtils.Payload {
+	op := &pbUtils.Operation{Op: make([]*pbUtils.Operation_Op, 0)}
+	for i := range updates {
+		op.Op = append(op.Op, &pbUtils.Operation_Op{
+			Attr:   attr[i],
+			Update: updates[i],
+		})
+	}
+	return &pbUtils.Payload{
+		Val: &pbUtils.Payload_Op{
+			Op: op,
 		},
 	}
 }
 
-//State creates a protos/qpu/State object
-func State(obj *pb.Object, ds *pb.DataSet) *pbQPU.State {
-	return &pbQPU.State{
-		Object:  obj,
-		Dataset: ds,
+// PayloadDelta ...
+func PayloadDelta(old *pbUtils.ObjectState, new *pbUtils.ObjectState) *pbUtils.Payload {
+	return &pbUtils.Payload{
+		Val: &pbUtils.Payload_Delta{
+			Delta: &pbUtils.Payload_StateDelta{
+				Old: old,
+				New: new,
+			},
+		},
+	}
+}
+
+// Update ...
+func Update(opT string, val *pbUtils.Value) *pbUtils.Operation_Update {
+	return &pbUtils.Operation_Update{
+		OpType: opT,
+		Value:  val,
+	}
+}
+
+//ObjectState creates a protos/qpu/State object
+func ObjectState(attrs []*pbUtils.Attribute) *pbUtils.ObjectState {
+	objState := &pbUtils.ObjectState{
+		Attrs: make([]*pbUtils.Attribute, len(attrs)),
+	}
+	for i, attr := range attrs {
+		objState.Attrs[i] = attr
+	}
+	return objState
+}
+
+//Attribute ...
+func Attribute(key string, typ pbUtils.Attribute_AttributeType, val *pbUtils.Value) *pbUtils.Attribute {
+	return &pbUtils.Attribute{
+		AttrKey:  key,
+		AttrType: typ,
+		Value:    val,
 	}
 }
 
 //RequestStreamRequest creates a protos/qpu/RequestStream{Request} object
-func RequestStreamRequest(ts *pb.SnapshotTimePredicate, predicate []*pb.AttributePredicate, ops bool, sync bool) *pbQPU.RequestStream {
+func RequestStreamRequest(ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, ops bool, sync bool) *pbQPU.RequestStream {
 	return &pbQPU.RequestStream{
 		Payload: &pbQPU.RequestStream_Request{
-			Request: &pbQPU.QueryRequest{
-				Clock:     ts,
-				Predicate: predicate,
-				Ops:       ops,
-				Sync:      sync,
-			},
+			Request: QueryRequest(ts, predicate, ops, sync),
 		},
 	}
 }
 
 //RequestStreamAck creates a protos/qpu/RequestStream{Ack} object
-func RequestStreamAck(msg string, opID string) *pbQPU.RequestStream {
+func RequestStreamAck(sID int64) *pbQPU.RequestStream {
 	return &pbQPU.RequestStream{
 		Payload: &pbQPU.RequestStream_Ack{
 			Ack: &pbQPU.AckMsg{
-				Msg:  msg,
-				OpId: opID,
+				SequenceId: sID,
 			},
 		},
+	}
+}
+
+//QueryRequest ...
+func QueryRequest(ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, ops bool, sync bool) *pbQPU.QueryRequest {
+	return &pbQPU.QueryRequest{
+		Clock:     ts,
+		Predicate: predicate,
+		Ops:       ops,
+		Sync:      sync,
 	}
 }
 
@@ -66,97 +126,58 @@ func ConfigRequest() *pbQPU.ConfigRequest {
 	return &pbQPU.ConfigRequest{}
 }
 
-//Object creates a protos/utils/Object object
-func Object(key string, attrs map[string]*pb.Value) *pb.Object {
-	return &pb.Object{
-		Key:        key,
-		Attributes: attrs,
+//ConfigRespοnse ...
+func ConfigRespοnse(typ pbQPU.ConfigResponse_QPUType, attrs []*pbUtils.AttributePredicate, ds *pbQPU.DataSet) *pbQPU.ConfigResponse {
+	return &pbQPU.ConfigResponse{
+		QpuType:          typ,
+		SupportedQueries: attrs,
+		Dataset:          ds,
 	}
 }
 
 //DataSet creates a protos/utils/Dataset object
-func DataSet(db string, dc string, shard string) *pb.DataSet {
-	return &pb.DataSet{
-		Db:    db,
-		Dc:    dc,
-		Shard: shard,
+func DataSet(dbMap map[string]map[string][]string) *pbQPU.DataSet {
+	dbs := make(map[string]*pbQPU.DataSet_DB)
+	for dbID, dcMap := range dbMap {
+		dcs := make(map[string]*pbQPU.DataSet_DC)
+		for dcID, shards := range dcMap {
+			dcs[dcID] = &pbQPU.DataSet_DC{Shards: shards}
+		}
+		dbs[dbID] = &pbQPU.DataSet_DB{Datacenters: dcs}
 	}
+	return &pbQPU.DataSet{Databases: dbs}
 }
 
 //AttributePredicate create a protos/utils/AttributePredicate object
-func AttributePredicate(datatype string, attribute string, lb *pb.Value, ub *pb.Value) *pb.AttributePredicate {
-	return &pb.AttributePredicate{
-		Datatype:  datatype,
-		Attribute: attribute,
-		Lbound:    lb,
-		Ubound:    ub,
-	}
-}
-
-//OperationOp creates a protos/utils/Operation{Op} object
-func OperationOp(OpID string, key string, bucket string, attrKey string, attrType string, payload string, ds *pb.DataSet) *pb.Operation {
-	return &pb.Operation{
-		OpId:   OpID,
-		Key:    key,
-		Bucket: bucket,
-		OpPayload: &pb.OperationPayload{
-			Payload: &pb.OperationPayload_Op{
-				Op: &pb.Op{
-					AttrKey:  attrKey,
-					AttrType: attrType,
-					Payload:  payload,
-				},
-			},
-		},
-		DataSet: ds,
-	}
-}
-
-//OperationState creates a protos/utils/Operation{State} object
-func OperationState(OpID string, obj *pb.Object, ds *pb.DataSet) *pb.Operation {
-	return &pb.Operation{
-		OpId: OpID,
-		OpPayload: &pb.OperationPayload{
-			Payload: &pb.OperationPayload_State{
-				State: obj,
-			},
-		},
-		DataSet: ds,
+func AttributePredicate(attr *pbUtils.Attribute, lb *pbUtils.Value, ub *pbUtils.Value) *pbUtils.AttributePredicate {
+	return &pbUtils.AttributePredicate{
+		Attr:   attr,
+		Lbound: lb,
+		Ubound: ub,
 	}
 }
 
 //SnapshotTimePredicate create a protos/utils/SnapshotTimePredicate object
-func SnapshotTimePredicate(lb *pb.SnapshotTime, ub *pb.SnapshotTime) *pb.SnapshotTimePredicate {
-	return &pb.SnapshotTimePredicate{
+func SnapshotTimePredicate(lb *pbUtils.SnapshotTime, ub *pbUtils.SnapshotTime) *pbUtils.SnapshotTimePredicate {
+	return &pbUtils.SnapshotTimePredicate{
 		Lbound: lb,
 		Ubound: ub,
 	}
 }
 
 //SnapshotTime creates a protos/utils/SnapshotTime object
-func SnapshotTime(value string, vectorClock map[string]uint64) *pb.SnapshotTime {
-	if value == "latest" {
-		return &pb.SnapshotTime{
-			Type: pb.SnapshotTime_LATEST,
-		}
-	} else if value == "zero" {
-		return &pb.SnapshotTime{
-			Type: pb.SnapshotTime_ZERO,
-		}
-	} else if value == "inf" {
-		return &pb.SnapshotTime{
-			Type: pb.SnapshotTime_INF,
-		}
-	} else if value == "vectorclock" {
-		return &pb.SnapshotTime{
-			Type: pb.SnapshotTime_VECTORCLOCK,
-			Value: &pb.Vectorclock{
-				Vc: vectorClock,
-			},
-		}
+func SnapshotTime(t pbUtils.SnapshotTime_SnapshotTimeType, vc *pbUtils.Vectorclock) *pbUtils.SnapshotTime {
+	return &pbUtils.SnapshotTime{
+		Type:  t,
+		Value: vc,
 	}
-	log.Fatal("protoutils:SnapshotTime invalid SnapshotTime type")
-	return nil
+}
+
+//Vectorclock creates a protos/utils/Vectorclock object
+func Vectorclock(vc map[string]uint64) *pbUtils.Vectorclock {
+	return &pbUtils.Vectorclock{
+		Vc: vc,
+	}
 }
 
 //SubRequestAntidote creates a protos/qpu/antidote/SubRequest object
@@ -166,43 +187,28 @@ func SubRequestAntidote(ts int64) *antidote.SubRequest {
 	}
 }
 
-//SubRequestS3 creates a protos/qpu/s3/SubRequest object
-func SubRequestS3(ts int64) *s3.SubRequest {
-	return &s3.SubRequest{
-		Timestamp: ts,
-	}
-}
-
-//OpAckS3 creates a protos/qpu/s3/OpAck object
-func OpAckS3(msg string, opID string) *s3.OpAck {
-	return &s3.OpAck{
-		Msg:  msg,
-		OpId: opID,
-	}
-}
-
 //ValueInt creates a protos/utils/Value{Int} object
-func ValueInt(i int64) *pb.Value {
-	return &pb.Value{
-		Val: &pb.Value_Int{
+func ValueInt(i int64) *pbUtils.Value {
+	return &pbUtils.Value{
+		Val: &pbUtils.Value_Int{
 			Int: i,
 		},
 	}
 }
 
 //ValueStr creates a protos/utils/Value{Str} object
-func ValueStr(s string) *pb.Value {
-	return &pb.Value{
-		Val: &pb.Value_Str{
+func ValueStr(s string) *pbUtils.Value {
+	return &pbUtils.Value{
+		Val: &pbUtils.Value_Str{
 			Str: s,
 		},
 	}
 }
 
 //ValueFlt creates a protos/utils/Value{Flt} object
-func ValueFlt(f float64) *pb.Value {
-	return &pb.Value{
-		Val: &pb.Value_Flt{
+func ValueFlt(f float64) *pbUtils.Value {
+	return &pbUtils.Value{
+		Val: &pbUtils.Value_Flt{
 			Flt: f,
 		},
 	}

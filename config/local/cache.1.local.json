@@ -1,7 +1,10 @@
 {
     "qpuType": "cache",
     "port": "50450",
-    "connections": [{
-        "endpoint": "localhost:50250"
-    }]
+    "connections": [
+        "localhost:50250"
+    ],
+    "cacheConfig": {
+        "size" : 10
+    }
 }

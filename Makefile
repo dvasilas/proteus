@@ -1,5 +1,5 @@
 
-all: build_qpu_server build_shell
+all: dep build_qpu_server
 
 PROTOC := $(shell which protoc)
 UNAME := $(shell uname)
@@ -15,33 +15,17 @@ ifeq ($(UNAME), Linux)
 endif
 
 dep:
-	go get github.com/golang/protobuf/protoc-gen-go
-	go get -d github.com/golang/mock/gomock
-	go install github.com/golang/mock/mockgen
-	go get -d google.golang.org/grpc
-	go get -d github.com/hpcloud/tail
-	go get -d github.com/stretchr/testify
-	go get -d github.com/abiosoft/ishell
-	go get -d github.com/spf13/viper
-	go get -d github.com/fsnotify/fsnotify
-	go get -d github.com/google/btree
-	go get -d github.com/sirupsen/logrus
-	go get -d github.com/aws/aws-sdk-go
-	go get -d github.com/AntidoteDB/antidote-go-client
+	dep ensure
 
 proto: $(PROTOC_CMD)
+	go get ./vendor/github.com/golang/protobuf/protoc-gen-go
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/utils/utils.proto
-	protoc --proto_path=./protos/utils --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
-	protoc --proto_path=./protos/utils --proto_path=./protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./protos/antidote/antidote.proto
+	protoc --proto_path=./protos/utils --proto_path=./protos/qpu --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
+	protoc --proto_path=./protos/utils --proto_path=./protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./protos/antidote/log_propagation.proto
 	protoc --proto_path=./protos/qpu --proto_path=./protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/qpu/qpu.proto
-	go generate ./...
 
-
-build_qpu_server: dep proto
+build_qpu_server:
 	go build -o bin/qpu_server -v ./qpu/server/server.go
-
-build_shell: dep proto
-	go build -o bin/shell -v ./shell/shell.go
 
 # Cross compilation
 build_qpu_server_linux:
@@ -55,10 +39,6 @@ serve_scan_qpu:
 
 serve_index_qpu:
 	$(PWD)/bin/qpu_server -qpu=indexQPU
-
-local: proto
-	go build -o bin/qpu_server -v ./qpu/server/server.go
-	go build -o bin/shell -v ./shell/shell.go
 
 test:
 	go test -v ./...

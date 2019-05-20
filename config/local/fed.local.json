@@ -1,0 +1,8 @@
+{
+  "qpuType": "federation",
+  "port": "50550",
+  "connections": [
+    "localhost:50250",
+    "localhost:50251"
+  ]
+}

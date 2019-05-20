@@ -2,7 +2,6 @@
     "qpuType": "filter",
     "port": "50250",
     "connections": [
-    {
-        "endpoint": "localhost:50150"
-    }]
+      "localhost:50150"
+    ]
 }

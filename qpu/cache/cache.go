@@ -1,233 +1,132 @@
 package cache
 
 import (
-	"container/list"
 	"errors"
-	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/dvasilas/proteus"
+	"github.com/dvasilas/proteus/config"
 	"github.com/dvasilas/proteus/protos"
-	pb "github.com/dvasilas/proteus/protos/qpu"
-	pbQPU "github.com/dvasilas/proteus/protos/utils"
-	cli "github.com/dvasilas/proteus/qpu/client"
+	pbQPU "github.com/dvasilas/proteus/protos/qpu"
+	pbUtils "github.com/dvasilas/proteus/protos/utils"
+	"github.com/dvasilas/proteus/qpu/cache/lruCache"
 	log "github.com/sirupsen/logrus"
 )
 
-//CQPU implements a cache QPU
+// CQPU implements a cache QPU.
 type CQPU struct {
-	cache *cache
+	qpu    *utils.QPU
+	cache  cacheImplementation
+	config *config.Config
 }
 
-type cache struct {
-	MaxEntries int
-	ll         *list.List
-	items      map[string]*list.Element
-	OnEvict    func(key []*pbQPU.AttributePredicate, value []cachedValue)
-}
-
-type entry struct {
-	key   []*pbQPU.AttributePredicate
-	value []cachedValue
-}
-
-type cachedValue struct {
-	Object  pbQPU.Object
-	Dataset pbQPU.DataSet
+// Describes the interface that any cache implementation needs to expose
+// to work with this module.
+type cacheImplementation interface {
+	Put(predicate []*pbUtils.AttributePredicate, obj utils.ObjectState) error
+	Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
 }
 
 //---------------- API Functions -------------------
 
-//QPU creates a cache QPU
-func QPU() (*CQPU, error) {
-	return &CQPU{
-		cache: new(10),
-	}, nil
+// QPU creates a cache QPU
+func QPU(conf *config.Config) (*CQPU, error) {
+	q := &CQPU{
+		qpu: &utils.QPU{
+			Config: conf,
+		},
+		cache: lrucache.New(conf),
+	}
+	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
+		return nil, err
+	}
+	if len(q.qpu.Conns) > 1 {
+		return nil, errors.New("cache QPUs support a single connection")
+	}
+	return q, nil
 }
 
-//Query implements the Query API for the cache QPU
-func (q *CQPU) Query(streamOut pb.QPU_QueryServer, conns utils.DownwardConns) error {
-	msg, err := streamOut.Recv()
+// Query implements the Query API for the cache QPU
+func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
+	request, err := streamOut.Recv()
 	if err == io.EOF {
 		return errors.New("Query received EOF")
 	}
 	if err != nil {
 		return err
 	}
-	req := msg.GetRequest()
+	req := request.GetRequest()
+	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
 	if req.GetOps() {
 		return errors.New("not supported")
 	}
-	if req.GetClock().GetLbound().GetType() != pbQPU.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbQPU.SnapshotTime_LATEST {
+	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
 		return errors.New("not supported")
 	}
 
-	cachedResult, hit := q.cache.get(req.GetPredicate())
+	cachedResult, hit := q.cache.Get(req.GetPredicate())
 	if hit {
 		log.WithFields(log.Fields{
 			"cache entry": cachedResult,
 		}).Debug("cache hit, responding")
 
+		var seqID int64
 		for _, item := range cachedResult {
-			if err := streamOut.Send(protoutils.QueryResponseStreamState(&item.Object, &item.Dataset)); err != nil {
+			logOp := protoutils.LogOperation(
+				item.ObjectID,
+				item.Bucket,
+				item.ObjectType,
+				&item.Timestamp,
+				protoutils.PayloadState(&item.State),
+			)
+			if err := streamOut.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, logOp)); err != nil {
 				return err
 			}
+			seqID++
 		}
 		return nil
 	}
 	log.WithFields(log.Fields{}).Debug("cache miss")
 
-	clients, err := forwardQuery(conns, req.GetPredicate())
+	errChan := make(chan error)
+	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false, false)
 	if err != nil {
 		return err
 	}
+	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
 
-	errs := make(chan error)
-
-	streamIn, _, err := clients[0].Query(req.GetPredicate(), req.GetClock(), false, false)
-	if err != nil {
-		return err
-	}
-
-	go utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, errs, q.cache.storeAndRespond)
-
-	err = <-errs
+	err = <-errChan
 	return err
 }
 
-//Cleanup ...
+// GetConfig implements the GetConfig API for the cache QPU
+func (q *CQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+	resp := protoutils.ConfigRespοnse(q.qpu.Config.QpuType,
+		q.qpu.QueryingCapabilities,
+		q.qpu.Dataset)
+	return resp, nil
+}
+
+// Cleanup is called when the process receives a SIGTERM signcal
 func (q *CQPU) Cleanup() {
 	log.Info("cache QPU cleanup")
 }
 
-//----------- Stream Consumer Functions ------------
-
 //---------------- Internal Functions --------------
 
-//Create new cache instance
-//Receives the cache size as argument
-func new(maxEntries int) *cache {
-	return &cache{
-		MaxEntries: maxEntries,
-		ll:         list.New(),
-		items:      make(map[string]*list.Element),
+// Stores an object that is part of a query response in the cache
+// and forwards to the response stream
+func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
+	obj := utils.ObjectState{
+		ObjectID:   streamRec.GetLogOp().GetObjectId(),
+		ObjectType: streamRec.GetLogOp().GetObjectType(),
+		Bucket:     streamRec.GetLogOp().GetBucket(),
+		State:      *streamRec.GetLogOp().GetPayload().GetState(),
+		Timestamp:  *streamRec.GetLogOp().GetTimestamp(),
 	}
-}
-
-//Stores an object in the cache and send it upwards through an output stream
-func (c *cache) storeAndRespond(in []*pbQPU.AttributePredicate, streamMsg *pb.QueryResponseStream, streamOut pb.QPU_QueryServer) error {
-	if err := c.put(in, *streamMsg.GetState().GetObject(), *streamMsg.GetState().GetDataset()); err != nil {
+	if err := q.cache.Put(predicate, obj); err != nil {
 		return err
 	}
-	return streamOut.Send(protoutils.QueryResponseStreamState(streamMsg.GetState().GetObject(), streamMsg.GetState().GetDataset()))
-}
-
-//Stores an object in a cache entry
-func (c *cache) put(query []*pbQPU.AttributePredicate, obj pbQPU.Object, ds pbQPU.DataSet) error {
-	if c.items == nil {
-		c.ll = list.New()
-		c.items = make(map[string]*list.Element)
-	}
-	key := predicateToKey(query)
-	if item, ok := c.items[key]; ok {
-		c.ll.MoveToFront(item)
-		item.Value.(*entry).value = append(item.Value.(*entry).value, cachedValue{Object: obj, Dataset: ds})
-	} else {
-		item := c.ll.PushFront(&entry{key: query, value: []cachedValue{cachedValue{Object: obj, Dataset: ds}}})
-		c.items[key] = item
-		if c.ll.Len() > c.MaxEntries {
-			c.evict()
-		}
-	}
-	return nil
-}
-
-//Retrieves an enty from the cache
-func (c *cache) get(p []*pbQPU.AttributePredicate) ([]cachedValue, bool) {
-	if c.items == nil {
-		return nil, false
-	}
-	key := predicateToKey(p)
-	if item, ok := c.items[key]; ok {
-		c.ll.MoveToFront(item)
-		return item.Value.(*entry).value, true
-	}
-	return nil, false
-}
-
-//Evicts an entry from the cache (LRU)
-func (c *cache) evict() error {
-	if c.items == nil {
-		return nil
-	}
-	item := c.ll.Back()
-	if item != nil {
-		c.ll.Remove(item)
-		ee := item.Value.(*entry)
-		key := predicateToKey(ee.key)
-		delete(c.items, key)
-		if c.OnEvict != nil {
-			c.OnEvict(ee.key, ee.value)
-		}
-	}
-	return nil
-}
-
-//---------------- Auxiliary Functions -------------
-
-//forwardQuery selects a set of downward connections for forwarding a query, based on the available QPUs and their configuration.
-//Returns an array connections for initiating Query queries, and any error encountered.
-func forwardQuery(conns utils.DownwardConns, query []*pbQPU.AttributePredicate) ([]cli.Client, error) {
-	forwardTo := make([]cli.Client, 0)
-	for _, db := range conns.DBs {
-		for _, r := range db.DCs {
-			for _, sh := range r.Shards {
-				for _, q := range sh.QPUs {
-					if (q.QpuType == "index" || q.QpuType == "cache") && utils.CanProcessQuery(q, query) {
-						if utils.QueryInAttrRange(q, query) {
-							forwardTo = append(forwardTo, q.Client)
-						}
-					}
-				}
-				for _, q := range sh.QPUs {
-					if q.QpuType == "filter" {
-						forwardTo = append(forwardTo, q.Client)
-					}
-				}
-			}
-		}
-	}
-	if len(forwardTo) == 0 {
-		return forwardTo, errors.New("dispatch found no QPU to forward query")
-	}
-	return forwardTo, nil
-
-}
-
-//Converts a predicate to a cache entry key
-func predicateToKey(p []*pbQPU.AttributePredicate) string {
-	entryKey := ""
-	for i, pp := range p {
-		switch pp.Lbound.Val.(type) {
-		case *pbQPU.Value_Int:
-			entryKey += pp.Attribute + "/" + strconv.FormatInt(pp.Lbound.GetInt(), 10) + "/" + strconv.FormatInt(pp.Ubound.GetInt(), 10)
-		case *pbQPU.Value_Str:
-			entryKey += pp.Attribute + "/" + pp.Lbound.GetStr() + "/" + pp.Ubound.GetStr()
-		case *pbQPU.Value_Flt:
-			entryKey += pp.Attribute + "/" + strconv.FormatFloat(float64(pp.Lbound.GetFlt()), 'E', -1, 32) + "/" + strconv.FormatFloat(float64(pp.Ubound.GetFlt()), 'E', -1, 32)
-		}
-		if i < len(p)-1 {
-			entryKey += "&"
-		}
-	}
-	return entryKey
-}
-
-//Prints the contents of the cache
-func (c *cache) print() {
-	for e := c.ll.Front(); e != nil; e = e.Next() {
-		fmt.Println(e.Value)
-	}
+	return streamOut.Send(streamRec)
 }

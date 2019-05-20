@@ -1,17 +1,22 @@
 {
+    "qpuType": "dbdriver",
     "port": "50150",
-    "dataStore": {
-        "dataSet": {
-            "db": 1,
-            "dc": 1,
-            "shard": 1
-        },
-        "type": "antidote",
-        "dataDir": "/cloudserver",
-        "ΑwsAccessKeyId": "accessKey1",
-        "awsSecretAccessKey": "verySecretKey1",
-        "endpoint": "http://localhost:8000",
-        "bucketName": "local-s3",
-        "logStreamEndpoint": "localhost:50050"
-    }
+    "connections": [
+    {
+        "endpoint": "127.0.0.1:8087",
+            "dataSet": {
+                "db": 1,
+                "dc": 1,
+                "shard": 1
+            },
+            "dataStoreConfig": {
+            "type": "antidote",
+            "dataDir": "/cloudserver",
+            "ΑwsAccessKeyId": "accessKey1",
+            "awsSecretAccessKey": "verySecretKey1",
+            "bucketName": "buck",
+            "logStreamEndpoint": "localhost:8080"
+            }
+        }
+    ]
 }
