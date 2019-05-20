@@ -1,0 +1,48 @@
+version: '3'
+services:
+  indexqpu_local_1:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50350:50350"
+    command: go run server.go -conf=index.docker.1
+    environment:
+      - DEBUG=true
+    depends_on:
+      - datastoreqpu
+      - s3server
+    networks:
+      mynetwork:
+        aliases:
+          - qpu.index
+  datastoreqpu:
+    build:
+      context: ../
+      dockerfile: qpu/server/Dockerfile
+    ports:
+      - "127.0.0.1:50000:50000"
+    command: go run server.go -conf=datastore.1.docker
+    environment:
+      - DEBUG=true
+    depends_on:
+      - s3server
+    networks:
+      mynetwork:
+        aliases:
+          - qpu.datastore
+  s3server:
+    image: cloudserver/compose:latest
+    environment:
+    - REMOTE_MANAGEMENT_DISABLE=1
+    ports:
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:8001:8000"
+    networks:
+      mynetwork:
+        aliases:
+          - s3.server
+
+networks:
+  mynetwork:
+    driver: bridge

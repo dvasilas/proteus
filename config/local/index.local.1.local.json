@@ -1,20 +1,20 @@
 {
     "qpuType": "index",
     "port": "50350",
-    "connections": [{
-        "endpoint": "localhost:50150"
-    }],
+    "connections": [
+      "localhost:50150"
+    ],
     "indexConfig": {
-        "attribute": "tagF",
-        "indexType": "btree_s3tagF",
+        "attributeName": "test",
+        "attributeType": "s3tagFlt",
         "lBound": "0.0",
         "uBound": "1.0",
         "consLevel": "async",
         "indexStore": {
-            "store": "inMem",
-            "host": "127.0.0.1",
-            "port": 8087,
-            "bucket": "indexQPU0"
+            "store": "antidote",
+            "endpoint": "127.0.0.1:8087",
+            "bucket": "indexqpu",
+            "indexDataStruct": "btree"
         }
     }
 }

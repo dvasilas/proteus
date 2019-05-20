@@ -3,15 +3,17 @@ language: go
 go:
   - 1.10.x
 
-install:
-  - curl -L https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip -o /tmp/protoc.zip
-  - unzip /tmp/protoc.zip -d "$HOME/protoc"
-
 env:
-  - PATH=$HOME/protoc/bin:$PATH
+  - DEP_VERSION="0.5.3"
+
+before_install:
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+
+install:
+  - dep ensure
 
 before_script:
-  - make all
+  - go vet ./...
 
 script:
   - make test

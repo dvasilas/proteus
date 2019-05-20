@@ -1,24 +1,46 @@
 syntax = "proto3";
 
-package s3datastore;
+package notificationpubsub;
 option go_package = "github.com/dvasilas/proteus/protos/s3";
 
-import "utils.proto";
+service NotificationService {
+    rpc subscribeNotifications(stream RequestStream) returns (stream NotificationStream) {}
+}
 
-service S3DataStore {
-    rpc watchSync(stream OpAck) returns (stream OpStream) {}
-    rpc watchAsync(SubRequest) returns (stream OpStream) {}
+message NotificationStream {
+    enum StreamRecordType {
+      UpdateDelta = 0;
+    }
+    int64 sequence_id = 1;
+    StreamRecordType type = 2;
+    Payload payload = 3;
+    int64 timestamp = 4;
+}
+
+message Payload {
+    message ObjectState {
+      int64 contentLength = 1;
+      int64 lastModified = 2;
+      map<string, string> attributes = 3;
+    }
+    string object_id = 1;
+    string bucket = 2;
+    ObjectState old_state = 3;
+    ObjectState new_state = 4;
+}
+
+message RequestStream {
+  oneof val {
+    SubRequest request = 1;
+    AckMsg ack = 2;
+  }
 }
 
 message SubRequest {
     int64 timestamp = 1;
+    bool sync = 2;
 }
 
-message OpAck {
-    string msg = 1;
-    string opId = 2;
-}
-
-message OpStream {
-    utils.Operation operation = 1;
+message AckMsg {
+    int64 timestamp = 1;
 }
