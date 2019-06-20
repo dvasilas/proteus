@@ -16,24 +16,24 @@ func TestMain(m *testing.M) {
 
 func TestMergeDatasets(t *testing.T) {
 	ds := protoutils.DataSet(map[string]map[string][]string{
-		"s3server": map[string][]string{
-			"site1": []string{"s1", "s2"},
+		"s3server": {
+			"site1": {"s1", "s2"},
 		},
 	})
 	ds1 := protoutils.DataSet(map[string]map[string][]string{
-		"s3server": map[string][]string{
-			"site1": []string{"s3", "s4", "s5"},
+		"s3server": {
+			"site1": {"s3", "s4", "s5"},
 		},
 	})
 	ds2 := protoutils.DataSet(map[string]map[string][]string{
-		"s3server": map[string][]string{
-			"site2": []string{"s1", "s2"},
+		"s3server": {
+			"site2": {"s1", "s2"},
 		},
 	})
 	ds3 := protoutils.DataSet(map[string]map[string][]string{
-		"antidote": map[string][]string{
-			"dc1": []string{"s1"},
-			"dc2": []string{"s1", "s2"},
+		"antidote": {
+			"dc1": {"s1"},
+			"dc2": {"s1", "s2"},
 		},
 	})
 

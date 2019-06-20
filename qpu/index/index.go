@@ -62,6 +62,9 @@ func QPU(conf *config.Config) (*IQPU, error) {
 		}
 	case config.ANT:
 		index, err = mapindex.New(conf)
+		if err != nil {
+			return &IQPU{}, err
+		}
 	}
 	q.index = index
 

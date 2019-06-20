@@ -142,7 +142,7 @@ func initDebug() error {
 	return nil
 }
 
-//setCleanup set a cleanup() fucntion that will be called
+//setCleanup set a cleanup() function that will be called
 //in case the QPU server process receives a SIGTERM signal
 func setCleanup(server QPUServer) {
 	c := make(chan os.Signal)

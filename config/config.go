@@ -51,6 +51,9 @@ func GetConfig(configFArg string) (*Config, error) {
 	viper.AutomaticEnv()
 
 	err := viper.BindEnv("HOME")
+	if err != nil {
+		return nil, err
+	}
 	configF, err := getConfigFile(configFArg)
 	if err != nil {
 		return nil, err
@@ -131,8 +134,8 @@ func (c *Config) getDatastoreConfig(conf ConfJSON) error {
 	c.DatastoreConfig.AwsSecretAccessKey = conf.DataStoreConfig.AwsSecretAccessKey
 	c.DatastoreConfig.Dataset = protoutils.DataSet(
 		map[string]map[string][]string{
-			conf.DataStoreConfig.DataSet.DB: map[string][]string{
-				conf.DataStoreConfig.DataSet.DC: []string{
+			conf.DataStoreConfig.DataSet.DB: {
+				conf.DataStoreConfig.DataSet.DC: {
 					conf.DataStoreConfig.DataSet.Shard,
 				},
 			},
@@ -147,7 +150,7 @@ func (c *Config) getDatastore(store string) error {
 	case "antidote":
 		c.DatastoreConfig.Type = ANTIDOTE
 	default:
-		return errors.New("unkown backend datastore")
+		return errors.New("unknown backend datastore")
 	}
 	return nil
 }
