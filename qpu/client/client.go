@@ -39,10 +39,10 @@ func (c *Client) CloseConnection() error {
 }
 
 //NewClient ...
-func NewClient(address string) (Client, *grpc.ClientConn, error) {
+func NewClient(address string) (Client, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		return Client{}, nil, err
+		return Client{}, err
 	}
-	return Client{cli: pb.NewQPUClient(conn), conn: conn}, conn, nil
+	return Client{cli: pb.NewQPUClient(conn), conn: conn}, nil
 }

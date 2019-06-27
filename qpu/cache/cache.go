@@ -95,9 +95,11 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		return err
 	}
 	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
-
 	err = <-errChan
-	return err
+	if err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 // GetConfig implements the GetConfig API for the cache QPU

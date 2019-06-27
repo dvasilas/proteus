@@ -2,7 +2,6 @@ package federation
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/dvasilas/proteus"
@@ -73,7 +72,6 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	for streamCnt > 0 {
 		select {
 		case err := <-errChan:
-			fmt.Println("received ", err)
 			if err == io.EOF {
 				streamCnt--
 			} else if err != nil {
@@ -81,7 +79,6 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 			}
 		}
 	}
-	fmt.Println("streamCnt", streamCnt)
 	return nil
 }
 
@@ -104,15 +101,12 @@ func (q *FQPU) Cleanup() {
 //---------------- Internal Functions --------------
 
 func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*utils.QPU, error) {
-	fmt.Println("generateSubQueries")
-	fmt.Println("conns", q.qpu.Conns)
 	forwardTo := make([]*utils.QPU, 0)
 	for _, c := range q.qpu.Conns {
 		capabl, err := utils.CanRespondToQuery(predicate, c.QueryingCapabilities)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(c, capabl)
 		if capabl {
 			forwardTo = append(forwardTo, c)
 		}

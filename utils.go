@@ -44,7 +44,7 @@ func ConnectToQPUGraph(q *QPU) error {
 	fmt.Println("q.Config.Connections", q.Config.Connections)
 	conns := make([]*QPU, len(q.Config.Connections))
 	for i, conn := range q.Config.Connections {
-		c, _, err := cli.NewClient(conn)
+		c, err := cli.NewClient(conn)
 		if err != nil {
 			return err
 		}

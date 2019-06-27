@@ -55,7 +55,6 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
 		return errors.New("not supported")
 	}
-
 	errChan := make(chan error)
 	emptyPred := make([]*pbUtils.AttributePredicate, 0)
 	streamIn, _, err := q.qpu.Conns[0].Client.Query(emptyPred,
@@ -69,7 +68,10 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	}
 	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, forward, errChan)
 	err = <-errChan
-	return err
+	if err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 // GetConfig implements the GetConfig API for the filter QPU
