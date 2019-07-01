@@ -24,8 +24,8 @@
     "private/protocol",
     "private/protocol/rest"
   ]
-  revision = "f93aa42e3b85ff7cc865c95357006d68ad1b3b63"
-  version = "v1.20.3"
+  revision = "a1d51bafccb48eb36512b3cd8b1ad3e63737af9b"
+  version = "v1.20.11"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -178,13 +178,13 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "b5b0513f8c1bb7c1e3e6f168fba117131fe2614a"
+  revision = "3b0461eec859c4b73bb64fdc8285971fd33e3938"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "516e3c20635fbe39539f7ed361a15c51fec29cd8"
+  revision = "04f50cda93cbb67f2afa353c52f342100e80e625"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -213,7 +213,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "a7e196e89fd3a3c4d103ca540bd5dac3a736e375"
+  revision = "eb59cef1c072c61ea4f7623910448d5e9c6a4455"
 
 [[projects]]
   name = "google.golang.org/grpc"
