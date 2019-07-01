@@ -124,6 +124,8 @@ const (
 	S3 Datastore = iota
 	// ANTIDOTE is the enum value for an Antidote backend data store
 	ANTIDOTE Datastore = iota
+	// MOCK
+	MOCK Datastore = iota
 )
 
 func (c *Config) getDatastoreConfig(conf ConfJSON) error {
@@ -149,6 +151,8 @@ func (c *Config) getDatastore(store string) error {
 		c.DatastoreConfig.Type = S3
 	case "antidote":
 		c.DatastoreConfig.Type = ANTIDOTE
+	case "mock":
+		c.DatastoreConfig.Type = MOCK
 	default:
 		return errors.New("unknown backend datastore")
 	}

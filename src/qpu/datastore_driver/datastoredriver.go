@@ -11,6 +11,7 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	antDS "github.com/dvasilas/proteus/src/qpu/datastore_driver/antidoteDataStore"
+	mockDS "github.com/dvasilas/proteus/src/qpu/datastore_driver/mockDatastore"
 	s3DS "github.com/dvasilas/proteus/src/qpu/datastore_driver/s3DataStore"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -25,6 +26,7 @@ type DriverQPU struct {
 type dataStore interface {
 	GetSnapshot(chan *pbUtils.LogOperation) <-chan error
 	SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error)
+	Op(op *pbUtils.LogOperation)
 }
 
 //---------------- API Functions -------------------
@@ -53,8 +55,10 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 			conf.DatastoreConfig.Endpoint,
 			conf.DatastoreConfig.LogStreamEndpoint,
 			conf.DatastoreConfig.Bucket)
-	}
 
+	case config.MOCK:
+		q.ds = mockDS.New()
+	}
 	return q, nil
 }
 
@@ -110,6 +114,10 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		}
 	}
 	return nil
+}
+
+func (q *DriverQPU) Op(op *pbUtils.LogOperation) {
+	q.ds.Op(op)
 }
 
 //GetConfig implements the GetConfig API for the datastoredriver QPU

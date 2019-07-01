@@ -1,0 +1,17 @@
+{
+  "qpuType": "mock",
+  "port": "50150",
+  "dataStoreConfig": {
+    "dataSet": {
+      "db": 1,
+      "dc": 1,
+      "shard": 1
+    },
+    "type": "s3",
+    "endpoint": "http://localhost:8000",
+    "bucketName": "local-s3",
+    "logStreamEndpoint": "localhost:50000",
+    "awsAccessKeyID": "accessKey1",
+    "awsSecretAccessKey": "verySecretKey1"
+  }
+}

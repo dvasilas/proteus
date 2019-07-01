@@ -92,6 +92,8 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan error {
 	return errs
 }
 
+func (ds S3DataStore) Op(op *pbUtils.LogOperation) {}
+
 //----------- Stream Consumer Functions ------------
 
 //opConsumer creates a goroutine that receives a stream of updates from cloudserver,

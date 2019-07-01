@@ -40,8 +40,6 @@ type ObjectState struct {
 
 // ConnectToQPUGraph ...
 func ConnectToQPUGraph(q *QPU) error {
-	fmt.Println("ConnectToQPUGraph")
-	fmt.Println("q.Config.Connections", q.Config.Connections)
 	conns := make([]*QPU, len(q.Config.Connections))
 	for i, conn := range q.Config.Connections {
 		c, err := cli.NewClient(conn)

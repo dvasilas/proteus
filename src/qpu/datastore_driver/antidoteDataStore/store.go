@@ -70,6 +70,9 @@ func (ds AntidoteDataStore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan e
 	return errs
 }
 
+func (ds AntidoteDataStore) Op(op *pbUtils.LogOperation) {
+}
+
 //----------- Stream Consumer Functions ------------
 
 //opConsumer creates a goroutine that receives a stream of updates from AntidoteDB,

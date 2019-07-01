@@ -89,10 +89,7 @@ func (i *MapIndex) Get(predicate *pbUtils.AttributePredicate) (map[string]utils.
 
 // RemoveOldEntry ...
 func (i *MapIndex) RemoveOldEntry(attribute *pbUtils.Attribute, objectID string) error {
-	fmt.Println("RemoveOldEntry")
-	fmt.Println(attribute, objectID)
 	entryKey := attribute.GetAttrKey() + "_" + attribute.GetAttrType().String()
-	fmt.Println(entryKey)
 	tx, err := i.client.StartTransaction()
 	if err != nil {
 		return err
