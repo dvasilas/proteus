@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package qpu;
+option go_package = "github.com/dvasilas/proteus/src/protos/qpu";
+
+import "utils.proto";
+
+service QPU {
+  rpc Query(stream RequestStream) returns (stream ResponseStreamRecord) {}
+  rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
+}
+
+message RequestStream {
+  oneof payload {
+    QueryRequest request = 1;
+    AckMsg ack = 2;
+  }
+}
+
+message ResponseStreamRecord {
+  enum StreamRecordType {
+      UPDATEOP = 0;
+      UPDATEDELTA = 1;
+      STATE = 2;
+      HEARTBEAT = 3;
+    }
+  int64 sequence_id = 1;
+  StreamRecordType type = 2;
+  utils.LogOperation logOp = 3;
+}
+
+message QueryRequest {
+  //Timestamp is part of the attributes
+  //Desclared explicitly here for easier parsing
+  utils.SnapshotTimePredicate clock = 1;
+  repeated utils.AttributePredicate predicate = 2;
+  bool ops = 3;
+  bool sync = 4;
+}
+
+message AckMsg {
+  int64 sequence_id = 1;
+}
+
+message ConfigRequest {
+  utils.SnapshotTimePredicate clock = 1;
+}
+
+message ConfigResponse {
+  enum QPUType {
+    DBDRIVER = 0;
+    FILTER = 1;
+    INDEX = 2;
+    CACHE = 3;
+    FEDERATION_DISPATCHER = 4;
+  }
+  QPUType qpu_type = 1;
+  repeated utils.AttributePredicate supportedQueries = 2;
+  DataSet dataset = 3;
+}
+
+
+message DataSet {
+  message DB {
+    map<string, DC> datacenters = 1;
+  }
+  message DC {
+    repeated string shards = 1;
+  }
+  map<string, DB> databases = 1;
+}

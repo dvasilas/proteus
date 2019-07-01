@@ -19,13 +19,13 @@ dep:
 
 proto: $(PROTOC_CMD)
 	go get ./vendor/github.com/golang/protobuf/protoc-gen-go
-	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/utils/utils.proto
-	protoc --proto_path=./protos/utils --proto_path=./protos/qpu --proto_path=./protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./protos/s3/s3.proto
-	protoc --proto_path=./protos/utils --proto_path=./protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./protos/antidote/log_propagation.proto
-	protoc --proto_path=./protos/qpu --proto_path=./protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./protos/qpu/qpu.proto
+	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
+	protoc --proto_path=./protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
+	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
+	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
 
 build_qpu_server:
-	go build -o bin/qpu_server -v ./qpu/server/server.go
+	go build -o bin/qpu_server -v ./src/qpu/server/server.go
 
 # Cross compilation
 build_qpu_server_linux:

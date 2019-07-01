@@ -4,10 +4,10 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/dvasilas/proteus/protos"
-	pbQPU "github.com/dvasilas/proteus/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/protos/utils"
-	"github.com/dvasilas/proteus/qpu/client"
+	"github.com/dvasilas/proteus/src/protos"
+	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
+	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/qpu/client"
 )
 
 // Client represents a connection to Proteus.
