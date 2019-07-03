@@ -1,0 +1,34 @@
+version: '3'
+services:
+  cloudserver-front:
+    image: dvasilas/cloudserver:latest
+    environment:
+    - REMOTE_MANAGEMENT_DISABLE=1
+    - S3BACKEND=mem
+    ports:
+      - "127.0.0.1:50000:50000"
+      - "127.0.0.1:8000:8000"
+  qpu_datastore:
+    build:
+      context: ../../
+    ports:
+      - "127.0.0.1:50150:50150"
+    command: >
+        bash -c "./docker-proteus/wait-for-it.sh --host=cloudserver-front --port=8000 --timeout=0
+        && go run src/qpu/server/server.go -conf=datastore.1.docker"
+    environment:
+      - DEBUG=true
+    depends_on:
+      - cloudserver-front
+  qpu_filter:
+    build:
+      context: ../../
+    ports:
+      - "127.0.0.1:50250:50250"
+    command: >
+      bash -c "./docker-proteus/wait-for-it.sh --host=qpu_datastore --port=50150 --timeout=0
+      && go run src/qpu/server/server.go -conf=filter.1.docker"
+    environment:
+      - DEBUG=true
+    depends_on:
+      - qpu_datastore

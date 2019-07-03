@@ -58,7 +58,7 @@ func main() {
 		}
 	}
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "localhost", Port: 50450})
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50250})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -193,7 +193,6 @@ func doQuery(c *proteusclient.Client, query query) time.Duration {
 				log.Fatal(err)
 			}
 		case <-respCh:
-			//fmt.Println(resp)
 			if !responseStarted {
 				elapsed = time.Since(start)
 				responseStarted = true

@@ -8,9 +8,9 @@
       "shard": 1
     },
     "type": "s3",
-    "endpoint": "http://cloudserver-front:8000",
+    "endpoint": "http://lb:8000",
     "bucketName": "local-s3",
-    "logStreamEndpoint": "cloudserver-front:50000",
+    "logStreamEndpoint": "lb:50000",
     "awsAccessKeyID": "accessKey1",
     "awsSecretAccessKey": "verySecretKey1"
   }
