@@ -73,11 +73,11 @@ var tests = []testScenario{
 				&config.Config{
 					QpuType:     pbQPU.ConfigResponse_FILTER,
 					Port:        "50250",
-					Connections: []string{"localhost:50150"},
+					Connections: []string{"127.0.0.1:50150"},
 				},
 			},
 		},
-		endpoint: "localhost:50250",
+		endpoint: "127.0.0.1:50250",
 		plan: queryPlan{
 			{
 				query: []*pbUtils.AttributePredicate{
@@ -96,16 +96,16 @@ var tests = []testScenario{
 				&config.Config{
 					QpuType:     pbQPU.ConfigResponse_FILTER,
 					Port:        "50250",
-					Connections: []string{"localhost:50150"},
+					Connections: []string{"127.0.0.1:50150"},
 				},
 				&config.Config{
 					QpuType:     pbQPU.ConfigResponse_CACHE,
 					Port:        "50451",
-					Connections: []string{"localhost:50250"},
+					Connections: []string{"127.0.0.1:50250"},
 				},
 			},
 		},
-		endpoint: "localhost:50451",
+		endpoint: "127.0.0.1:50451",
 		plan: queryPlan{
 			{
 				query: []*pbUtils.AttributePredicate{

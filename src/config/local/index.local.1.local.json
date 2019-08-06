@@ -11,8 +11,8 @@
         "uBound": "1.0",
         "consLevel": "async",
         "indexStore": {
-            "store": "antidote",
-            "endpoint": "127.0.0.1:8087",
+            "store": "in_mem",
+            "endpoint": "127.0.0.1:50000",
             "bucket": "indexqpu",
             "indexDataStruct": "btree"
         }

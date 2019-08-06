@@ -1,7 +1,7 @@
 package btreeindex
 
 import (
-	"fmt"
+	"sync"
 
 	utils "github.com/dvasilas/proteus/src"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
@@ -17,6 +17,7 @@ type BTreeIndex struct {
 	attributeName string
 	attributeType pbUtils.Attribute_AttributeType
 	tree          *btree.BTree
+	mutex         sync.RWMutex
 }
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
@@ -54,8 +55,8 @@ func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*BTreeIndex
 // Put inserts an entry to the index
 func (i *BTreeIndex) Put(attribute *pbUtils.Attribute, object utils.ObjectState) error {
 	log.WithFields(log.Fields{"attr": attribute, "obj": object}).Debug("index Put")
-
 	entry := i.index.opToItem(attribute)
+	i.mutex.Lock()
 	if i.tree.Has(entry) {
 		item := i.tree.Get(entry)
 		item = i.index.appendPostings(item, object.ObjectID, object)
@@ -64,10 +65,11 @@ func (i *BTreeIndex) Put(attribute *pbUtils.Attribute, object utils.ObjectState)
 		entry = i.index.appendPostings(entry, object.ObjectID, object)
 		i.tree.ReplaceOrInsert(entry)
 	}
+	i.mutex.Unlock()
 	return nil
 }
 
-// Get peforms a range query in the index and returns the result.
+// Get performs a range query in the index and returns the result.
 func (i *BTreeIndex) Get(predicate *pbUtils.AttributePredicate) (map[string]utils.ObjectState, error) {
 	log.WithFields(log.Fields{"predicate": predicate}).Debug("index Get")
 	res := make(map[string]utils.ObjectState)
@@ -77,11 +79,13 @@ func (i *BTreeIndex) Get(predicate *pbUtils.AttributePredicate) (map[string]util
 		}
 		return true
 	}
+	i.mutex.RLock()
 	i.tree.AscendRange(
 		i.index.boundToItem(predicate.GetLbound()),
 		i.index.boundToItem(predicate.GetUbound()),
 		it,
 	)
+	i.mutex.RUnlock()
 	if len(res) == 0 {
 		return nil, nil
 	}
@@ -93,6 +97,7 @@ func (i *BTreeIndex) Get(predicate *pbUtils.AttributePredicate) (map[string]util
 // and removes the given object from its posting list.
 func (i *BTreeIndex) RemoveOldEntry(attribute *pbUtils.Attribute, objectID string) error {
 	key := i.index.opToItem(attribute)
+	i.mutex.Lock()
 	item := i.tree.Get(key)
 	if item != nil {
 		delete(i.index.getPostings(item), objectID)
@@ -100,13 +105,13 @@ func (i *BTreeIndex) RemoveOldEntry(attribute *pbUtils.Attribute, objectID strin
 			i.tree.Delete(item)
 		}
 	}
+	i.mutex.Unlock()
 	return nil
 }
 
 // Print ...
 func (i *BTreeIndex) Print() {
 	it := func(item btree.Item) bool {
-		fmt.Println(item)
 		return true
 	}
 	i.tree.Ascend(it)

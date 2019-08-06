@@ -3,6 +3,7 @@ package lrucache
 import (
 	"container/list"
 	"fmt"
+	"sync"
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
@@ -15,6 +16,7 @@ type Cache struct {
 	ll         *list.List
 	items      map[string]*list.Element
 	OnEvict    func(key []*pbUtils.AttributePredicate, value []utils.ObjectState)
+	mutex      sync.RWMutex
 }
 
 type entry struct {
@@ -33,11 +35,12 @@ func New(conf *config.Config) *Cache {
 
 // Put stores an object in a cache entry
 func (c *Cache) Put(predicate []*pbUtils.AttributePredicate, obj utils.ObjectState) error {
+	key := predicateToCacheKey(predicate)
+	c.mutex.Lock()
 	if c.items == nil {
 		c.ll = list.New()
 		c.items = make(map[string]*list.Element)
 	}
-	key := predicateToCacheKey(predicate)
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
 		item.Value.(*entry).value = append(item.Value.(*entry).value, obj)
@@ -48,6 +51,7 @@ func (c *Cache) Put(predicate []*pbUtils.AttributePredicate, obj utils.ObjectSta
 			c.evict()
 		}
 	}
+	c.mutex.Unlock()
 	return nil
 }
 
@@ -57,10 +61,15 @@ func (c *Cache) Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
 		return nil, false
 	}
 	key := predicateToCacheKey(p)
+	c.mutex.RLock()
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
-		return item.Value.(*entry).value, true
+		resp := make([]utils.ObjectState, len(item.Value.(*entry).value))
+		copy(resp, item.Value.(*entry).value)
+		c.mutex.RUnlock()
+		return resp, true
 	}
+	c.mutex.RUnlock()
 	return nil, false
 }
 

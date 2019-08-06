@@ -213,7 +213,6 @@ func (q *IQPU) update(attrStateO, attrStateN *pbUtils.Attribute, objectID string
 	if err := q.index.Put(attrStateN, object); err != nil {
 		return err
 	}
-	q.index.Print()
 	return nil
 }
 
