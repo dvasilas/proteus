@@ -77,13 +77,17 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		"req": req,
 	}).Debug("Query request")
 
-	if req.GetOps() {
-		if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
-			return errors.New("not supported")
-		}
-
+	if req.GetClock().GetUbound().GetType() < req.GetClock().GetUbound().GetType() {
+		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
+	}
+	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
+		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+		return errors.New("not supported")
+	}
+	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		opCh := make(chan *pbUtils.LogOperation)
-		var conn *grpc.ClientConn
 		ack := make(chan bool)
 
 		errsConsm := q.opConsumer(streamOut, opCh, ack, req.GetSync())
@@ -96,11 +100,8 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		case err := <-errsSub:
 			return err
 		}
-	} else {
-		if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
-			return errors.New("not supported")
-		}
-
+	}
+	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
 		errsGetSn := q.ds.GetSnapshot(streamCh)
 
@@ -116,6 +117,7 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	return nil
 }
 
+// Op ...
 func (q *DriverQPU) Op(op *pbUtils.LogOperation) {
 	q.ds.Op(op)
 }

@@ -99,12 +99,12 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 	switch TsPredicate {
 	case LATEST_SNAPSHOT:
 		tsPred = protoutils.SnapshotTimePredicate(
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_ZERO, nil),
+			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 		)
 	case NOTIFY:
 		tsPred = protoutils.SnapshotTimePredicate(
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
+			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 		)
 	}

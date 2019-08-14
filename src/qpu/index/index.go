@@ -3,8 +3,9 @@ package index
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
+	"math/rand"
+	"time"
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
@@ -19,9 +20,10 @@ import (
 
 // IQPU implements an index QPU
 type IQPU struct {
-	qpu    *utils.QPU
-	index  indexStore
-	cancel []context.CancelFunc
+	qpu         *utils.QPU
+	index       indexStore
+	cancelFuncs []context.CancelFunc
+	forwardM    map[int]chan *pbQPU.ResponseStreamRecord
 }
 
 // indexStore describes the interface that any index implementation needs to expose
@@ -37,11 +39,13 @@ type indexStore interface {
 
 // QPU creates an index QPU
 func QPU(conf *config.Config) (*IQPU, error) {
+	rand.Seed(time.Now().UnixNano())
 	q := &IQPU{
 		qpu: &utils.QPU{
 			Config:               conf,
 			QueryingCapabilities: conf.IndexConfig.IndexingConfig,
 		},
+		forwardM: make(map[int]chan *pbQPU.ResponseStreamRecord),
 	}
 
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
@@ -78,12 +82,12 @@ func QPU(conf *config.Config) (*IQPU, error) {
 		return nil, errors.New("unknown index consistency level")
 	}
 	pred := []*pbUtils.AttributePredicate{}
-	cancelFuncs := make([]context.CancelFunc, len(q.qpu.Conns))
+	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
 	for i, conn := range q.qpu.Conns {
 		streamIn, cancel, err := conn.Client.Query(
 			pred,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
+				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 			),
 			true,
@@ -93,7 +97,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 			cancel()
 			return nil, err
 		}
-		cancelFuncs[i] = cancel
+		q.cancelFuncs[i] = cancel
 		go q.opConsumer(streamIn, cancel, sync)
 	}
 
@@ -116,33 +120,49 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	req := request.GetRequest()
 	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
-	if req.GetOps() {
+	if req.GetClock().GetUbound().GetType() < req.GetClock().GetUbound().GetType() {
+		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
+	}
+	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
+		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
-		return errors.New("not supported")
-	}
-	indexResult, err := q.lookup(req.GetPredicate()[0])
-	if err != nil {
-		return err
-	}
-	var seqID int64
-	for _, item := range indexResult {
-		logOp := protoutils.LogOperation(
-			item.ObjectID,
-			item.Bucket,
-			item.ObjectType,
-			&item.Timestamp,
-			protoutils.PayloadState(&item.State),
-		)
-		if err := streamOut.Send(protoutils.ResponseStreamRecord(
-			seqID,
-			pbQPU.ResponseStreamRecord_STATE,
-			logOp,
-		)); err != nil {
+	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+		indexResult, err := q.lookup(req.GetPredicate()[0])
+		if err != nil {
 			return err
 		}
-		seqID++
+		var seqID int64
+		for _, item := range indexResult {
+			logOp := protoutils.LogOperation(
+				item.ObjectID,
+				item.Bucket,
+				item.ObjectType,
+				&item.Timestamp,
+				protoutils.PayloadState(&item.State),
+			)
+			if err := streamOut.Send(protoutils.ResponseStreamRecord(
+				seqID,
+				pbQPU.ResponseStreamRecord_STATE,
+				logOp,
+			)); err != nil {
+				return err
+			}
+			seqID++
+		}
+	}
+	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+		forwardCh := make(chan *pbQPU.ResponseStreamRecord, 0)
+		errCh := make(chan error)
+		chID := rand.Int()
+		q.forwardM[chID] = forwardCh
+		go q.forward(req.GetPredicate(), forwardCh, streamOut, errCh, chID)
+		err := <-errCh
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -159,12 +179,31 @@ func (q *IQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 // Cleanup ...
 func (q *IQPU) Cleanup() {
 	log.Info("index QPU cleanup")
-	for _, cFunc := range q.cancel {
+	for _, cFunc := range q.cancelFuncs {
 		cFunc()
 	}
 }
 
 //----------- Stream Consumer Functions ------------
+
+func (q *IQPU) forward(predicate []*pbUtils.AttributePredicate, forwardCh chan *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, errCh chan error, chanID int) {
+	for streamRec := range forwardCh {
+		match, err := filter.Filter(predicate, streamRec)
+		if err != nil {
+			errCh <- err
+			break
+		}
+		if match {
+			if err := streamOut.Send(streamRec); err != nil {
+				errCh <- err
+				break
+			}
+		}
+	}
+	errCh <- nil
+	close(forwardCh)
+	delete(q.forwardM, chanID)
+}
 
 // Receives an stream of update operations
 // Updates the index for each operation
@@ -198,6 +237,9 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 						log.Fatal("opConsumer stream.Send failed")
 						return
 					}
+				}
+				for _, ch := range q.forwardM {
+					ch <- streamRec
 				}
 			}
 		}
@@ -260,14 +302,13 @@ func (q *IQPU) updateIndex(op *pbUtils.LogOperation) error {
 // catchUp performs an index catch-up operation.
 // It reads the latest snapshot for the underlying data store, and builds an index.
 func (q *IQPU) catchUp() error {
-
 	errChan := make(chan error)
 	for _, conn := range q.qpu.Conns {
 		pred := make([]*pbUtils.AttributePredicate, 0)
 		stream, cancel, err := conn.Client.Query(
 			pred,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_ZERO, nil),
+				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			),
 			false,
@@ -283,7 +324,6 @@ func (q *IQPU) catchUp() error {
 	for streamCnt > 0 {
 		select {
 		case err := <-errChan:
-			fmt.Println("received ", err)
 			if err == io.EOF {
 				streamCnt--
 			} else if err != nil {

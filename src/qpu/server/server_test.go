@@ -223,7 +223,7 @@ func doTest(t *testing.T, test testScenario) {
 		stream, _, err := client.Query(
 			q.query,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_ZERO, nil),
+				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			),
 			false, false,

@@ -58,48 +58,45 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	req := request.GetRequest()
 	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
-	if req.GetOps() {
-		return errors.New("not supported")
-	}
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
-		return errors.New("not supported")
-	}
+	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+		cachedResult, hit := q.cache.Get(req.GetPredicate())
+		if hit {
+			log.WithFields(log.Fields{
+				"cache entry": cachedResult,
+			}).Debug("cache hit, responding")
 
-	cachedResult, hit := q.cache.Get(req.GetPredicate())
-	if hit {
-		log.WithFields(log.Fields{
-			"cache entry": cachedResult,
-		}).Debug("cache hit, responding")
-
-		var seqID int64
-		for _, item := range cachedResult {
-			logOp := protoutils.LogOperation(
-				item.ObjectID,
-				item.Bucket,
-				item.ObjectType,
-				&item.Timestamp,
-				protoutils.PayloadState(&item.State),
-			)
-			if err := streamOut.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, logOp)); err != nil {
-				return err
+			var seqID int64
+			for _, item := range cachedResult {
+				logOp := protoutils.LogOperation(
+					item.ObjectID,
+					item.Bucket,
+					item.ObjectType,
+					&item.Timestamp,
+					protoutils.PayloadState(&item.State),
+				)
+				if err := streamOut.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, logOp)); err != nil {
+					return err
+				}
+				seqID++
 			}
-			seqID++
+			return nil
+		}
+		log.WithFields(log.Fields{}).Debug("cache miss")
+
+		errChan := make(chan error)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false, false)
+		if err != nil {
+			return err
+		}
+		utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
+		err = <-errChan
+		if err != io.EOF {
+			return err
 		}
 		return nil
+	} else {
+		return errors.New("not supported")
 	}
-	log.WithFields(log.Fields{}).Debug("cache miss")
-
-	errChan := make(chan error)
-	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false, false)
-	if err != nil {
-		return err
-	}
-	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
-	err = <-errChan
-	if err != io.EOF {
-		return err
-	}
-	return nil
 }
 
 // GetConfig implements the GetConfig API for the cache QPU

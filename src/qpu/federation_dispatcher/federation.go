@@ -45,14 +45,6 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	req := request.GetRequest()
 	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
-	if req.GetOps() {
-		return errors.New("not supported")
-	}
-
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
-		return errors.New("not supported")
-	}
-
 	forwardTo, err := q.generateSubQueries(req.GetPredicate())
 	if err != nil {
 		return err

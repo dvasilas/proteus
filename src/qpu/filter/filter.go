@@ -48,24 +48,8 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	req := request.GetRequest()
 	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
-	if req.GetOps() {
-		return errors.New("not supported")
-	}
-
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_ZERO || req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST {
-		return errors.New("not supported")
-	}
 	errChan := make(chan error)
-	emptyPred := make([]*pbUtils.AttributePredicate, 0)
-	streamIn, _, err := q.qpu.Conns[0].Client.Query(emptyPred,
-		protoutils.SnapshotTimePredicate(
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_ZERO, nil),
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
-		),
-		false, false)
-	if err != nil {
-		return err
-	}
+	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), req.GetOps(), req.GetSync())
 	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, forward, errChan)
 	err = <-errChan
 	if err != io.EOF {
@@ -95,9 +79,10 @@ func (q *FQPU) Cleanup() {
 func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
+		"pred":   pred,
 	}).Debug("FQPU: received input stream record")
 
-	match, err := filter(pred, streamRec.GetLogOp())
+	match, err := Filter(pred, streamRec)
 	if err != nil {
 		return err
 	}
@@ -110,12 +95,19 @@ func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStream
 	return nil
 }
 
-func filter(predicate []*pbUtils.AttributePredicate, obj *pbUtils.LogOperation) (bool, error) {
+func Filter(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord) (bool, error) {
 	if len(predicate) == 0 {
 		return false, errors.New("empty Query AttributePredicate")
 	}
 	for _, pred := range predicate {
-		for _, attr := range obj.GetPayload().GetState().GetAttrs() {
+		var attrs []*pbUtils.Attribute
+		switch streamRec.GetType() {
+		case pbQPU.ResponseStreamRecord_STATE:
+			attrs = streamRec.GetLogOp().GetPayload().GetState().GetAttrs()
+		case pbQPU.ResponseStreamRecord_UPDATEDELTA:
+			attrs = streamRec.GetLogOp().GetPayload().GetDelta().GetNew().GetAttrs()
+		}
+		for _, attr := range attrs {
 			match, err := AttrMatchesPredicate(pred, attr)
 			if err != nil {
 				return false, err
