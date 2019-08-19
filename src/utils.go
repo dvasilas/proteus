@@ -228,18 +228,25 @@ func valueType(v *pbUtils.Value) int {
 //----------- Stream Consumer Functions ------------
 
 //QueryResponseConsumer receives a QueryResponseStream, iteratively reads from the stream, and processes each input element based on a given function
-func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QPU_QueryClient, streamOut pbQPU.QPU_QueryServer, process func([]*pbUtils.AttributePredicate, *pbQPU.ResponseStreamRecord, pbQPU.QPU_QueryServer) error, errChan chan error) {
+func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QPU_QueryClient, streamOut pbQPU.QPU_QueryServer, process func([]*pbUtils.AttributePredicate, *pbQPU.ResponseStreamRecord, pbQPU.QPU_QueryServer, *int64) error, errChan chan error) {
+	seqID := int64(0)
 	go func() {
 		for {
 			streamRec, err := streamIn.Recv()
 			if err == io.EOF {
-				errChan <- err
+				errChan <- streamOut.Send(
+					protoutils.ResponseStreamRecord(
+						seqID,
+						pbQPU.ResponseStreamRecord_END_OF_STREAM,
+						&pbUtils.LogOperation{},
+					),
+				)
 				return
 			} else if err != nil {
 				errChan <- err
 				return
 			}
-			if err = process(pred, streamRec, streamOut); err != nil {
+			if err = process(pred, streamRec, streamOut, &seqID); err != nil {
 				errChan <- err
 				return
 			}

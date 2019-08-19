@@ -25,13 +25,19 @@ type Host struct {
 type AttributeType int
 
 const (
-	S3TAGSTR    = iota
-	S3TAGINT    = iota
-	S3TAGFLT    = iota
+	// S3TAGSTR ...
+	S3TAGSTR = iota
+	// S3TAGINT ...
+	S3TAGINT = iota
+	// S3TAGFLT ...
+	S3TAGFLT = iota
+	// CRDTCOUNTER ...
 	CRDTCOUNTER = iota
-	CRDTLWWREG  = iota
+	// CRDTLWWREG ...
+	CRDTLWWREG = iota
 )
 
+// AttributePredicate ...
 type AttributePredicate struct {
 	AttrName string
 	AttrType AttributeType
@@ -43,17 +49,23 @@ type AttributePredicate struct {
 type QueryType int
 
 const (
-	LATEST_SNAPSHOT = iota
-	NOTIFY          = iota
+	// LATESTSNAPSHOT ...
+	LATESTSNAPSHOT = iota
+	// NOTIFY ...
+	NOTIFY = iota
 )
 
+// ObjectType ...
 type ObjectType int
 
 const (
+	// S3OBJECT ...
 	S3OBJECT = iota
-	MAPCRDT  = iota
+	// MAPCRDT ...
+	MAPCRDT = iota
 )
 
+// ResponseRecord ...
 type ResponseRecord struct {
 	SequenceID int64
 	ObjectID   string
@@ -63,14 +75,17 @@ type ResponseRecord struct {
 	Timestamp  Vectorclock
 }
 
+// ObjectState ...
 type ObjectState []Attribute
 
+// Attribute ...
 type Attribute struct {
 	AttrName string
 	AttrType AttributeType
 	Value    interface{}
 }
 
+// Vectorclock ...
 type Vectorclock map[string]uint64
 
 // NewClient creates a new Proteus client connected to the given QPU server.
@@ -97,7 +112,7 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 	}
 	var tsPred *pbUtils.SnapshotTimePredicate
 	switch TsPredicate {
-	case LATEST_SNAPSHOT:
+	case LATESTSNAPSHOT:
 		tsPred = protoutils.SnapshotTimePredicate(
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
@@ -115,7 +130,6 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 	respChan := make(chan ResponseRecord)
 	errChan := make(chan error)
 	go func() {
-		seqID := int64(0)
 		for {
 			streamRec, err := stream.Recv()
 			if err != nil {
@@ -125,14 +139,13 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 				return
 			}
 			respChan <- ResponseRecord{
-				SequenceID: seqID,
+				SequenceID: streamRec.GetSequenceId(),
 				ObjectID:   streamRec.GetLogOp().GetObjectId(),
 				ObjectType: getObjectType(streamRec),
 				Bucket:     streamRec.GetLogOp().GetBucket(),
 				State:      logOpToObjectState(streamRec.GetLogOp()),
 				Timestamp:  streamRec.GetLogOp().GetTimestamp().GetVc(),
 			}
-			seqID++
 		}
 	}()
 	return respChan, errChan, nil

@@ -13,6 +13,7 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	"github.com/dvasilas/proteus/src/qpu/cache"
 	"github.com/dvasilas/proteus/src/qpu/datastore_driver"
+	"github.com/dvasilas/proteus/src/qpu/fault_injection"
 	"github.com/dvasilas/proteus/src/qpu/federation_dispatcher"
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index"
@@ -85,6 +86,11 @@ func server(confArg string) error {
 		}
 	case pbQPU.ConfigResponse_FEDERATION_DISPATCHER:
 		api, err = federation.QPU(conf)
+		if err != nil {
+			return err
+		}
+	case pbQPU.ConfigResponse_FAULT_INJECTION:
+		api, err = faultinjection.QPU(conf)
 		if err != nil {
 			return err
 		}

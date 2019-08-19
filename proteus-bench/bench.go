@@ -177,7 +177,7 @@ func doQuery(c *proteusclient.Client, query query) time.Duration {
 			Ubound:   pred.ubound,
 		})
 	}
-	respCh, errCh, err := c.Query(q, proteusclient.LATEST_SNAPSHOT)
+	respCh, errCh, err := c.Query(q, proteusclient.LATESTSNAPSHOT)
 	if err != nil {
 		log.Fatal(err)
 	}

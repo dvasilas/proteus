@@ -23,6 +23,7 @@ message ResponseStreamRecord {
       UPDATEDELTA = 1;
       STATE = 2;
       HEARTBEAT = 3;
+      END_OF_STREAM = 4;
     }
   int64 sequence_id = 1;
   StreamRecordType type = 2;
@@ -52,6 +53,7 @@ message ConfigResponse {
     INDEX = 2;
     CACHE = 3;
     FEDERATION_DISPATCHER = 4;
+    FAULT_INJECTION = 5;
   }
   QPUType qpu_type = 1;
   repeated utils.AttributePredicate supportedQueries = 2;

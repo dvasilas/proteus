@@ -104,11 +104,18 @@ func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*u
 	return forwardTo, nil
 }
 
-func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
+func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
 	}).Debug("Federation QPU: received input stream record")
 
 	//TODO fix sequenceIDs
-	return streamOut.Send(streamRec)
+	err := streamOut.Send(
+		protoutils.ResponseStreamRecord(
+			*seqID,
+			streamRec.GetType(),
+			streamRec.GetLogOp(),
+		))
+	(*seqID)++
+	return err
 }

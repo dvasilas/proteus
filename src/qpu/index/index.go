@@ -332,7 +332,7 @@ func (q *IQPU) catchUp() error {
 	return nil
 }
 
-func (q *IQPU) updateIndexCatchUp(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
+func (q *IQPU) updateIndexCatchUp(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
 	delta := protoutils.PayloadDelta(nil, streamRec.GetLogOp().GetPayload().GetState())
 	op := protoutils.LogOperation(
 		streamRec.GetLogOp().GetObjectId(),

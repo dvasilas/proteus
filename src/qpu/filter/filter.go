@@ -27,11 +27,11 @@ func QPU(conf *config.Config) (*FQPU, error) {
 			Config: conf,
 		},
 	}
+	if len(conf.Connections) > 1 {
+		return nil, errors.New("filter QPUs support a single connection")
+	}
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
-	}
-	if len(q.qpu.Conns) > 1 {
-		return nil, errors.New("filter QPUs support a single connection")
 	}
 	return q, nil
 }
@@ -67,7 +67,7 @@ func (q *FQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
-// Cleanup is called when the process receives a SIGTERM signcal
+// Cleanup is called when the QPU receives a SIGTERM signcal
 func (q *FQPU) Cleanup() {
 	log.Info("filter QPU cleanup")
 }
@@ -76,7 +76,7 @@ func (q *FQPU) Cleanup() {
 
 //forward checks if a given object matches a given predicate
 // if yes, it sends it to a given stream
-func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
+func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
 		"pred":   pred,
@@ -88,13 +88,20 @@ func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStream
 	}
 	if match {
 		log.WithFields(log.Fields{"Object": streamRec.GetLogOp()}).Debug("Object matches query")
-		//TODO fix sequenceIDs
-		return streamOut.Send(streamRec)
+		err := streamOut.Send(
+			protoutils.ResponseStreamRecord(
+				*seqID,
+				streamRec.GetType(),
+				streamRec.GetLogOp(),
+			))
+		(*seqID)++
+		return err
 	}
 	log.WithFields(log.Fields{"Object": streamRec.GetLogOp()}).Debug("Object does not match query")
 	return nil
 }
 
+// Filter ...
 func Filter(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord) (bool, error) {
 	if len(predicate) == 0 {
 		return false, errors.New("empty Query AttributePredicate")

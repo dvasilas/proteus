@@ -41,6 +41,10 @@ type Config struct {
 			IndexImplementation IndexImplementation
 		}
 	}
+	FaultInjectionConfig struct {
+		Function string
+		Rate     float32
+	}
 }
 
 //---------------- API Functions -------------------
@@ -88,8 +92,9 @@ func GetConfig(configFArg string) (*Config, error) {
 		if err := config.getIndexConfig(conf); err != nil {
 			return nil, err
 		}
+	case pbQPU.ConfigResponse_FAULT_INJECTION:
+		config.getFaultInjConfig(conf)
 	}
-
 	return config, nil
 }
 
@@ -108,6 +113,8 @@ func (c *Config) getQpuType(t string) error {
 		c.QpuType = pbQPU.ConfigResponse_CACHE
 	case "federation":
 		c.QpuType = pbQPU.ConfigResponse_FEDERATION_DISPATCHER
+	case "fault_injection":
+		c.QpuType = pbQPU.ConfigResponse_FAULT_INJECTION
 	default:
 		return errors.New("unknown QPU tpye")
 	}
@@ -124,7 +131,7 @@ const (
 	S3 Datastore = iota
 	// ANTIDOTE is the enum value for an Antidote backend data store
 	ANTIDOTE Datastore = iota
-	// MOCK
+	// MOCK ...
 	MOCK Datastore = iota
 )
 
@@ -163,6 +170,13 @@ func (c *Config) getDatastore(store string) error {
 
 func (c *Config) getCacheConfig(conf ConfJSON) {
 	c.CacheConfig.Size = conf.CacheConfig.Size
+}
+
+// ------- Fault Injection QPU Configuration --------
+
+func (c *Config) getFaultInjConfig(conf ConfJSON) {
+	c.FaultInjectionConfig.Function = conf.FaultInjectionConfig.Function
+	c.FaultInjectionConfig.Rate = conf.FaultInjectionConfig.Rate
 }
 
 //----------- Index QPU Configuration --------------
@@ -314,6 +328,10 @@ type ConfJSON struct {
 	}
 	CacheConfig struct {
 		Size int
+	}
+	FaultInjectionConfig struct {
+		Function string
+		Rate     float32
 	}
 }
 

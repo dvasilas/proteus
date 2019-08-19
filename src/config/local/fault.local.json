@@ -1,0 +1,11 @@
+{
+    "qpuType": "fault_injection",
+    "port": "50260",
+    "connections": [
+      "localhost:50250"
+    ],
+    "faultInjectionConfig": {
+      "function": "drop",
+      "rate": 0.5
+    }
+}

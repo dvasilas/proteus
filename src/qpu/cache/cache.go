@@ -115,7 +115,7 @@ func (q *CQPU) Cleanup() {
 
 // Stores an object that is part of a query response in the cache
 // and forwards to the response stream
-func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
+func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
 	obj := utils.ObjectState{
 		ObjectID:   streamRec.GetLogOp().GetObjectId(),
 		ObjectType: streamRec.GetLogOp().GetObjectType(),
