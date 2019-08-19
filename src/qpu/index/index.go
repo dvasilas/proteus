@@ -90,7 +90,6 @@ func QPU(conf *config.Config) (*IQPU, error) {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 			),
-			true,
 			sync,
 		)
 		if err != nil {
@@ -311,7 +310,6 @@ func (q *IQPU) catchUp() error {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			),
-			false,
 			false,
 		)
 		defer cancel()

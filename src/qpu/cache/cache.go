@@ -84,7 +84,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		log.WithFields(log.Fields{}).Debug("cache miss")
 
 		errChan := make(chan error)
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false, false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false)
 		if err != nil {
 			return err
 		}
@@ -94,9 +94,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 			return err
 		}
 		return nil
-	} else {
-		return errors.New("not supported")
 	}
+	return errors.New("not supported")
 }
 
 // GetConfig implements the GetConfig API for the cache QPU

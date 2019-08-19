@@ -49,7 +49,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	log.WithFields(log.Fields{"req": req}).Debug("Query request")
 
 	errChan := make(chan error)
-	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), req.GetOps(), req.GetSync())
+	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), req.GetSync())
 	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, forward, errChan)
 	err = <-errChan
 	if err != io.EOF {

@@ -226,7 +226,7 @@ func doTest(t *testing.T, test testScenario) {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			),
-			false, false,
+			false,
 		)
 		if err != nil {
 			t.Error(err)

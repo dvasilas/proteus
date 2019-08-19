@@ -20,7 +20,7 @@ dep:
 proto: $(PROTOC_CMD)
 	go get ./vendor/github.com/golang/protobuf/protoc-gen-go
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
-	protoc --proto_path=./protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
+	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
 	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
 	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
 

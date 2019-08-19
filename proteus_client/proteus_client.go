@@ -108,7 +108,7 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 		)
 	}
-	stream, _, err := c.client.Query(pred, tsPred, false, false)
+	stream, _, err := c.client.Query(pred, tsPred, false)
 	if err != nil {
 		return nil, nil, err
 	}

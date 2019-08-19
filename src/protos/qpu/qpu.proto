@@ -34,7 +34,6 @@ message QueryRequest {
   //Desclared explicitly here for easier parsing
   utils.SnapshotTimePredicate clock = 1;
   repeated utils.AttributePredicate predicate = 2;
-  bool ops = 3;
   bool sync = 4;
 }
 
