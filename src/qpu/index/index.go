@@ -104,7 +104,6 @@ func QPU(conf *config.Config) (*IQPU, error) {
 		return nil, err
 	}
 	return q, nil
-
 }
 
 // Query implements the Query API for the index QPU
@@ -316,7 +315,7 @@ func (q *IQPU) catchUp() error {
 		if err != nil {
 			return err
 		}
-		utils.QueryResponseConsumer(pred, stream, nil, q.updateIndexCatchUp, errChan)
+		go utils.QueryResponseConsumer(pred, stream, nil, q.updateIndexCatchUp, errChan)
 	}
 	streamCnt := len(q.qpu.Conns)
 	for streamCnt > 0 {

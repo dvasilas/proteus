@@ -234,13 +234,16 @@ func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QP
 		for {
 			streamRec, err := streamIn.Recv()
 			if err == io.EOF {
-				errChan <- streamOut.Send(
-					protoutils.ResponseStreamRecord(
-						seqID,
-						pbQPU.ResponseStreamRecord_END_OF_STREAM,
-						&pbUtils.LogOperation{},
-					),
-				)
+				if streamOut != nil {
+					errChan <- streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						),
+					)
+				}
+				errChan <- err
 				return
 			} else if err != nil {
 				errChan <- err

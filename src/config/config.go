@@ -1,17 +1,13 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
-	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"github.com/dvasilas/proteus/src/protos"
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 // Config specifies the configuration structure of a QPU
@@ -50,28 +46,9 @@ type Config struct {
 //---------------- API Functions -------------------
 
 //GetConfig ...
-func GetConfig(configFArg string) (*Config, error) {
-	var conf ConfJSON
-	viper.AutomaticEnv()
-
-	err := viper.BindEnv("HOME")
-	if err != nil {
-		return nil, err
-	}
-	configF, err := getConfigFile(configFArg)
-	if err != nil {
-		return nil, err
-	}
-	err = readConfigFile(configF, &conf)
-	if err != nil {
-		return nil, err
-	}
-	confJSON, err := json.Marshal(conf)
-	if err != nil {
-		return nil, err
-	}
+func GetConfig(conf ConfJSON) (*Config, error) {
 	log.WithFields(log.Fields{
-		"configuration": string(confJSON),
+		"configuration": conf,
 	}).Info("read configuration")
 
 	config := &Config{}
@@ -116,7 +93,7 @@ func (c *Config) getQpuType(t string) error {
 	case "fault_injection":
 		c.QpuType = pbQPU.ConfigResponse_FAULT_INJECTION
 	default:
-		return errors.New("unknown QPU tpye")
+		return errors.New("unknown QPU type")
 	}
 	return nil
 }
@@ -333,36 +310,4 @@ type ConfJSON struct {
 		Function string
 		Rate     float32
 	}
-}
-
-func getConfigFile(arg string) (string, error) {
-	var configF string
-	if arg == "noArg" {
-		confF := viper.Get("CONFIG_FILE")
-		if confF == nil {
-			return "", errors.New("QPU config file not specified")
-		}
-		configF = confF.(string)
-	} else {
-		configF = arg
-	}
-	return configF, nil
-}
-
-//func readConfigFile(file string, conf *DSQPUConfig) error {
-func readConfigFile(file string, conf interface{}) error {
-	_, f, _, _ := runtime.Caller(0)
-	basepath := filepath.Dir(f)
-	viper.SetConfigName(file)
-	viper.AddConfigPath(basepath + "/")
-	viper.AddConfigPath(basepath + "/local")
-	viper.AddConfigPath(basepath + "/dockerCompose")
-	viper.SetConfigType("json")
-	if err := viper.ReadInConfig(); err != nil {
-		return err
-	}
-	if err := viper.Unmarshal(conf); err != nil {
-		return err
-	}
-	return nil
 }

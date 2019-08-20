@@ -1,9 +1,7 @@
-package main
+package server
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"net"
 	"os"
 	"os/signal"
@@ -18,7 +16,6 @@ import (
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -53,9 +50,8 @@ func (s *QPUServer) GetConfig(ctx context.Context, in *pbQPU.ConfigRequest) (*pb
 
 //---------------- Internal Functions --------------
 
-func server(confArg string) error {
-	initDebug()
-
+// Server ...
+func Server(confArg config.ConfJSON) error {
 	conf, err := config.GetConfig(confArg)
 	if err != nil {
 		return err
@@ -120,33 +116,6 @@ func (s *QPUServer) cleanup() {
 }
 
 //---------------- Auxiliary Functions -------------
-
-func main() {
-	var qType string
-	flag.StringVar(&qType, "conf", "noArg", "configuration file to be used")
-	flag.Parse()
-
-	err := server(qType)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Fatal("QPU server failed")
-	}
-}
-
-func initDebug() error {
-	err := viper.BindEnv("DEBUG")
-	if err != nil {
-		return errors.New("BindEnv DEBUG failed")
-	}
-	debug := viper.GetBool("DEBUG")
-	if debug {
-		log.SetLevel(log.DebugLevel)
-	} else {
-		log.SetLevel(log.InfoLevel)
-	}
-	return nil
-}
 
 //setCleanup set a cleanup() function that will be called
 //in case the QPU server process receives a SIGTERM signal

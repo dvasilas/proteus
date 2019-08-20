@@ -116,15 +116,17 @@ func (q *CQPU) Cleanup() {
 // Stores an object that is part of a query response in the cache
 // and forwards to the response stream
 func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
-	obj := utils.ObjectState{
-		ObjectID:   streamRec.GetLogOp().GetObjectId(),
-		ObjectType: streamRec.GetLogOp().GetObjectType(),
-		Bucket:     streamRec.GetLogOp().GetBucket(),
-		State:      *streamRec.GetLogOp().GetPayload().GetState(),
-		Timestamp:  *streamRec.GetLogOp().GetTimestamp(),
-	}
-	if err := q.cache.Put(predicate, obj); err != nil {
-		return err
+	if streamRec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+		obj := utils.ObjectState{
+			ObjectID:   streamRec.GetLogOp().GetObjectId(),
+			ObjectType: streamRec.GetLogOp().GetObjectType(),
+			Bucket:     streamRec.GetLogOp().GetBucket(),
+			State:      *streamRec.GetLogOp().GetPayload().GetState(),
+			Timestamp:  *streamRec.GetLogOp().GetTimestamp(),
+		}
+		if err := q.cache.Put(predicate, obj); err != nil {
+			return err
+		}
 	}
 	return streamOut.Send(streamRec)
 }

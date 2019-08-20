@@ -85,14 +85,15 @@ func (q *FIQPU) forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.Res
 
 	if q.qpu.Config.FaultInjectionConfig.Function == "drop" {
 		return drop(q.qpu.Config.FaultInjectionConfig.Rate, streamRec, streamOut)
-	} else {
-		return streamOut.Send(streamRec)
 	}
+	return streamOut.Send(streamRec)
 }
 
 func drop(rate float32, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer) error {
 	if rate < rand.Float32() {
+		log.Debug("forward")
 		return streamOut.Send(streamRec)
 	}
+	log.Debug("drop")
 	return nil
 }

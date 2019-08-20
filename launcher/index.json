@@ -1,0 +1,13 @@
+{
+    "attributeName": "test",
+    "attributeType": "s3tagFlt",
+    "lBound": "0.0",
+    "uBound": "1.0",
+    "consLevel": "async",
+    "indexStore": {
+      "store": "in_mem",
+      "endpoint": "127.0.0.1:50000",
+      "bucket": "indexqpu",
+      "indexDataStruct": "btree"
+    }
+}

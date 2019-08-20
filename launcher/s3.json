@@ -1,0 +1,5 @@
+{
+  "bucketName": "local-s3",
+  "awsAccessKeyID": "accessKey1",
+  "awsSecretAccessKey": "verySecretKey1"
+}
