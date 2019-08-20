@@ -53,7 +53,8 @@ message ConfigResponse {
     INDEX = 2;
     CACHE = 3;
     FEDERATION_DISPATCHER = 4;
-    FAULT_INJECTION = 5;
+    LOAD_BALANCER = 5;
+    FAULT_INJECTION = 6;
   }
   QPUType qpu_type = 1;
   repeated utils.AttributePredicate supportedQueries = 2;

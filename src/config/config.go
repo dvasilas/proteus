@@ -92,6 +92,8 @@ func (c *Config) getQpuType(t string) error {
 		c.QpuType = pbQPU.ConfigResponse_FEDERATION_DISPATCHER
 	case "fault_injection":
 		c.QpuType = pbQPU.ConfigResponse_FAULT_INJECTION
+	case "load_balancer":
+		c.QpuType = pbQPU.ConfigResponse_LOAD_BALANCER
 	default:
 		return errors.New("unknown QPU type")
 	}

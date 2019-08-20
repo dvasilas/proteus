@@ -118,7 +118,7 @@ func main() {
 		conf.FaultInjectionConfig.Rate = float32(rate)
 	}
 
-	if conf.QpuType == "filter" || conf.QpuType == "cache" || conf.QpuType == "index" || conf.QpuType == "federation" || conf.QpuType == "fault_injection" {
+	if conf.QpuType == "filter" || conf.QpuType == "cache" || conf.QpuType == "index" || conf.QpuType == "federation" || conf.QpuType == "fault_injection"  || conf.QpuType == "load_balancer" {
 		var connections string
 		connFlags := flag.NewFlagSet("graph QPU flags", flag.ExitOnError)
 		connFlags.StringVar(&connections, "conns", "noArg", "the QPU's outgoing connection to the graph")

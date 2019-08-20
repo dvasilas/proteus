@@ -31,7 +31,7 @@ func QPU(conf *config.Config) (*FIQPU, error) {
 		},
 	}
 	if len(conf.Connections) > 1 {
-		return nil, errors.New("filter QPUs support a single connection")
+		return nil, errors.New("fault injection QPUs support a single connection")
 	}
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
