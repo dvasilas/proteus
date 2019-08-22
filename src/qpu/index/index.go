@@ -13,7 +13,6 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	"github.com/dvasilas/proteus/src/qpu/filter"
-	"github.com/dvasilas/proteus/src/qpu/index/antidote"
 	"github.com/dvasilas/proteus/src/qpu/index/inMem"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,10 +28,9 @@ type IQPU struct {
 // indexStore describes the interface that any index implementation needs to expose
 // to work with this module.
 type indexStore interface {
-	Put(*pbUtils.Attribute, utils.ObjectState) error
-	Get(*pbUtils.AttributePredicate) (map[string]utils.ObjectState, error)
-	RemoveOldEntry(*pbUtils.Attribute, string) error
-	Print()
+	Update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
+	UpdateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
+	Lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error)
 }
 
 //---------------- API Functions -------------------
@@ -58,17 +56,19 @@ func QPU(conf *config.Config) (*IQPU, error) {
 	var err error
 	switch q.qpu.Config.IndexConfig.IndexStore.Store {
 	case config.INMEM:
-		index, err = btreeindex.New(
+		index, err = inmemindex.New(
 			q.qpu.Config.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey(),
 			q.qpu.Config.IndexConfig.IndexingConfig[0].GetAttr().GetAttrType())
 		if err != nil {
 			return &IQPU{}, err
 		}
 	case config.ANT:
-		index, err = mapindex.New(conf)
-		if err != nil {
-			return &IQPU{}, err
-		}
+		/*
+			index, err = mapindex.New(conf)
+			if err != nil {
+				return &IQPU{}, err
+			}
+		*/
 	}
 	q.index = index
 
@@ -128,7 +128,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		return errors.New("not supported")
 	}
 	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		indexResult, err := q.lookup(req.GetPredicate()[0])
+		indexResult, err := q.index.Lookup(req.GetPredicate()[0], req.GetClock())
 		if err != nil {
 			return err
 		}
@@ -218,15 +218,9 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			return
 		} else {
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-				log.WithFields(log.Fields{
-					"operation": streamRec,
-				}).Debug("index QPU received operation")
-
-				if err := q.updateIndex(streamRec.GetLogOp()); err != nil {
-					log.WithFields(log.Fields{
-						"error": err,
-						"op":    streamRec,
-					}).Fatal("opConsumer: index Update failed")
+				log.WithFields(log.Fields{"operation": streamRec, "timestap": streamRec.GetLogOp().GetTimestamp()}).Debug("index QPU received operation")
+				if err := q.updateIndex(streamRec); err != nil {
+					log.WithFields(log.Fields{"error": err, "op": streamRec}).Fatal("opConsumer: index Update failed")
 					return
 				}
 				if sync {
@@ -246,32 +240,19 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 
 //---------------- Internal Functions --------------
 
-func (q *IQPU) update(attrStateO, attrStateN *pbUtils.Attribute, objectID string, object utils.ObjectState) error {
-	if attrStateO != nil {
-		q.index.RemoveOldEntry(attrStateO, objectID)
-	}
-	if err := q.index.Put(attrStateN, object); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *IQPU) lookup(predicate *pbUtils.AttributePredicate) (map[string]utils.ObjectState, error) {
-	return q.index.Get(predicate)
-}
-
 // Given an operation sent from the data store, updates the index
-func (q *IQPU) updateIndex(op *pbUtils.LogOperation) error {
-	log.WithFields(log.Fields{
-		"operation":       op,
-		"querying config": q.qpu.QueryingCapabilities,
-	}).Debug("updateIndex")
+func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
+	log.WithFields(log.Fields{"stream record": rec, "querying config": q.qpu.QueryingCapabilities}).Debug("updateIndex")
 
 	state := utils.ObjectState{
-		ObjectID:   op.GetObjectId(),
-		ObjectType: op.GetObjectType(),
-		Bucket:     op.GetBucket(),
-		State:      *op.GetPayload().GetDelta().GetNew(),
+		ObjectID:   rec.GetLogOp().GetObjectId(),
+		ObjectType: rec.GetLogOp().GetObjectType(),
+		Bucket:     rec.GetLogOp().GetBucket(),
+	}
+	if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+		state.State = *rec.GetLogOp().GetPayload().GetDelta().GetNew()
+	} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+		state.State = *rec.GetLogOp().GetPayload().GetState()
 	}
 	for _, attr := range state.State.GetAttrs() {
 		toIndex := true
@@ -286,12 +267,16 @@ func (q *IQPU) updateIndex(op *pbUtils.LogOperation) error {
 			}
 		}
 		if toIndex {
-			for _, attrOld := range op.GetPayload().GetDelta().GetOld().GetAttrs() {
-				if attr.GetAttrKey() == attrOld.GetAttrKey() && attr.GetAttrType() == attrOld.GetAttrType() {
-					return q.update(attrOld, attr, state.ObjectID, state)
+			if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+				for _, attrOld := range rec.GetLogOp().GetPayload().GetDelta().GetOld().GetAttrs() {
+					if attr.GetAttrKey() == attrOld.GetAttrKey() && attr.GetAttrType() == attrOld.GetAttrType() {
+						return q.index.Update(attrOld, attr, state, *rec.GetLogOp().GetTimestamp())
+					}
 				}
+				return q.index.Update(nil, attr, state, *rec.GetLogOp().GetTimestamp())
+			} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+				return q.index.UpdateCatchUp(attr, state, *rec.GetLogOp().GetTimestamp())
 			}
-			return q.update(nil, attr, state.ObjectID, state)
 		}
 	}
 	return nil
@@ -332,13 +317,5 @@ func (q *IQPU) catchUp() error {
 }
 
 func (q *IQPU) updateIndexCatchUp(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
-	delta := protoutils.PayloadDelta(nil, streamRec.GetLogOp().GetPayload().GetState())
-	op := protoutils.LogOperation(
-		streamRec.GetLogOp().GetObjectId(),
-		streamRec.GetLogOp().GetBucket(),
-		streamRec.GetLogOp().GetObjectType(),
-		streamRec.GetLogOp().GetTimestamp(),
-		delta,
-	)
-	return q.updateIndex(op)
+	return q.updateIndex(streamRec)
 }

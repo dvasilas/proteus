@@ -175,7 +175,7 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 				log.Debug("DataStoreQPU:opConsumer waiting for ACK..")
 				ackMsg, err := stream.Recv()
 				if err == io.EOF {
-					errs <- errors.New("DataStoreQPU:opConsumer reveived nil")
+					errs <- errors.New("DataStoreQPU:opConsumer received nil")
 					break
 				}
 				if err != nil {

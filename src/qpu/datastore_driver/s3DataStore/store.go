@@ -277,7 +277,7 @@ func (ds S3DataStore) formatOperation(update *pbS3.NotificationStream) (*pbUtils
 		update.GetPayload().GetObjectId(),
 		update.GetPayload().GetBucket(),
 		pbUtils.LogOperation_S3OBJECT,
-		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(update.GetTimestamp())}),
+		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(update.GetPayload().GetNewState().GetLastModified())}),
 		payload), nil
 }
 
