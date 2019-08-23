@@ -1,0 +1,10 @@
+{"1.1.0",
+[{<<"antidote_pb">>,
+  {git,"https://github.com/SyncFree/antidote_pb",
+       {ref,"c7817e4903b5d83e68d174ca0f75fd0fee0aee9d"}},
+  0},
+ {<<"antidote_pb_codec">>,{pkg,<<"antidote_pb_codec">>,<<"0.1.1">>},1}]}.
+[
+{pkg_hash,[
+ {<<"antidote_pb_codec">>, <<"29891F77FB5DC8240495C425160EA152E9CA5753B7137E1866D9BA279F0F997B">>}]}
+].

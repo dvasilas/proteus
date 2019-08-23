@@ -66,7 +66,11 @@ func main() {
 		conf.DataStoreConfig.DataSet.DC = dset[1]
 		conf.DataStoreConfig.DataSet.Shard = dset[2]
 		conf.DataStoreConfig.Type = dbtype
-		conf.DataStoreConfig.Endpoint = "http://" + endp[0]
+		if dbtype == "s3" {
+			conf.DataStoreConfig.Endpoint = "http://" + endp[0]
+		} else if dbtype == "antidote" {
+			conf.DataStoreConfig.Endpoint = endp[0]
+		}
 		conf.DataStoreConfig.LogStreamEndpoint = endp[1]
 
 		var dsConf DataStoreConfJSON
@@ -75,8 +79,10 @@ func main() {
 			log.Fatal(err)
 		}
 		conf.DataStoreConfig.BucketName = dsConf.BucketName
-		conf.DataStoreConfig.AwsAccessKeyID = dsConf.AwsAccessKeyID
-		conf.DataStoreConfig.AwsSecretAccessKey = dsConf.AwsSecretAccessKey
+		if dbtype == "s3" {
+			conf.DataStoreConfig.AwsAccessKeyID = dsConf.AwsAccessKeyID
+			conf.DataStoreConfig.AwsSecretAccessKey = dsConf.AwsSecretAccessKey
+		}
 	case "cache":
 		var size int
 		cacheFlags := flag.NewFlagSet("cache QPU flags", flag.ExitOnError)

@@ -19,144 +19,164 @@ type InMemIndex struct {
 	index         indexImplementation
 	attributeName string
 	attributeType pbUtils.Attribute_AttributeType
-	mutex         sync.RWMutex
 }
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
 type indexImplementation interface {
-	updateEntry(btree.Item)
-	lookup(lbound, ubound *pbUtils.Value) map[string]utils.ObjectState
-	getEntry(*pbUtils.Attribute) btree.Item
-	removeOldEntry(attr *pbUtils.Attribute, objectID string, ts pbUtils.Vectorclock) error
+	update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
+	updateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
+	lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error)
 	print()
 }
 
 //---------------- API Functions -------------------
 
-//New creates a new B-Tree index
+//New creates a new in-memory index
 func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*InMemIndex, error) {
 	ind := &InMemIndex{
 		attributeName: attrName,
 		attributeType: attrType,
 	}
-	switch ind.attributeType {
-	case pbUtils.Attribute_S3TAGFLT:
-		ind.index = newIndexFloat()
-	case pbUtils.Attribute_S3TAGSTR, pbUtils.Attribute_CRDTLWWREG:
-	case pbUtils.Attribute_S3TAGINT, pbUtils.Attribute_CRDTCOUNTER:
-	}
+	ind.index = newBTreeIndex(ind.attributeType)
 	return ind, nil
 }
 
 // Update updates the index based on a given operation
 func (i *InMemIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
-	log.WithFields(log.Fields{"attr": attrNew, "obj": object}).Debug("index Put")
-
-	i.mutex.Lock()
-	if attrOld != nil {
-		i.index.removeOldEntry(attrOld, object.ObjectID, ts)
-	}
-
-	if entry := i.index.getEntry(attrNew); entry != nil {
-		entry.(bTreeNode).update(object, ts)
-		i.index.updateEntry(entry)
-	} else {
-		entry := newIndexEntry(attrNew, ts, object)
-		i.index.updateEntry(entry)
-	}
-	i.index.print()
-	i.mutex.Unlock()
-	return nil
+	return i.index.update(attrOld, attrNew, object, ts)
 }
 
 // UpdateCatchUp updates the index based on a given object state
 func (i *InMemIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
-	log.WithFields(log.Fields{"attr": attr, "obj": object}).Debug("index PutCatchUp")
-	i.mutex.Lock()
-	if entry := i.index.getEntry(attr); entry != nil {
-		entry.(bTreeNode).updateCatchUp(object)
-		i.index.updateEntry(entry)
-	} else {
-		entry := newCatchUpIndexEntry(attr, ts, object)
-		i.index.updateEntry(entry)
-	}
-	i.index.print()
-	i.mutex.Unlock()
-	return nil
+	return i.index.updateCatchUp(attr, object, ts)
 }
 
 // Lookup performs a range lookup on the index and returns the result.
 func (i *InMemIndex) Lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
-	log.WithFields(log.Fields{"predicate": attrPred}).Debug("index Lookup")
+	return i.index.lookup(attrPred, tsPred)
+}
+
+//------- indexImplementation interface ------------
+
+// bTreeIndex implements indexImplementation
+type bTreeIndex struct {
+	tree  *btree.BTree
+	mutex sync.RWMutex
+	entry indexEntry
+}
+
+func newBTreeIndex(t pbUtils.Attribute_AttributeType) *bTreeIndex {
+	index := &bTreeIndex{tree: btree.New(2)}
+	switch t {
+	case pbUtils.Attribute_S3TAGFLT:
+		index.entry = newIndexFloat()
+	case pbUtils.Attribute_S3TAGSTR, pbUtils.Attribute_CRDTLWWREG:
+	case pbUtils.Attribute_S3TAGINT, pbUtils.Attribute_CRDTCOUNTER:
+		index.entry = newIndexInt()
+	}
+	return index
+}
+
+func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+	i.mutex.Lock()
+	if attrOld != nil {
+		if indexEntry, found := i.getIndexEntry(attrOld); found {
+			indexEntry.removeObjFromEntry(object.ObjectID, ts)
+		}
+	}
+	if indexEntry, found := i.getIndexEntry(attrNew); found {
+		indexEntry.newVersion(object, ts)
+		i.updateIndexEntry(indexEntry)
+	} else {
+		indexEntry := i.newIndexEntry(attrNew, ts, object)
+		i.updateIndexEntry(indexEntry)
+	}
+	i.print()
+	i.mutex.Unlock()
+	return nil
+}
+
+func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+	i.mutex.Lock()
+	if indexEntry, found := i.getIndexEntry(attr); found {
+		indexEntry.updateFirstVersion(object)
+		i.updateIndexEntry(indexEntry)
+	} else {
+		indexEntry = i.newCatchUpIndexEntry(attr, ts, object)
+		i.updateIndexEntry(indexEntry)
+	}
+	i.mutex.Unlock()
+	i.print()
+	return nil
+}
+
+func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
+	res := make(map[string]utils.ObjectState)
+	it := func(node btree.Item) bool {
+		postings := node.(treeNode).getLatestVersion()
+		for _, obj := range postings.Objects {
+			res[obj.ObjectID] = obj
+		}
+		return true
+	}
+	lb, ub := i.entry.predicateToIndexEntries(attrPred.GetLbound(), attrPred.GetUbound())
 
 	i.mutex.RLock()
-	res := i.index.lookup(attrPred.GetLbound(), attrPred.GetUbound())
+	i.tree.AscendRange(lb, ub, it)
 	i.mutex.RUnlock()
+
 	if len(res) == 0 {
 		return nil, nil
 	}
 	return res, nil
 }
 
-//----------------- indexFloat ---------------------
-
-// indexFloat represents a B-Tree index implementation for float64 values.
-type indexFloat struct {
-	tree *btree.BTree
-}
-
-func newIndexFloat() *indexFloat {
-	return &indexFloat{
-		tree: btree.New(2),
+func (i *bTreeIndex) newIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) btree.Item {
+	item := i.entry.newIndexEntry(attr)
+	posting := Posting{
+		Objects:   map[string]utils.ObjectState{obj.ObjectID: obj},
+		Timestamp: ts,
 	}
+	item.createNewVersion(posting)
+	return item
 }
 
-func (i *indexFloat) getEntry(attr *pbUtils.Attribute) btree.Item {
-	indexEntry := attrToIndexEntry(attr)
+func (i *bTreeIndex) newCatchUpIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) treeNode {
+	zeroTs := make(map[string]uint64)
+	for k := range ts.GetVc() {
+		zeroTs[k] = 0
+	}
+	entry := i.entry.newIndexEntry(attr)
+	posting := Posting{
+		Objects:   map[string]utils.ObjectState{obj.ObjectID: obj},
+		Timestamp: *protoutils.Vectorclock(zeroTs),
+	}
+	entry.createNewVersion(posting)
+	return entry
+}
+
+func (i *bTreeIndex) getIndexEntry(attr *pbUtils.Attribute) (treeNode, bool) {
+	indexEntry := i.entry.attrToIndexEntry(attr)
 	if i.tree.Has(indexEntry) {
-		return i.tree.Get(indexEntry)
+		return i.tree.Get(indexEntry).(treeNode), true
 	}
-	return nil
+	return treeNode{}, false
 }
 
-func (i *indexFloat) updateEntry(e btree.Item) {
+func (i *bTreeIndex) updateIndexEntry(e btree.Item) {
 	i.tree.ReplaceOrInsert(e)
 }
 
-func (i *indexFloat) lookup(lbound, ubound *pbUtils.Value) map[string]utils.ObjectState {
-	res := make(map[string]utils.ObjectState)
-	it := func(item btree.Item) bool {
-		postings := item.(bTreeNode).getPostings().Back()
-		for _, obj := range postings.Value.(Posting).Objects {
-			res[obj.ObjectID] = obj
-		}
-		return true
-	}
-	lb, ub := predicateToIndexEntries(lbound, ubound)
-	i.tree.AscendRange(lb, ub, it)
-	return res
-}
-
-// removeOldEntry removes an old attribute value from the index.
-// It finds the B-Tree item which corresponds to a given attribute value
-// and removes the given object from its posting list.
-func (i *indexFloat) removeOldEntry(attr *pbUtils.Attribute, objectID string, ts pbUtils.Vectorclock) error {
-	if entry := i.getEntry(attr); entry != nil {
-		entry.(bTreeNode).updateRemove(objectID, ts)
-	}
-	return nil
-}
-
-func (i *indexFloat) print() {
+func (i *bTreeIndex) print() {
 	log.Debug("Printing index")
 	it := func(item btree.Item) bool {
-		log.WithFields(log.Fields{"val": item.(bTreeNode).Value}).Debug("value")
-		for e := item.(bTreeNode).Postings.Front(); e != nil; e = e.Next() {
-			log.WithFields(log.Fields{
-				"timestamp": e.Value.(Posting).Timestamp,
-			}).Debug("posting version")
-			for o := range e.Value.(Posting).Objects {
-				log.Debug(o)
+		if item != nil {
+			log.WithFields(log.Fields{"val": item.(treeNode).Value}).Debug("value")
+			for e := item.(treeNode).Postings.Front(); e != nil; e = e.Next() {
+				log.WithFields(log.Fields{"timestamp": e.Value.(Posting).Timestamp}).Debug("posting version")
+				for o := range e.Value.(Posting).Objects {
+					log.Debug("- ", o)
+				}
 			}
 		}
 		return true
@@ -165,11 +185,54 @@ func (i *indexFloat) print() {
 	log.Debug()
 }
 
-//---------------- btree.BTree ---------------------
+//------------ indexEntry interface ----------------
 
-// bTreeNode represents a B-Tree item for float64 values.
-type bTreeNode struct {
-	Value    float64
+type indexEntry interface {
+	newIndexEntry(*pbUtils.Attribute) treeNode
+	attrToIndexEntry(attr *pbUtils.Attribute) btree.Item
+	predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item)
+}
+
+// indexFloat implements indexEntry
+type indexFloat struct {
+}
+
+// indexInt implements indexEntry
+type indexInt struct {
+}
+
+func newIndexFloat() indexFloat {
+	return indexFloat{}
+}
+func newIndexInt() indexInt {
+	return indexInt{}
+}
+
+func (i indexFloat) newIndexEntry(attr *pbUtils.Attribute) treeNode {
+	return treeNode{Value: valueFloat{Val: attr.GetValue().GetFlt()}, Postings: list.New()}
+}
+func (i indexFloat) attrToIndexEntry(attr *pbUtils.Attribute) btree.Item {
+	return treeNode{Value: valueFloat{Val: attr.GetValue().GetFlt()}}
+}
+func (i indexFloat) predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item) {
+	return treeNode{Value: valueFloat{Val: lb.GetFlt()}}, treeNode{Value: valueFloat{Val: ub.GetFlt()}}
+}
+
+func (i indexInt) newIndexEntry(attr *pbUtils.Attribute) treeNode {
+	return treeNode{Value: valueInt{Val: attr.GetValue().GetInt()}, Postings: list.New()}
+}
+func (i indexInt) attrToIndexEntry(attr *pbUtils.Attribute) btree.Item {
+	return treeNode{Value: valueInt{Val: attr.GetValue().GetInt()}}
+}
+func (i indexInt) predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item) {
+	return treeNode{Value: valueInt{Val: lb.GetInt()}}, treeNode{Value: valueInt{Val: ub.GetInt()}}
+}
+
+//------------ btree.Item interface ----------------
+
+// treeNode implements btree.Item (need to implement Less)
+type treeNode struct {
+	Value    comparable
 	Postings *list.List
 }
 
@@ -179,79 +242,76 @@ type Posting struct {
 	Timestamp pbUtils.Vectorclock
 }
 
-// Less tests whether the current item is less than the given argument.
-func (x bTreeNode) Less(than btree.Item) bool {
-	return x.Value < than.(bTreeNode).Value
+func (n treeNode) Less(than btree.Item) bool {
+	return n.Value.less(than.(treeNode).Value)
 }
 
-func (x bTreeNode) update(obj utils.ObjectState, ts pbUtils.Vectorclock) {
-	log.WithFields(log.Fields{
-		"timestamp": ts,
-	}).Debug("posting update")
-	newObjectsM := make(map[string]utils.ObjectState)
-	for k, v := range x.Postings.Back().Value.(Posting).Objects {
-		newObjectsM[k] = v
+func (n treeNode) clodeLatestVerion() map[string]utils.ObjectState {
+	newObjMap := make(map[string]utils.ObjectState)
+	for k, v := range n.getLatestVersion().Objects {
+		newObjMap[k] = v
 	}
-	newObjectsM[obj.ObjectID] = obj
-	x.Postings.PushBack(Posting{
-		Objects:   newObjectsM,
+	return newObjMap
+}
+
+func (n treeNode) newVersion(obj utils.ObjectState, ts pbUtils.Vectorclock) {
+	objMap := n.clodeLatestVerion()
+	objMap[obj.ObjectID] = obj
+	n.createNewVersion(Posting{
+		Objects:   objMap,
 		Timestamp: ts,
 	})
-	if x.Postings.Len() > 10 {
-		x.Postings.Remove(x.Postings.Front())
+	n.trimVersions()
+}
+
+func (n treeNode) trimVersions() {
+	if n.Postings.Len() > 10 {
+		n.Postings.Remove(n.Postings.Front())
 	}
 }
 
-func (x bTreeNode) updateCatchUp(obj utils.ObjectState) {
-	x.Postings.Front().Value.(Posting).Objects[obj.ObjectID] = obj
+func (n treeNode) updateFirstVersion(obj utils.ObjectState) {
+	n.Postings.Front().Value.(Posting).Objects[obj.ObjectID] = obj
 }
 
-func (x bTreeNode) updateRemove(objectID string, ts pbUtils.Vectorclock) {
-	newObjectsM := make(map[string]utils.ObjectState)
-	for k, v := range x.Postings.Back().Value.(Posting).Objects {
-		newObjectsM[k] = v
-	}
-	delete(newObjectsM, objectID)
-	x.Postings.PushBack(Posting{
-		Objects:   newObjectsM,
-		Timestamp: ts,
-	})
+func (n treeNode) createNewVersion(p Posting) {
+	n.Postings.PushBack(p)
 }
 
-func (x bTreeNode) getPostings() *list.List {
-	return x.Postings
+func (n treeNode) getLatestVersion() Posting {
+	return n.Postings.Back().Value.(Posting)
 }
 
-//---------------- Internal Functions --------------
-
-func predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item) {
-	return bTreeNode{Value: lb.GetFlt()}, bTreeNode{Value: ub.GetFlt()}
+func (n treeNode) removeObjFromEntry(objectID string, ts pbUtils.Vectorclock) {
+	objMap := n.clodeLatestVerion()
+	delete(objMap, objectID)
+	n.createNewVersion(
+		Posting{
+			Objects:   objMap,
+			Timestamp: ts,
+		})
 }
 
-func newCatchUpIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) btree.Item {
-	zeroTs := make(map[string]uint64)
-	for k := range ts.GetVc() {
-		zeroTs[k] = 0
-	}
-	item := bTreeNode{Value: attr.GetValue().GetFlt(), Postings: list.New()}
-	posting := Posting{
-		Objects:   map[string]utils.ObjectState{obj.ObjectID: obj},
-		Timestamp: *protoutils.Vectorclock(zeroTs),
-	}
-	item.Postings.PushBack(posting)
-	return item
+// ------------ comparable interface ----------------
+
+type comparable interface {
+	less(comparable) bool
 }
 
-func newIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) btree.Item {
-	item := bTreeNode{Value: attr.GetValue().GetFlt(), Postings: list.New()}
-	posting := Posting{
-		Objects:   map[string]utils.ObjectState{obj.ObjectID: obj},
-		Timestamp: ts,
-	}
-	item.Postings.PushBack(posting)
-	return item
+// valueFloat implements comparable
+type valueFloat struct {
+	Val float64
 }
 
-func attrToIndexEntry(attr *pbUtils.Attribute) btree.Item {
-	return bTreeNode{Value: attr.GetValue().GetFlt()}
+// valueInt implements comparable
+type valueInt struct {
+	Val int64
+}
+
+func (x valueInt) less(than comparable) bool {
+	return x.Val < than.(valueInt).Val
+}
+
+func (x valueFloat) less(than comparable) bool {
+	return x.Val < than.(valueFloat).Val
 }
