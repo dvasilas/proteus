@@ -13,6 +13,7 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	"github.com/dvasilas/proteus/src/qpu/filter"
+	"github.com/dvasilas/proteus/src/qpu/index/antidote"
 	"github.com/dvasilas/proteus/src/qpu/index/inMem"
 	log "github.com/sirupsen/logrus"
 )
@@ -63,12 +64,10 @@ func QPU(conf *config.Config) (*IQPU, error) {
 			return &IQPU{}, err
 		}
 	case config.ANT:
-		/*
-			index, err = mapindex.New(conf)
-			if err != nil {
-				return &IQPU{}, err
-			}
-		*/
+		index, err = antidoteindex.New(conf)
+		if err != nil {
+			return &IQPU{}, err
+		}
 	}
 	q.index = index
 

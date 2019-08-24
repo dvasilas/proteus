@@ -173,7 +173,7 @@ func (i *bTreeIndex) print() {
 		if item != nil {
 			log.WithFields(log.Fields{"val": item.(treeNode).Value}).Debug("value")
 			for e := item.(treeNode).Postings.Front(); e != nil; e = e.Next() {
-				log.WithFields(log.Fields{"timestamp": e.Value.(Posting).Timestamp}).Debug("posting version")
+				log.WithFields(log.Fields{"timestamp": e.Value.(Posting).Timestamp}).Debug("posting list version")
 				for o := range e.Value.(Posting).Objects {
 					log.Debug("- ", o)
 				}
