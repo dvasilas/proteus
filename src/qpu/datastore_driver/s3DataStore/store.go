@@ -92,6 +92,7 @@ func (ds S3DataStore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan error {
 	return errs
 }
 
+// Op ...
 func (ds S3DataStore) Op(op *pbUtils.LogOperation) {}
 
 //----------- Stream Consumer Functions ------------
@@ -253,31 +254,32 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 
 func (ds S3DataStore) formatOperation(update *pbS3.NotificationStream) (*pbUtils.LogOperation, error) {
 	var payload *pbUtils.Payload
-	stateNew, err := s3UpdateToObjectState(
-		update.GetPayload().GetNewState().GetAttributes(),
-		update.GetPayload().GetNewState().GetContentLength(),
-		update.GetPayload().GetNewState().GetLastModified())
-	if err != nil {
-		return nil, err
+	var stateNew, stateOld *pbUtils.ObjectState
+	var err error
+	if update.GetPayload().GetNewState() != nil {
+		stateNew, err = s3UpdateToObjectState(
+			update.GetPayload().GetNewState().GetAttributes(),
+			update.GetPayload().GetNewState().GetContentLength(),
+			update.GetPayload().GetNewState().GetLastModified())
+		if err != nil {
+			return nil, err
+		}
 	}
-	if update.GetPayload().GetOldState() == nil {
-		payload = protoutils.PayloadDelta(nil, stateNew)
-	} else {
-		stateOld, err := s3UpdateToObjectState(
+	if update.GetPayload().GetOldState() != nil {
+		stateOld, err = s3UpdateToObjectState(
 			update.GetPayload().GetOldState().GetAttributes(),
 			update.GetPayload().GetOldState().GetContentLength(),
 			update.GetPayload().GetOldState().GetLastModified())
 		if err != nil {
 			return nil, err
 		}
-		payload = protoutils.PayloadDelta(stateOld, stateNew)
 	}
-
+	payload = protoutils.PayloadDelta(stateOld, stateNew)
 	return protoutils.LogOperation(
 		update.GetPayload().GetObjectId(),
 		update.GetPayload().GetBucket(),
 		pbUtils.LogOperation_S3OBJECT,
-		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(update.GetPayload().GetNewState().GetLastModified())}),
+		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(update.GetTimestamp())}),
 		payload), nil
 }
 

@@ -84,12 +84,14 @@ func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribu
 			indexEntry.removeObjFromEntry(object.ObjectID, ts)
 		}
 	}
-	if indexEntry, found := i.getIndexEntry(attrNew); found {
-		indexEntry.newVersion(object, ts)
-		i.updateIndexEntry(indexEntry)
-	} else {
-		indexEntry := i.newIndexEntry(attrNew, ts, object)
-		i.updateIndexEntry(indexEntry)
+	if attrNew != nil {
+		if indexEntry, found := i.getIndexEntry(attrNew); found {
+			indexEntry.newVersion(object, ts)
+			i.updateIndexEntry(indexEntry)
+		} else {
+			indexEntry := i.newIndexEntry(attrNew, ts, object)
+			i.updateIndexEntry(indexEntry)
+		}
 	}
 	i.print()
 	i.mutex.Unlock()

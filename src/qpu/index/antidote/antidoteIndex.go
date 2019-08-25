@@ -60,21 +60,21 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 	if err != nil {
 		return err
 	}
-	attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
-	if err != nil {
-		return err
-	}
 	// if attrOld != nil then the previous value has been indexed
 	// the index entry of the previous value needs to be updated
 	// by creating a new object list version without the given object
 	if attrOld != nil {
+		attrToValIndex, err := i.getAttrToValIndex(attrOld, tx)
+		if err != nil {
+			return err
+		}
 		valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrOld)
 		if err != nil {
-			return nil
+			return err
 		}
 		lastVRef, err := getLastVersionRef(valToTsIndex)
 		if err != nil {
-			return nil
+			return err
 		}
 		objList, err := i.bucket.ReadSet(tx, lastVRef)
 		if err != nil {
@@ -87,35 +87,41 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			antidote.SetRemove(antidote.Key([]byte(ref)), objectEncoded),
 		)
 	}
-	valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrNew)
-	// if valIndex == nil the is no entry for this value in the value-to-ts index
-	// a new entry with the given value needs to be created
-	if valToTsIndex == nil {
-		newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
-		indexStoreUpdates = append(indexStoreUpdates,
-			newVUpdate,
-			antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-		)
-	} else {
-		// an index entry for this value exists
-		// a new version for the entry needs to created, by added the given object
-		lastVRef, err := getLastVersionRef(valToTsIndex)
-		if err != nil {
-			return nil
-		}
-		objList, err := i.bucket.ReadSet(tx, lastVRef)
+	if attrNew != nil {
+		attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
 		if err != nil {
 			return err
 		}
-		newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
-		indexStoreUpdates = append(indexStoreUpdates,
-			newVUpdate,
-			antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
-			antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-		)
+		valToTsIndex, _ := getValtoTsIndex(attrToValIndex, attrNew)
+		// if valIndex == nil the is no entry for this value in the value-to-ts index
+		// a new entry with the given value needs to be created
+		if valToTsIndex == nil {
+			newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
+			indexStoreUpdates = append(indexStoreUpdates,
+				newVUpdate,
+				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+			)
+		} else {
+			// an index entry for this value exists
+			// a new version for the entry needs to created, by added the given object
+			lastVRef, err := getLastVersionRef(valToTsIndex)
+			if err != nil {
+				return nil
+			}
+			objList, err := i.bucket.ReadSet(tx, lastVRef)
+			if err != nil {
+				return err
+			}
+			newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
+			indexStoreUpdates = append(indexStoreUpdates,
+				newVUpdate,
+				antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
+				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+			)
+		}
 	}
 	if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-		return nil
+		return err
 	}
 	return tx.Commit()
 }
@@ -257,20 +263,16 @@ func encodeTimestamp(ts map[string]uint64) []byte {
 }
 
 func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*pbUtils.Vectorclock, error) {
-	log.Debug("decodeTimestamps")
 	res := make([]*pbUtils.Vectorclock, 0)
 	for _, ts := range tsEncArr {
-		log.Debug(string(ts.Key))
 		var vcEntries []string
 		if strings.Contains(string(ts.Key), "_") {
 			vcEntries = strings.Split(string(ts.Key), "_")
 		} else {
 			vcEntries = []string{string(ts.Key)}
 		}
-		log.Debug(vcEntries)
 		vcMap := make(map[string]uint64)
 		for _, e := range vcEntries {
-			log.Debug(e)
 			vc := strings.Split(e, ":")
 			t, err := strconv.ParseInt(vc[1], 10, 64)
 			if err != nil {
@@ -325,9 +327,9 @@ func greater(a, b *pbUtils.Vectorclock) bool {
 	return greater
 }
 
-func (i *AntidoteIndex) print(attr *pbUtils.Attribute) error {
+func (i *AntidoteIndex) print() error {
 	log.Debug("Printing index")
-	attributeKey := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
+	attributeKey := i.attributeName + "_" + i.attributeType.String()
 
 	tx, err := i.client.StartTransaction()
 	if err != nil {

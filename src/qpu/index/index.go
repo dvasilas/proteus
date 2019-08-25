@@ -249,7 +249,11 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 		Bucket:     rec.GetLogOp().GetBucket(),
 	}
 	if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-		state.State = *rec.GetLogOp().GetPayload().GetDelta().GetNew()
+		if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {
+			state.State = *rec.GetLogOp().GetPayload().GetDelta().GetNew()
+		} else if rec.GetLogOp().GetPayload().GetDelta().GetOld() != nil {
+			state.State = *rec.GetLogOp().GetPayload().GetDelta().GetOld()
+		}
 	} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
 		state.State = *rec.GetLogOp().GetPayload().GetState()
 	}
@@ -267,12 +271,15 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 		}
 		if toIndex {
 			if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-				for _, attrOld := range rec.GetLogOp().GetPayload().GetDelta().GetOld().GetAttrs() {
-					if attr.GetAttrKey() == attrOld.GetAttrKey() && attr.GetAttrType() == attrOld.GetAttrType() {
-						return q.index.Update(attrOld, attr, state, *rec.GetLogOp().GetTimestamp())
+				if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {
+					for _, attrOld := range rec.GetLogOp().GetPayload().GetDelta().GetOld().GetAttrs() {
+						if attr.GetAttrKey() == attrOld.GetAttrKey() && attr.GetAttrType() == attrOld.GetAttrType() {
+							return q.index.Update(attrOld, attr, state, *rec.GetLogOp().GetTimestamp())
+						}
 					}
+					return q.index.Update(nil, attr, state, *rec.GetLogOp().GetTimestamp())
 				}
-				return q.index.Update(nil, attr, state, *rec.GetLogOp().GetTimestamp())
+				return q.index.Update(attr, nil, state, *rec.GetLogOp().GetTimestamp())
 			} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
 				return q.index.UpdateCatchUp(attr, state, *rec.GetLogOp().GetTimestamp())
 			}
