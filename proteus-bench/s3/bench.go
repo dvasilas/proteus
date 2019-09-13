@@ -1,80 +1,179 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
-	"os/exec"
 	"sort"
-	"strconv"
 	"time"
 
+	"github.com/dvasilas/proteus/proteus-bench/s3/yelpDataset"
 	"github.com/dvasilas/proteus/proteus_client"
+	pbS3Cli "github.com/dvasilas/proteus/src/protos/s3client"
+	"google.golang.org/grpc"
+
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
 )
 
-type bench struct {
-	conf config
+const bucket = "local-s3"
+const preloadSize = 10
+const workloadRation = 0.8
+const workloadSize = 1000
+const workloadTime = 10
+
+type dataset interface {
+	PopulateDB(string, string, int, func(string, string, string, map[string]string) error) error
+	Update(string, func(string, string, map[string]string) error) error
+	Query() []proteusclient.AttributePredicate
+}
+
+type benchmark struct {
+	workload      *yelp.Workload
+	conf          config
+	proteusClient *proteusclient.Client
+	s3client      pbS3Cli.S3Client
+	respTime      []time.Duration
 }
 
 type config struct {
-	DatasetSize     int
-	MaxAttributeNum int
+	datasetSize     int
+	maxAttributeNum int
+	queryWriteRatio float32
+	workloadMaxOPs  int
+	workloadMaxTime time.Duration
 }
 
-type attribute struct {
-	attrName string
-	xAmzKey  string
-	attrType proteusclient.AttributeType
-	value    string
-}
-
-type predicate struct {
-	attribute attribute
-	lbound    interface{}
-	ubound    interface{}
-}
-
-type query []predicate
-
-func main() {
-	b := bench{
-		conf: config{
-			DatasetSize:     100,
-			MaxAttributeNum: 10,
-		},
+func (b *benchmark) populateDB(input string, doPopulate bool) error {
+	err := b.createBucket(bucket)
+	if err != nil {
+		return err
 	}
-	rand.Seed(time.Now().UnixNano())
-	populate := flag.Bool("p", false, "populate database")
-	flag.Parse()
+	if b.workload.PopulateDB(input, bucket, b.conf.datasetSize, doPopulate, b.putObject) != nil {
+		return err
+	}
+	return nil
+}
 
-	rand.Shuffle(len(attributePool), func(i, j int) { attributePool[i], attributePool[j] = attributePool[j], attributePool[i] })
-
-	if *populate {
-		if err := b.populateDB("local-s3", "127.0.0.1:8000"); err != nil {
-			fmt.Println(err)
-			log.Fatal(err)
+func (b *benchmark) doWorkload() error {
+	t := time.Now()
+	for i := 0; i < b.conf.workloadMaxOPs && time.Since(t) < b.conf.workloadMaxTime; i++ {
+		r := rand.Float32()
+		fmt.Println(r)
+		if r <= b.conf.queryWriteRatio {
+			query := b.workload.Query()
+			fmt.Println(query)
+			t, err := b.doQuery(query)
+			if err != nil {
+				return err
+			}
+			b.respTime = append(b.respTime, t)
+		} else {
+			if err := b.workload.Update(bucket, b.updateTags); err != nil {
+				return err
+			}
 		}
 	}
-
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50250})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	workload := b.createQueryWorkload()
-	respTime := make([]time.Duration, len(workload))
-	for i, q := range workload {
-		respTime[i] = doQuery(c, q)
-	}
-	sort.Sort(responseTime(respTime))
-	fmt.Println(respTime)
-	fmt.Println("mean", (respTime[49]+respTime[50])/2)
-	fmt.Println("p90", respTime[89])
-	fmt.Println("p95", respTime[94])
-	fmt.Println("p99", respTime[98])
+	return nil
 }
+
+func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Duration, error) {
+	start := time.Now()
+	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.LATESTSNAPSHOT)
+	if err != nil {
+		return time.Since(start), err
+	}
+	eof := false
+	responseStarted := false
+	var elapsed time.Duration
+	for !eof {
+		select {
+		case err := <-errCh:
+			if err == io.EOF {
+				eof = true
+			} else {
+				return time.Since(start), err
+			}
+		case <-respCh:
+			if !responseStarted {
+				elapsed = time.Since(start)
+				responseStarted = true
+			}
+		}
+	}
+	return elapsed, nil
+}
+
+func (b *benchmark) plot() error {
+	p, err := plot.New()
+	if err != nil {
+		return err
+	}
+
+	p.Title.Text = "CDF plot"
+	p.X.Label.Text = "latency ms"
+	p.Y.Label.Text = "cdf(x)"
+
+	pts := make(plotter.XYs, len(b.respTime))
+	for i, t := range b.respTime {
+		pts[i].X = t.Seconds() * 1000
+		pts[i].Y = float64(i) / float64(len(b.respTime)) * float64(100.0)
+	}
+	err = plotutil.AddLinePoints(p,
+		"", pts,
+	)
+	if err != nil {
+		return err
+	}
+	if err := p.Save(8*vg.Inch, 8*vg.Inch, "plot.pdf"); err != nil {
+		return err
+	}
+	return nil
+}
+
+//---------------- S3 operations -------------------
+
+func (b *benchmark) createBucket(bucketName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := b.s3client.CreateBucket(ctx, &pbS3Cli.CreateBucketRequest{BucketName: bucketName})
+	return err
+}
+
+func (b *benchmark) putObject(bucketName, objName, content string, md map[string]string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r, err := b.s3client.PutObject(ctx, &pbS3Cli.PutObjectRequest{
+		ObjectName: objName,
+		BucketName: bucketName,
+		Content:    content,
+		XAmzMeta:   md,
+	})
+	fmt.Println("r: ", r.GetReply() == 0)
+	fmt.Println("err: ", err)
+	return err
+}
+
+func (b *benchmark) updateTags(bucketName, objName string, md map[string]string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r, err := b.s3client.UpdateTags(ctx, &pbS3Cli.UpdateTagsRequest{
+		ObjectName: objName,
+		BucketName: bucketName,
+		XAmzMeta:   md,
+	})
+	fmt.Println("r: ", r.GetReply() == 0)
+	fmt.Println("err: ", err)
+	return err
+}
+
+//----------------- responseTime -------------------
 
 type responseTime []time.Duration
 
@@ -88,239 +187,61 @@ func (t responseTime) Less(i, j int) bool {
 	return t[i].Nanoseconds() < t[j].Nanoseconds()
 }
 
-func (b *bench) createQueryWorkload() []query {
-	workload := make([]query, 100)
-	for i := range workload {
-		q := make([]predicate, 0)
-		q = append(q, predicate{
-			attribute: attributePool[rand.Intn(b.conf.MaxAttributeNum)],
-		})
-		switch q[0].attribute.attrType {
-		case proteusclient.S3TAGFLT:
-			q[0].lbound = rand.Float64()
-			q[0].ubound = q[0].lbound.(float64) + rand.Float64()*(1-q[0].lbound.(float64))
-		case proteusclient.S3TAGINT:
-			q[0].lbound = int64(rand.Intn(100))
-			q[0].ubound = q[0].lbound.(int64) + int64(rand.Intn((100 - int(q[0].lbound.(int64)))))
-		}
-		workload[i] = q
+//-------------------- main ------------------------
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+
+	populate := flag.Bool("pp", false, "populate database")
+	queryPort := flag.Int("port", 0, "qpu port")
+	s3ClientEndP := flag.String("s3", "", "s3_client server port")
+	dataset := flag.String("data", "", "dataset file")
+	doPlot := flag.Bool("plot", false, "plot latency cdf")
+	flag.Parse()
+
+	if *queryPort < 50250 || *queryPort > 50550 {
+		log.Fatal(errors.New("invalid query port"))
 	}
-	return workload
-}
-
-func (b *bench) createAttributes() []attribute {
-	attrN := rand.Intn(b.conf.MaxAttributeNum-1) + 1
-	attributes := attributePool[:attrN]
-	for i, attr := range attributes {
-		switch attr.attrType {
-		case proteusclient.S3TAGFLT:
-			attributes[i].value = fmt.Sprintf("%f", rand.Float64())
-		case proteusclient.S3TAGINT:
-			attributes[i].value = strconv.Itoa(rand.Intn(100))
-		}
-	}
-	return attributes
-}
-
-func (b *bench) populateDB(bucketName, endpoint string) error {
-	createBucket(bucketName, endpoint)
-	for i := 0; i < b.conf.DatasetSize; i++ {
-		mdAttrs := b.createAttributes()
-		if err := putObjectAndMD(bucketName, "obj"+strconv.Itoa(i), mdAttrs, endpoint); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func createBucket(bucketName, endpoint string) error {
-	out, err := exec.Command("s3cmd", "mb", "s3://"+bucketName, "--host="+endpoint).Output()
-	fmt.Println(string(out))
-	return err
-}
-
-func putObject(bucketName, objName, endpoint string) error {
-	args := []string{"put", "./bench.go", "s3://" + bucketName + "/" + objName, "--host=" + endpoint}
-	out, err := exec.Command("s3cmd", args...).Output()
-	fmt.Println(string(out))
-	return err
-}
-
-func putObjectMD(bucketName, objName string, xAmzMeta []attribute, endpoint string) error {
-	args := []string{"modify", "s3://" + bucketName + "/" + objName, "--host=" + endpoint}
-	for _, attr := range xAmzMeta {
-		args = append(args, "--add-header=x-amz-meta-"+attr.xAmzKey+":"+attr.value)
-	}
-	out, err := exec.Command("s3cmd", args...).Output()
-	fmt.Println(string(out))
-	return err
-}
-
-func putObjectAndMD(bucketName string, objName string, xAmzMeta []attribute, endpoint string) error {
-	args := []string{"put", "./bench.go", "s3://" + bucketName + "/" + objName, "--host=" + endpoint}
-	for _, attr := range xAmzMeta {
-		args = append(args, "--add-header=x-amz-meta-"+attr.xAmzKey+":"+attr.value)
-	}
-	out, err := exec.Command("s3cmd", args...).Output()
-	fmt.Println(string(out))
-	return err
-}
-
-func doQuery(c *proteusclient.Client, query query) time.Duration {
-	start := time.Now()
-	q := make([]proteusclient.AttributePredicate, 0)
-	for _, pred := range query {
-		q = append(q, proteusclient.AttributePredicate{
-			AttrName: pred.attribute.attrName,
-			AttrType: pred.attribute.attrType,
-			Lbound:   pred.lbound,
-			Ubound:   pred.ubound,
-		})
-	}
-	respCh, errCh, err := c.Query(q, proteusclient.LATESTSNAPSHOT)
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: *queryPort})
 	if err != nil {
 		log.Fatal(err)
 	}
-	eof := false
-	responseStarted := false
-	var elapsed time.Duration
-	for !eof {
-		select {
-		case err := <-errCh:
-			if err == io.EOF {
-				eof = true
-			} else {
-				log.Fatal(err)
-			}
-		case <-respCh:
-			if !responseStarted {
-				elapsed = time.Since(start)
-				responseStarted = true
-			}
+	conn, err := grpc.Dial("localhost:"+string(*s3ClientEndP), grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+
+	b := benchmark{
+		workload:      yelp.New(),
+		proteusClient: c,
+		s3client:      pbS3Cli.NewS3Client(conn),
+		conf: config{
+			datasetSize:     preloadSize,
+			queryWriteRatio: workloadRation,
+			workloadMaxOPs:  workloadSize,
+			workloadMaxTime: time.Second * workloadTime,
+		},
+		respTime: make([]time.Duration, 0),
+	}
+
+	if err := b.populateDB(*dataset, *populate); err != nil {
+		log.Fatal(err)
+	}
+	if err := b.doWorkload(); err != nil {
+		log.Fatal(err)
+	}
+
+	sort.Sort(responseTime(b.respTime))
+	l := len(b.respTime)
+	fmt.Println("p50", b.respTime[l*50/100])
+	fmt.Println("p90", b.respTime[l*90/100])
+	fmt.Println("p95", b.respTime[l*95/100])
+	fmt.Println("p99", b.respTime[l*99/100])
+
+	if *doPlot {
+		if err := b.plot(); err != nil {
+			log.Fatal(err)
 		}
 	}
-	return elapsed
-}
-
-var attributePool = []attribute{
-	{
-		"attr0",
-		"f-attr0",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr1",
-		"f-attr1",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr2",
-		"f-attr2",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr3",
-		"f-attr3",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr4",
-		"f-attr4",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr5",
-		"f-attr5",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr6",
-		"f-attr6",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr7",
-		"f-attr7",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr8",
-		"f-attr8",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr9",
-		"f-attr9",
-		proteusclient.S3TAGFLT,
-		"",
-	},
-	{
-		"attr10",
-		"i-attr10",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr11",
-		"i-attr11",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr12",
-		"i-attr12",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr13",
-		"i-attr13",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr14",
-		"i-attr14",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr15",
-		"i-attr15",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr16",
-		"i-attr16",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr17",
-		"i-attr17",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr18",
-		"i-attr18",
-		proteusclient.S3TAGINT,
-		"",
-	},
-	{
-		"attr19",
-		"i-attr19",
-		proteusclient.S3TAGINT,
-		"",
-	},
 }

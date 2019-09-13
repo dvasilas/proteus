@@ -43,6 +43,7 @@ func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*InMemIndex
 
 // Update updates the index based on a given operation
 func (i *InMemIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+	log.WithFields(log.Fields{"attrOld": attrOld, "attrNew": attrNew}).Debug("index:update")
 	return i.index.update(attrOld, attrNew, object, ts)
 }
 
@@ -78,6 +79,7 @@ func newBTreeIndex(t pbUtils.Attribute_AttributeType) *bTreeIndex {
 }
 
 func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+
 	i.mutex.Lock()
 	if attrOld != nil {
 		if indexEntry, found := i.getIndexEntry(attrOld); found {
@@ -93,7 +95,7 @@ func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribu
 			i.updateIndexEntry(indexEntry)
 		}
 	}
-	i.print()
+	//i.print()
 	i.mutex.Unlock()
 	return nil
 }
@@ -108,7 +110,7 @@ func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectS
 		i.updateIndexEntry(indexEntry)
 	}
 	i.mutex.Unlock()
-	i.print()
+	//i.print()
 	return nil
 }
 

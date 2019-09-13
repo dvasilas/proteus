@@ -229,7 +229,6 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 		return
 	}
 	attrs = append(attrs, protoutils.Attribute("contentLength", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(v)))
-	attrs = append(attrs, protoutils.Attribute("contentType", pbUtils.Attribute_S3TAGSTR, protoutils.ValueStr(head["Content-Type"][0])))
 	state := protoutils.ObjectState(attrs)
 	payload = protoutils.PayloadState(state)
 

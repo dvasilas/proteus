@@ -1,11 +1,11 @@
 {
-    "attributeName": "test",
-    "attributeType": "s3tagFlt",
-    "lBound": "0.0",
-    "uBound": "1.0",
+    "attributeName": "votes_useful",
+    "attributeType": "s3tagInt",
+    "lBound": "0",
+    "uBound": "10000",
     "consLevel": "async",
     "indexStore": {
-      "store": "antidote",
+      "store": "in_mem",
       "endpoint": "127.0.0.1:8087",
       "bucket": "indexqpu",
       "indexDataStruct": "btree"
