@@ -26,4 +26,8 @@ script:
   - make test
 
 notifications:
-  email: false
+  email:
+    recipients:
+      - dimitrios.vasilas@scality.com
+    on_success: always
+    on_failure: always
