@@ -1,0 +1,13 @@
+{
+    "attributeName": "votes_cool",
+    "attributeType": "s3tagInt",
+    "lBound": "0",
+    "uBound": "10000",
+    "consLevel": "async",
+    "indexStore": {
+      "store": "antidote",
+      "endpoint": "127.0.0.1:8087",
+      "bucket": "indexqpu2",
+      "indexDataStruct": "btree"
+    }
+}

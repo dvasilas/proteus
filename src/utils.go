@@ -36,6 +36,12 @@ type ObjectState struct {
 	Timestamp  pbUtils.Vectorclock
 }
 
+// SubQuery ...
+type SubQuery struct {
+	SubQuery []*pbUtils.AttributePredicate
+	Endpoint *QPU
+}
+
 //---------------- API Functions -------------------
 
 // ConnectToQPUGraph ...
@@ -54,6 +60,10 @@ func ConnectToQPUGraph(q *QPU) error {
 			Client:               c,
 			QueryingCapabilities: connConf.GetSupportedQueries(),
 			Dataset:              connConf.GetDataset(),
+			Config: &config.Config{
+				QpuType: connConf.QpuType,
+				Port:    conn,
+			},
 		}
 	}
 	q.Conns = conns

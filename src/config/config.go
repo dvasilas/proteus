@@ -96,6 +96,8 @@ func (c *Config) getQpuType(t string) error {
 		c.QpuType = pbQPU.ConfigResponse_LAMBDA
 	case "fault_injection":
 		c.QpuType = pbQPU.ConfigResponse_FAULT_INJECTION
+	case "intersection":
+		c.QpuType = pbQPU.ConfigResponse_INTERSECTION
 
 	default:
 		return errors.New("unknown QPU type")

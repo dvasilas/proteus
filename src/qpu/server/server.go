@@ -15,6 +15,7 @@ import (
 	"github.com/dvasilas/proteus/src/qpu/federation_dispatcher"
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index"
+	"github.com/dvasilas/proteus/src/qpu/intersection"
 	"github.com/dvasilas/proteus/src/qpu/lambda"
 	"github.com/dvasilas/proteus/src/qpu/load_balancer"
 	log "github.com/sirupsen/logrus"
@@ -99,6 +100,11 @@ func Server(confArg config.ConfJSON) error {
 		}
 	case pbQPU.ConfigResponse_LAMBDA:
 		api, err = lambda.QPU(conf)
+		if err != nil {
+			return err
+		}
+	case pbQPU.ConfigResponse_INTERSECTION:
+		api, err = intersection.QPU(conf)
 		if err != nil {
 			return err
 		}

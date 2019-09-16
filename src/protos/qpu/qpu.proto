@@ -56,6 +56,7 @@ message ConfigResponse {
     LOAD_BALANCER = 5;
     LAMBDA = 6;
     FAULT_INJECTION = 7;
+    INTERSECTION = 8;
   }
   QPUType qpu_type = 1;
   repeated utils.AttributePredicate supportedQueries = 2;
