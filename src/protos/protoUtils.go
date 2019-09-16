@@ -111,6 +111,17 @@ func RequestStreamAck(sID int64) *pbQPU.RequestStream {
 	}
 }
 
+// RequestStreamPing ...
+func RequestStreamPing(sID int64) *pbQPU.RequestStream {
+	return &pbQPU.RequestStream{
+		Payload: &pbQPU.RequestStream_Ping{
+			Ping: &pbQPU.PingMsg{
+				SeqId: sID,
+			},
+		},
+	}
+}
+
 //QueryRequest ...
 func QueryRequest(ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, sync bool) *pbQPU.QueryRequest {
 	return &pbQPU.QueryRequest{

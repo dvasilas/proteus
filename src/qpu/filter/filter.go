@@ -37,20 +37,12 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the filter QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
+func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
 	errChan := make(chan error)
-	streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), req.GetSync())
-	utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, forward, errChan)
+	streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), request.GetSync())
+	utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, forward, errChan)
 	err = <-errChan
 	if err != io.EOF {
 		return err

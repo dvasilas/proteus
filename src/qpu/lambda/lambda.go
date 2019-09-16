@@ -107,7 +107,9 @@ func QPU(conf *config.Config) (*LQPU, error) {
 }
 
 // Query implements the Query API for the fault injection QPU
-func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
+func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
 	_, err := streamOut.Recv()
 	if err == io.EOF {
 		return errors.New("Query received EOF")

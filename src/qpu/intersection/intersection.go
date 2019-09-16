@@ -1,7 +1,6 @@
 package intersection
 
 import (
-	"errors"
 	"io"
 
 	"github.com/dvasilas/proteus/src"
@@ -41,18 +40,10 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the intersection QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
-	subQueries, err := q.generateSubQueries(req.GetPredicate())
+func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	subQueries, err := q.generateSubQueries(request.GetPredicate())
 	if err != nil {
 		return err
 	}
@@ -66,7 +57,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 	errCh := make(chan error)
 
 	for _, subQ := range subQueries {
-		streamIn, _, err := subQ.Endpoint.Client.Query(subQ.SubQuery, protoutils.SnapshotTimePredicate(req.GetClock().GetLbound(), req.GetClock().GetUbound()), false)
+		streamIn, _, err := subQ.Endpoint.Client.Query(subQ.SubQuery, protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
 		if err != nil {
 			return err
 		}

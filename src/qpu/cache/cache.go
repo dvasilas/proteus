@@ -47,19 +47,11 @@ func QPU(conf *config.Config) (*CQPU, error) {
 }
 
 // Query implements the Query API for the cache QPU
-func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
-	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		cachedResult, hit := q.cache.Get(req.GetPredicate())
+func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+		cachedResult, hit := q.cache.Get(request.GetPredicate())
 		if hit {
 			log.WithFields(log.Fields{
 				"cache entry": cachedResult,
@@ -84,11 +76,11 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 		log.WithFields(log.Fields{}).Debug("cache miss")
 
 		errChan := make(chan error)
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(req.GetPredicate(), req.GetClock(), false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), false)
 		if err != nil {
 			return err
 		}
-		utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
+		utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
 		err = <-errChan
 		if err != io.EOF {
 			return err

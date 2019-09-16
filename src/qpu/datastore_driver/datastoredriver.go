@@ -63,35 +63,27 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 }
 
 //Query implements the Query API for the data store QPU
-func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	log.Debug("Query")
-	msg, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
+func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	if requestRec.GetPing() != nil {
+		return utils.Ping(streamOut, requestRec.GetPing())
 	}
-	if err != nil {
-		return err
-	}
-	req := msg.GetRequest()
-	log.WithFields(log.Fields{
-		"req": req,
-	}).Debug("Query request")
-
-	if req.GetClock().GetUbound().GetType() < req.GetClock().GetUbound().GetType() {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
-		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+	if request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
+		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
-	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		opCh := make(chan *pbUtils.LogOperation)
 		ack := make(chan bool)
 
-		errsConsm := q.opConsumer(streamOut, opCh, ack, req.GetSync())
-		conn, errsSub := q.ds.SubscribeOps(opCh, ack, req.GetSync())
+		errsConsm := q.opConsumer(streamOut, opCh, ack, request.GetSync())
+		conn, errsSub := q.ds.SubscribeOps(opCh, ack, request.GetSync())
 
 		select {
 		case err := <-errsConsm:
@@ -101,7 +93,7 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 			return err
 		}
 	}
-	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
 		errsGetSn := q.ds.GetSnapshot(streamCh)
 

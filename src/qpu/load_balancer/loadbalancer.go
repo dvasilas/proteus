@@ -44,17 +44,9 @@ func QPU(conf *config.Config) (*LBQPU, error) {
 }
 
 // Query implements the Query API for the fault injection QPU
-func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
+func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
 	forwardTo, err := q.generateSubQueries()
 	if err != nil {
 		return err
@@ -62,11 +54,11 @@ func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 
 	errChan := make(chan error)
 	for _, frwTo := range forwardTo {
-		streamIn, _, err := frwTo.Client.Query(req.GetPredicate(), protoutils.SnapshotTimePredicate(req.GetClock().GetLbound(), req.GetClock().GetUbound()), false)
+		streamIn, _, err := frwTo.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
 		if err != nil {
 			return err
 		}
-		go utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, q.forward, errChan)
+		go utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, q.forward, errChan)
 	}
 	streamCnt := len(forwardTo)
 	for streamCnt > 0 {

@@ -222,17 +222,24 @@ func Compare(a, b *pbUtils.Value) (int, error) {
 	return 0, errors.New("unknown Value type")
 }
 
-func valueType(v *pbUtils.Value) int {
-	switch v.GetVal().(type) {
-	case *pbUtils.Value_Flt:
-		return 0
-	case *pbUtils.Value_Int:
-		return 1
-	case *pbUtils.Value_Str:
-		return 2
+func Ping(stream pbQPU.QPU_QueryServer, msg *pbQPU.PingMsg) error {
+	seqID := msg.GetSeqId()
+	for {
+		seqID++
+		if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_HEARTBEAT, nil)); err != nil {
+			return err
+		}
+		p, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		seqID = p.GetPing().GetSeqId()
+		fmt.Println(seqID)
 	}
-	rand.Seed(time.Now().UTC().UnixNano())
-	return rand.Int()
+	return nil
 }
 
 //----------- Stream Consumer Functions ------------
@@ -296,4 +303,31 @@ func calcDataset(q *QPU, conns []*QPU) {
 	for _, c := range conns[:1] {
 		mergeDatasets(q.Dataset, c.Dataset)
 	}
+}
+
+func valueType(v *pbUtils.Value) int {
+	switch v.GetVal().(type) {
+	case *pbUtils.Value_Flt:
+		return 0
+	case *pbUtils.Value_Int:
+		return 1
+	case *pbUtils.Value_Str:
+		return 2
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	return rand.Int()
+}
+
+//----------------- responseTime -------------------
+
+type ResponseTime []time.Duration
+
+func (t ResponseTime) Len() int {
+	return len(t)
+}
+func (t ResponseTime) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
+}
+func (t ResponseTime) Less(i, j int) bool {
+	return t[i].Nanoseconds() < t[j].Nanoseconds()
 }

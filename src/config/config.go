@@ -37,7 +37,7 @@ type Config struct {
 			IndexImplementation IndexImplementation
 		}
 	}
-	FaultInjectionConfig struct {
+	NetworkQPUConfig struct {
 		Function string
 		Rate     float32
 	}
@@ -69,8 +69,8 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 		if err := config.getIndexConfig(conf); err != nil {
 			return nil, err
 		}
-	case pbQPU.ConfigResponse_FAULT_INJECTION:
-		config.getFaultInjConfig(conf)
+	case pbQPU.ConfigResponse_NETWORK:
+		config.getNetworkQPUConfig(conf)
 	}
 	return config, nil
 }
@@ -94,8 +94,8 @@ func (c *Config) getQpuType(t string) error {
 		c.QpuType = pbQPU.ConfigResponse_LOAD_BALANCER
 	case "lambda":
 		c.QpuType = pbQPU.ConfigResponse_LAMBDA
-	case "fault_injection":
-		c.QpuType = pbQPU.ConfigResponse_FAULT_INJECTION
+	case "network":
+		c.QpuType = pbQPU.ConfigResponse_NETWORK
 	case "intersection":
 		c.QpuType = pbQPU.ConfigResponse_INTERSECTION
 
@@ -156,11 +156,11 @@ func (c *Config) getCacheConfig(conf ConfJSON) {
 	c.CacheConfig.Size = conf.CacheConfig.Size
 }
 
-// ------- Fault Injection QPU Configuration --------
+// ----------- Network QPU Configuration ------------
 
-func (c *Config) getFaultInjConfig(conf ConfJSON) {
-	c.FaultInjectionConfig.Function = conf.FaultInjectionConfig.Function
-	c.FaultInjectionConfig.Rate = conf.FaultInjectionConfig.Rate
+func (c *Config) getNetworkQPUConfig(conf ConfJSON) {
+	c.NetworkQPUConfig.Function = conf.NetworkQPUConfig.Function
+	c.NetworkQPUConfig.Rate = conf.NetworkQPUConfig.Rate
 }
 
 //----------- Index QPU Configuration --------------
@@ -313,7 +313,7 @@ type ConfJSON struct {
 	CacheConfig struct {
 		Size int
 	}
-	FaultInjectionConfig struct {
+	NetworkQPUConfig struct {
 		Function string
 		Rate     float32
 	}

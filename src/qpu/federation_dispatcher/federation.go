@@ -1,7 +1,6 @@
 package federation
 
 import (
-	"errors"
 	"io"
 
 	"github.com/dvasilas/proteus/src"
@@ -34,28 +33,20 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the federation dispatcher QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
-	forwardTo, err := q.generateSubQueries(req.GetPredicate())
+func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	forwardTo, err := q.generateSubQueries(request.GetPredicate())
 	if err != nil {
 		return err
 	}
 	errChan := make(chan error)
 	for _, frwTo := range forwardTo {
-		streamIn, _, err := frwTo.Client.Query(req.GetPredicate(), protoutils.SnapshotTimePredicate(req.GetClock().GetLbound(), req.GetClock().GetUbound()), false)
+		streamIn, _, err := frwTo.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
 		if err != nil {
 			return err
 		}
-		utils.QueryResponseConsumer(req.GetPredicate(), streamIn, streamOut, forward, errChan)
+		utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, forward, errChan)
 	}
 
 	streamCnt := len(forwardTo)

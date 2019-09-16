@@ -106,28 +106,20 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the index QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
-	request, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-	req := request.GetRequest()
-	log.WithFields(log.Fields{"req": req}).Debug("Query request")
-
-	if req.GetClock().GetUbound().GetType() < req.GetClock().GetUbound().GetType() {
+func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
+	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
-	if req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		req.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
-		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		req.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+	if request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
+		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
-	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		indexResult, err := q.index.Lookup(req.GetPredicate()[0], req.GetClock())
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+		indexResult, err := q.index.Lookup(request.GetPredicate()[0], request.GetClock())
 		if err != nil {
 			return err
 		}
@@ -150,12 +142,12 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer) error {
 			seqID++
 		}
 	}
-	if req.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || req.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		forwardCh := make(chan *pbQPU.ResponseStreamRecord, 0)
 		errCh := make(chan error)
 		chID := rand.Int()
 		q.forwardM[chID] = forwardCh
-		go q.forward(req.GetPredicate(), forwardCh, streamOut, errCh, chID)
+		go q.forward(request.GetPredicate(), forwardCh, streamOut, errCh, chID)
 		err := <-errCh
 		if err != nil {
 			return err

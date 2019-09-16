@@ -13,6 +13,7 @@ import (
 
 	"github.com/dvasilas/proteus/proteus-bench/s3/yelpDataset"
 	"github.com/dvasilas/proteus/proteus_client"
+	"github.com/dvasilas/proteus/src"
 	pbS3Cli "github.com/dvasilas/proteus/src/protos/s3client"
 	"google.golang.org/grpc"
 
@@ -173,20 +174,6 @@ func (b *benchmark) updateTags(bucketName, objName string, md map[string]string)
 	return err
 }
 
-//----------------- responseTime -------------------
-
-type responseTime []time.Duration
-
-func (t responseTime) Len() int {
-	return len(t)
-}
-func (t responseTime) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
-}
-func (t responseTime) Less(i, j int) bool {
-	return t[i].Nanoseconds() < t[j].Nanoseconds()
-}
-
 //-------------------- main ------------------------
 
 func main() {
@@ -232,7 +219,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sort.Sort(responseTime(b.respTime))
+	sort.Sort(utils.ResponseTime(b.respTime))
 	l := len(b.respTime)
 	fmt.Println("p50", b.respTime[l*50/100])
 	fmt.Println("p90", b.respTime[l*90/100])

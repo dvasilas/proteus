@@ -5,7 +5,7 @@ import (
 
 	"github.com/dvasilas/proteus/src/protos"
 	pb "github.com/dvasilas/proteus/src/protos/qpu"
-	pbQPU "github.com/dvasilas/proteus/src/protos/utils"
+	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	"google.golang.org/grpc"
 )
 
@@ -16,7 +16,7 @@ type Client struct {
 }
 
 //Query ...
-func (c *Client) Query(predicate []*pbQPU.AttributePredicate, ts *pbQPU.SnapshotTimePredicate, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+func (c *Client) Query(predicate []*pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
@@ -31,6 +31,16 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	ctx := context.TODO()
 	resp, err := c.cli.GetConfig(ctx, protoutils.ConfigRequest())
 	return resp, err
+}
+
+// Ping ...
+func (c *Client) Forward() (pb.QPU_QueryClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.Query(ctx)
+	if err != nil {
+		return nil, cancel, nil
+	}
+	return stream, cancel, err
 }
 
 //CloseConnection ...

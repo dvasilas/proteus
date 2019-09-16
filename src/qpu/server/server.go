@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -11,13 +13,13 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	"github.com/dvasilas/proteus/src/qpu/cache"
 	"github.com/dvasilas/proteus/src/qpu/datastore_driver"
-	"github.com/dvasilas/proteus/src/qpu/fault_injection"
 	"github.com/dvasilas/proteus/src/qpu/federation_dispatcher"
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index"
 	"github.com/dvasilas/proteus/src/qpu/intersection"
 	"github.com/dvasilas/proteus/src/qpu/lambda"
 	"github.com/dvasilas/proteus/src/qpu/load_balancer"
+	"github.com/dvasilas/proteus/src/qpu/network"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -33,7 +35,7 @@ type QPUServer struct {
 
 //QPUAPI specifies the API of a QPU
 type QPUAPI interface {
-	Query(stream pbQPU.QPU_QueryServer) error
+	Query(pbQPU.QPU_QueryServer, *pbQPU.RequestStream) error
 	GetConfig() (*pbQPU.ConfigResponse, error)
 	Cleanup()
 }
@@ -43,7 +45,14 @@ type QPUAPI interface {
 //Query implements the Query method of a generic QPU
 //Calls specific implementations of the Query method
 func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
-	return s.api.Query(stream)
+	request, err := stream.Recv()
+	if err == io.EOF {
+		return errors.New("Query received EOF")
+	}
+	if err != nil {
+		return err
+	}
+	return s.api.Query(stream, request)
 }
 
 //GetConfig constructs and returns a structure describing the configuration of a QPU
@@ -88,8 +97,8 @@ func Server(confArg config.ConfJSON) error {
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_FAULT_INJECTION:
-		api, err = faultinjection.QPU(conf)
+	case pbQPU.ConfigResponse_NETWORK:
+		api, err = network.QPU(conf)
 		if err != nil {
 			return err
 		}

@@ -14,6 +14,7 @@ message RequestStream {
   oneof payload {
     QueryRequest request = 1;
     AckMsg ack = 2;
+    PingMsg ping = 3;
   }
 }
 
@@ -55,14 +56,13 @@ message ConfigResponse {
     FEDERATION_DISPATCHER = 4;
     LOAD_BALANCER = 5;
     LAMBDA = 6;
-    FAULT_INJECTION = 7;
+    NETWORK = 7;
     INTERSECTION = 8;
   }
   QPUType qpu_type = 1;
   repeated utils.AttributePredicate supportedQueries = 2;
   DataSet dataset = 3;
 }
-
 
 message DataSet {
   message DB {
@@ -72,4 +72,8 @@ message DataSet {
     repeated string shards = 1;
   }
   map<string, DB> databases = 1;
+}
+
+message PingMsg {
+  int64 seq_id = 1;
 }

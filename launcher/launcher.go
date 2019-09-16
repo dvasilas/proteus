@@ -111,21 +111,26 @@ func main() {
 		conf.IndexConfig.IndexStore.Endpoint = indexConf.IndexStore.Endpoint
 		conf.IndexConfig.IndexStore.Bucket = indexConf.IndexStore.Bucket
 		conf.IndexConfig.IndexStore.Implementation = indexConf.IndexStore.Implementation
-	case "fault_injection":
+	case "network":
 		var function string
-		var rate float64
-		faultInjFlags := flag.NewFlagSet("fault injection QPU flags", flag.ExitOnError)
-		faultInjFlags.StringVar(&function, "func", "noArg", "the type of fault to be injected")
-		faultInjFlags.Float64Var(&rate, "rate", 0.0, "the fault rate")
-		faultInjFlags.Parse(os.Args[3:5])
-		n += 2
-
-		conf.FaultInjectionConfig.Function = function
-		conf.FaultInjectionConfig.Rate = float32(rate)
+		networkQPUFlags := flag.NewFlagSet("network QPU flags", flag.ExitOnError)
+		networkQPUFlags.StringVar(&function, "func", "noArg", "the type of fault to be injected")
+		networkQPUFlags.Parse(os.Args[3:4])
+		n++
+		conf.NetworkQPUConfig.Function = function
+		switch conf.NetworkQPUConfig.Function {
+		case "drop":
+			var rate float64
+			dropFlags := flag.NewFlagSet("network QPU [drop] flags", flag.ExitOnError)
+			dropFlags.Float64Var(&rate, "rate", 0.0, "the fault rate")
+			dropFlags.Parse(os.Args[4:5])
+			n++
+			conf.NetworkQPUConfig.Rate = float32(rate)
+		}
 	}
 
 	if conf.QpuType == "filter" || conf.QpuType == "cache" || conf.QpuType == "index" ||
-		conf.QpuType == "federation" || conf.QpuType == "fault_injection" || conf.QpuType == "load_balancer" ||
+		conf.QpuType == "federation" || conf.QpuType == "network" || conf.QpuType == "load_balancer" ||
 		conf.QpuType == "lambda" || conf.QpuType == "intersection" {
 		var connections string
 		connFlags := flag.NewFlagSet("graph QPU flags", flag.ExitOnError)
