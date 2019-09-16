@@ -5,6 +5,8 @@ Proteus: Programmable Distributed Query Processing Architecture
 [![Go Report Card](https://goreportcard.com/badge/github.com/dvasilas/proteus)](https://goreportcard.com/report/github.com/dvasilas/proteus)
 
 
-Proteus (**PRO**grammable distribu**TE**d q**U**ery proce**S**sing) is a framework that enables geo-distributed data stores to be extended with query processing capabilities. For more details see https://dl.acm.org/citation.cfm?id=3194265.
+Proteus is a framework for deploying flexible search engines on top of geo-distributed data.
+
+For more details see https://dl.acm.org/citation.cfm?id=3194265.
 
 This repository contains a (work-in-progress) implementation of Proteus.
