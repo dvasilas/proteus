@@ -25,9 +25,8 @@ import (
 
 const bucket = "local-s3"
 const preloadSize = 10
-const workloadRation = 0.8
-const workloadSize = 1000
-const workloadTime = 10
+const workloadRation = 1.0
+const workloadTime = 20
 
 type dataset interface {
 	PopulateDB(string, string, int, func(string, string, string, map[string]string) error) error
@@ -47,7 +46,6 @@ type config struct {
 	datasetSize     int
 	maxAttributeNum int
 	queryWriteRatio float32
-	workloadMaxOPs  int
 	workloadMaxTime time.Duration
 }
 
@@ -62,33 +60,34 @@ func (b *benchmark) populateDB(input string, doPopulate bool) error {
 	return nil
 }
 
-func (b *benchmark) doWorkload() error {
-	t := time.Now()
-	for i := 0; i < b.conf.workloadMaxOPs && time.Since(t) < b.conf.workloadMaxTime; i++ {
+func (b *benchmark) doWorkload() (int64, float64, error) {
+	t0 := time.Now()
+	opCount := int64(0)
+	for time.Since(t0) < b.conf.workloadMaxTime {
 		r := rand.Float32()
-		fmt.Println(r)
 		if r <= b.conf.queryWriteRatio {
 			query := b.workload.Query()
-			fmt.Println(query)
 			t, err := b.doQuery(query)
 			if err != nil {
-				return err
+				return 0, 0, err
 			}
 			b.respTime = append(b.respTime, t)
+			opCount++
 		} else {
 			if err := b.workload.Update(bucket, b.updateTags); err != nil {
-				return err
+				return 0, 0, err
 			}
 		}
 	}
-	return nil
+	t := time.Since(t0)
+	return opCount, t.Seconds(), nil
 }
 
 func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Duration, error) {
-	start := time.Now()
+	t0 := time.Now()
 	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.LATESTSNAPSHOT)
 	if err != nil {
-		return time.Since(start), err
+		return time.Since(t0), err
 	}
 	eof := false
 	responseStarted := false
@@ -99,11 +98,11 @@ func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Dura
 			if err == io.EOF {
 				eof = true
 			} else {
-				return time.Since(start), err
+				return time.Since(t0), err
 			}
 		case <-respCh:
 			if !responseStarted {
-				elapsed = time.Since(start)
+				elapsed = time.Since(t0)
 				responseStarted = true
 			}
 		}
@@ -150,27 +149,23 @@ func (b *benchmark) createBucket(bucketName string) error {
 func (b *benchmark) putObject(bucketName, objName, content string, md map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := b.s3client.PutObject(ctx, &pbS3Cli.PutObjectRequest{
+	_, err := b.s3client.PutObject(ctx, &pbS3Cli.PutObjectRequest{
 		ObjectName: objName,
 		BucketName: bucketName,
 		Content:    content,
 		XAmzMeta:   md,
 	})
-	fmt.Println("r: ", r.GetReply() == 0)
-	fmt.Println("err: ", err)
 	return err
 }
 
 func (b *benchmark) updateTags(bucketName, objName string, md map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := b.s3client.UpdateTags(ctx, &pbS3Cli.UpdateTagsRequest{
+	_, err := b.s3client.UpdateTags(ctx, &pbS3Cli.UpdateTagsRequest{
 		ObjectName: objName,
 		BucketName: bucketName,
 		XAmzMeta:   md,
 	})
-	fmt.Println("r: ", r.GetReply() == 0)
-	fmt.Println("err: ", err)
 	return err
 }
 
@@ -206,7 +201,6 @@ func main() {
 		conf: config{
 			datasetSize:     preloadSize,
 			queryWriteRatio: workloadRation,
-			workloadMaxOPs:  workloadSize,
 			workloadMaxTime: time.Second * workloadTime,
 		},
 		respTime: make([]time.Duration, 0),
@@ -215,7 +209,8 @@ func main() {
 	if err := b.populateDB(*dataset, *populate); err != nil {
 		log.Fatal(err)
 	}
-	if err := b.doWorkload(); err != nil {
+	opCount, duration, err := b.doWorkload()
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -225,6 +220,8 @@ func main() {
 	fmt.Println("p90", b.respTime[l*90/100])
 	fmt.Println("p95", b.respTime[l*95/100])
 	fmt.Println("p99", b.respTime[l*99/100])
+
+	fmt.Println("throughput:", float64(opCount)/duration)
 
 	if *doPlot {
 		if err := b.plot(); err != nil {
