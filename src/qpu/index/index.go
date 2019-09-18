@@ -20,10 +20,15 @@ import (
 
 // IQPU implements an index QPU
 type IQPU struct {
-	qpu         *utils.QPU
-	index       indexStore
-	cancelFuncs []context.CancelFunc
-	forwardM    map[int]chan *pbQPU.ResponseStreamRecord
+	qpu          *utils.QPU
+	index        indexStore
+	cancelFuncs  []context.CancelFunc
+	persistentQs map[int]persistentQuery
+}
+
+type persistentQuery struct {
+	predicate []*pbUtils.AttributePredicate
+	stream    pbQPU.QPU_QueryServer
 }
 
 // indexStore describes the interface that any index implementation needs to expose
@@ -44,7 +49,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 			Config:               conf,
 			QueryingCapabilities: conf.IndexConfig.IndexingConfig,
 		},
-		forwardM: make(map[int]chan *pbQPU.ResponseStreamRecord),
+		persistentQs: make(map[int]persistentQuery),
 	}
 
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
@@ -143,14 +148,18 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		}
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
-		forwardCh := make(chan *pbQPU.ResponseStreamRecord, 0)
-		errCh := make(chan error)
 		chID := rand.Int()
-		q.forwardM[chID] = forwardCh
-		go q.forward(request.GetPredicate(), forwardCh, streamOut, errCh, chID)
-		err := <-errCh
-		if err != nil {
-			return err
+		q.persistentQs[chID] = persistentQuery{
+			predicate: request.GetPredicate(),
+			stream:    streamOut,
+		}
+		for {
+			err := streamOut.Send(protoutils.ResponseStreamRecord(int64(0), pbQPU.ResponseStreamRecord_HEARTBEAT, nil))
+			if err != nil {
+				delete(q.persistentQs, chID)
+				break
+			}
+			time.Sleep(time.Second)
 		}
 	}
 	return nil
@@ -175,23 +184,19 @@ func (q *IQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *IQPU) forward(predicate []*pbUtils.AttributePredicate, forwardCh chan *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, errCh chan error, chanID int) {
-	for streamRec := range forwardCh {
-		match, err := filter.Filter(predicate, streamRec)
+func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
+	for _, q := range q.persistentQs {
+		match, err := filter.Filter(q.predicate, record)
 		if err != nil {
-			errCh <- err
-			break
+			return err
 		}
 		if match {
-			if err := streamOut.Send(streamRec); err != nil {
-				errCh <- err
-				break
+			if err := q.stream.Send(record); err != nil {
+				return nil
 			}
 		}
 	}
-	errCh <- nil
-	close(forwardCh)
-	delete(q.forwardM, chanID)
+	return nil
 }
 
 // Receives an stream of update operations
@@ -209,21 +214,24 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			return
 		} else {
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-				log.WithFields(log.Fields{"operation": streamRec, "timestap": streamRec.GetLogOp().GetTimestamp()}).Debug("index QPU received operation")
-				if err := q.updateIndex(streamRec); err != nil {
-					log.WithFields(log.Fields{"error": err, "op": streamRec}).Fatal("opConsumer: index Update failed")
-					return
-				}
-				if sync {
-					log.Debug("QPUServer:index updated, sending ACK")
-					if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
-						log.Fatal("opConsumer stream.Send failed")
+				go func() {
+					log.WithFields(log.Fields{"operation": streamRec, "timestap": streamRec.GetLogOp().GetTimestamp()}).Debug("index QPU received operation")
+					if err := q.updateIndex(streamRec); err != nil {
+						log.WithFields(log.Fields{"error": err, "op": streamRec}).Fatal("opConsumer: index Update failed")
 						return
 					}
-				}
-				for _, ch := range q.forwardM {
-					ch <- streamRec
-				}
+					if sync {
+						log.Debug("QPUServer:index updated, sending ACK")
+						if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
+							log.Fatal("opConsumer stream.Send failed")
+							return
+						}
+					}
+					if err := q.forward(streamRec); err != nil {
+						log.Fatal("forwards err", err)
+						return
+					}
+				}()
 			}
 		}
 	}
