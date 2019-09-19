@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='s3client',
   syntax='proto3',
   serialized_options=_b('Z/github.com/dvasilas/proteus/src/protos/s3client'),
-  serialized_pb=_b('\n\x0es3client.proto\x12\x08s3client\"*\n\x13\x43reateBucketRequest\x12\x13\n\x0b\x62ucket_name\x18\x01 \x01(\t\"\xbc\x01\n\x10PutObjectRequest\x12\x13\n\x0bobject_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12<\n\nx_amz_meta\x18\x03 \x03(\x0b\x32(.s3client.PutObjectRequest.XAmzMetaEntry\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x1a/\n\rXAmzMetaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xad\x01\n\x11UpdateTagsRequest\x12\x13\n\x0bobject_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12=\n\nx_amz_meta\x18\x03 \x03(\x0b\x32).s3client.UpdateTagsRequest.XAmzMetaEntry\x1a/\n\rXAmzMetaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x05Reply\x12\r\n\x05reply\x18\x01 \x01(\x05\x32\xc0\x01\n\x02S3\x12@\n\x0c\x43reateBucket\x12\x1d.s3client.CreateBucketRequest\x1a\x0f.s3client.Reply\"\x00\x12:\n\tPutObject\x12\x1a.s3client.PutObjectRequest\x1a\x0f.s3client.Reply\"\x00\x12<\n\nUpdateTags\x12\x1b.s3client.UpdateTagsRequest\x1a\x0f.s3client.Reply\"\x00\x42\x31Z/github.com/dvasilas/proteus/src/protos/s3clientb\x06proto3')
+  serialized_pb=_b('\n\x0es3client.proto\x12\x08s3client\"*\n\x13\x43reateBucketRequest\x12\x13\n\x0b\x62ucket_name\x18\x01 \x01(\t\"\xbc\x01\n\x10PutObjectRequest\x12\x13\n\x0bobject_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12<\n\nx_amz_meta\x18\x03 \x03(\x0b\x32(.s3client.PutObjectRequest.XAmzMetaEntry\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x1a/\n\rXAmzMetaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xad\x01\n\x11UpdateTagsRequest\x12\x13\n\x0bobject_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12=\n\nx_amz_meta\x18\x03 \x03(\x0b\x32).s3client.UpdateTagsRequest.XAmzMetaEntry\x1a/\n\rXAmzMetaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x05Reply\x12\r\n\x05reply\x18\x01 \x01(\x05\x32\xc8\x01\n\x02S3\x12@\n\x0c\x43reateBucket\x12\x1d.s3client.CreateBucketRequest\x1a\x0f.s3client.Reply\"\x00\x12>\n\tPutObject\x12\x1a.s3client.PutObjectRequest\x1a\x0f.s3client.Reply\"\x00(\x01\x30\x01\x12@\n\nUpdateTags\x12\x1b.s3client.UpdateTagsRequest\x1a\x0f.s3client.Reply\"\x00(\x01\x30\x01\x42\x31Z/github.com/dvasilas/proteus/src/protos/s3clientb\x06proto3')
 )
 
 
@@ -324,7 +324,7 @@ _S3 = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   serialized_start=464,
-  serialized_end=656,
+  serialized_end=664,
   methods=[
   _descriptor.MethodDescriptor(
     name='CreateBucket',

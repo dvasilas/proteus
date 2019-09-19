@@ -19,12 +19,12 @@ class S3Stub(object):
         request_serializer=s3client__pb2.CreateBucketRequest.SerializeToString,
         response_deserializer=s3client__pb2.Reply.FromString,
         )
-    self.PutObject = channel.unary_unary(
+    self.PutObject = channel.stream_stream(
         '/s3client.S3/PutObject',
         request_serializer=s3client__pb2.PutObjectRequest.SerializeToString,
         response_deserializer=s3client__pb2.Reply.FromString,
         )
-    self.UpdateTags = channel.unary_unary(
+    self.UpdateTags = channel.stream_stream(
         '/s3client.S3/UpdateTags',
         request_serializer=s3client__pb2.UpdateTagsRequest.SerializeToString,
         response_deserializer=s3client__pb2.Reply.FromString,
@@ -42,14 +42,14 @@ class S3Servicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def PutObject(self, request, context):
+  def PutObject(self, request_iterator, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def UpdateTags(self, request, context):
+  def UpdateTags(self, request_iterator, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -64,12 +64,12 @@ def add_S3Servicer_to_server(servicer, server):
           request_deserializer=s3client__pb2.CreateBucketRequest.FromString,
           response_serializer=s3client__pb2.Reply.SerializeToString,
       ),
-      'PutObject': grpc.unary_unary_rpc_method_handler(
+      'PutObject': grpc.stream_stream_rpc_method_handler(
           servicer.PutObject,
           request_deserializer=s3client__pb2.PutObjectRequest.FromString,
           response_serializer=s3client__pb2.Reply.SerializeToString,
       ),
-      'UpdateTags': grpc.unary_unary_rpc_method_handler(
+      'UpdateTags': grpc.stream_stream_rpc_method_handler(
           servicer.UpdateTags,
           request_deserializer=s3client__pb2.UpdateTagsRequest.FromString,
           response_serializer=s3client__pb2.Reply.SerializeToString,

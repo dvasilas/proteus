@@ -18,7 +18,6 @@ class S3ClientServer(s3client_pb2_grpc.S3Servicer):
       self.s3.create_bucket(Bucket=bucket_name)
 
     def CreateBucket(self, request, context):
-      print(request)
       try:
         self.create_bucket(request.bucket_name)
       except ClientError as e:
@@ -26,32 +25,30 @@ class S3ClientServer(s3client_pb2_grpc.S3Servicer):
           return s3client_pb2.Reply(reply=-1)
       return s3client_pb2.Reply(reply=0)
 
-    def PutObject(self, request, context):
-      print(request)
-      md = {}
-      for k in request.x_amz_meta:
-        md[k] = request.x_amz_meta[k]
-      print(md)
-      try:
-          self.s3.put_object(Bucket=request.bucket_name, Key=request.object_name, Body=request.content.encode(), Metadata=md)
-      except ClientError as e:
-          logging.error(e)
-          return s3client_pb2.Reply(reply=-1)
-      return s3client_pb2.Reply(reply=0)
+    def PutObject(self, request_iterator, context):
+        for request in request_iterator:
+            md = {}
+            for k in request.x_amz_meta:
+                md[k] = request.x_amz_meta[k]
+            try:
+                self.s3.put_object(Bucket=request.bucket_name, Key=request.object_name, Body=request.content.encode(), Metadata=md)
+            except ClientError as e:
+                logging.error(e)
+                yield s3client_pb2.Reply(reply=-1)
+            yield s3client_pb2.Reply(reply=0)
 
-    def UpdateTags(self, request, context):
-      print(request)
-      try:
-          res = self.s3.head_object(Bucket=request.bucket_name, Key=request.object_name)
-          md = res['Metadata']
-          for k in request.x_amz_meta:
-            md[k] = request.x_amz_meta[k]
-          print(md)
-          self.s3.copy_object(Bucket=request.bucket_name, Key=request.object_name, CopySource={'Bucket': request.bucket_name, 'Key': request.object_name}, MetadataDirective='REPLACE',  Metadata=md)
-      except ClientError as e:
-          logging.error(e)
-          return s3client_pb2.Reply(reply=-1)
-      return s3client_pb2.Reply(reply=0)
+    def UpdateTags(self, request_iterator, context):
+      for request in request_iterator:
+        try:
+            res = self.s3.head_object(Bucket=request.bucket_name, Key=request.object_name)
+            md = res['Metadata']
+            for k in request.x_amz_meta:
+              md[k] = request.x_amz_meta[k]
+            self.s3.copy_object(Bucket=request.bucket_name, Key=request.object_name, CopySource={'Bucket': request.bucket_name, 'Key': request.object_name}, MetadataDirective='REPLACE',  Metadata=md)
+        except ClientError as e:
+            logging.error(e)
+            yield s3client_pb2.Reply(reply=-1)
+        yield s3client_pb2.Reply(reply=0)
 
 def serve(port, s3):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))

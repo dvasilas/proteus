@@ -138,21 +138,31 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 				close(errChan)
 				return
 			}
-			respChan <- ResponseRecord{
-				SequenceID: streamRec.GetSequenceId(),
-				ObjectID:   streamRec.GetLogOp().GetObjectId(),
-				ObjectType: getObjectType(streamRec),
-				Bucket:     streamRec.GetLogOp().GetBucket(),
-				State:      logOpToObjectState(streamRec.GetLogOp()),
-				Timestamp:  streamRec.GetLogOp().GetTimestamp().GetVc(),
+			if streamRec.GetType() == pbQPU.ResponseStreamRecord_HEARTBEAT {
+			} else if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+			} else {
+				respChan <- ResponseRecord{
+					SequenceID: streamRec.GetSequenceId(),
+					ObjectID:   streamRec.GetLogOp().GetObjectId(),
+					ObjectType: getObjectType(streamRec),
+					Bucket:     streamRec.GetLogOp().GetBucket(),
+					State:      logOpToObjectState(streamRec),
+					Timestamp:  streamRec.GetLogOp().GetTimestamp().GetVc(),
+				}
 			}
 		}
 	}()
 	return respChan, errChan, nil
 }
 
-func logOpToObjectState(logOp *pbUtils.LogOperation) ObjectState {
-	attrs := logOp.GetPayload().GetState().GetAttrs()
+func logOpToObjectState(record *pbQPU.ResponseStreamRecord) ObjectState {
+	logOp := record.GetLogOp()
+	var attrs []*pbUtils.Attribute
+	if record.GetType() == pbQPU.ResponseStreamRecord_STATE {
+		attrs = logOp.GetPayload().GetState().GetAttrs()
+	} else if record.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+		attrs = logOp.GetPayload().GetDelta().GetNew().GetAttrs()
+	}
 	state := make([]Attribute, len(attrs))
 	for i, attr := range attrs {
 		state[i] = Attribute{
@@ -239,7 +249,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 				protoutils.ValueStr(p.Lbound.(string)),
 				protoutils.ValueStr(p.Ubound.(string)))
 		default:
-			return nil, errors.New("unspported datatype in attribute predicate")
+			return nil, errors.New("unsupported datatype in attribute predicate")
 		}
 	}
 	return pred, nil

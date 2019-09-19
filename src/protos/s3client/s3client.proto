@@ -20,8 +20,8 @@ option go_package = "github.com/dvasilas/proteus/src/protos/s3client";
 
 service S3 {
   rpc CreateBucket (CreateBucketRequest) returns (Reply) {}
-  rpc PutObject (PutObjectRequest) returns (Reply) {}
-  rpc UpdateTags (UpdateTagsRequest) returns (Reply) {}
+  rpc PutObject (stream PutObjectRequest) returns (stream Reply) {}
+  rpc UpdateTags (stream UpdateTagsRequest) returns (stream Reply) {}
 }
 
 message CreateBucketRequest {

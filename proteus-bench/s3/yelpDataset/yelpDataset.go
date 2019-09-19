@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -51,19 +50,13 @@ func (w *Workload) Update(bucket string, updateTags func(string, string, map[str
 
 	switch voteInd {
 	case 0:
-		fmt.Println("vote_funny")
 		w.dataset[reviewInd].Votes.Funny++
-		fmt.Println(w.dataset[reviewInd])
 		return updateTags(bucket, w.dataset[reviewInd].ReviewID, map[string]string{"i-votes_funny": strconv.Itoa(w.dataset[reviewInd].Votes.Funny)})
 	case 1:
-		fmt.Println("vote_useful")
 		w.dataset[reviewInd].Votes.Useful++
-		fmt.Println(w.dataset[reviewInd])
 		return updateTags(bucket, w.dataset[reviewInd].ReviewID, map[string]string{"i-votes_useful": strconv.Itoa(w.dataset[reviewInd].Votes.Useful)})
 	case 2:
-		fmt.Println("vote_cool")
 		w.dataset[reviewInd].Votes.Cool++
-		fmt.Println(w.dataset[reviewInd])
 		return updateTags(bucket, w.dataset[reviewInd].ReviewID, map[string]string{"i-votes_cool": strconv.Itoa(w.dataset[reviewInd].Votes.Cool)})
 	}
 	return errors.New("any update")

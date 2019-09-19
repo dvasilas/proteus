@@ -113,11 +113,11 @@ func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecUp *pbQPU.Request
 
 // GetConfig implements the GetConfig API for the network QPU
 func (q *NQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
-	resp := protoutils.ConfigRespοnse(
-		q.qpu.Config.QpuType,
-		q.qpu.QueryingCapabilities,
-		q.qpu.Dataset)
-	return resp, nil
+	conf, err := q.qpu.Conns[0].Client.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	return conf, err
 }
 
 // Cleanup is called when the QPU receives a SIGTERM signcal
@@ -132,7 +132,8 @@ func (q *NQPU) process(send func() error) error {
 	case "drop":
 		return drop(q.qpu.Config.NetworkQPUConfig.Rate, send)
 	case "delay":
-		return delay(send)
+		go delay(send)
+		return nil
 	}
 	return nil
 }
@@ -147,6 +148,11 @@ func drop(rate float32, send func() error) error {
 }
 
 func delay(send func() error) error {
+	log.WithFields(log.Fields{"action": "going to sleep for 50ms"}).Debug("network QPU: delay")
 	time.Sleep(time.Millisecond * 50)
-	return send()
+	err := send()
+	if err != nil {
+		log.Debug(err)
+	}
+	return err
 }
