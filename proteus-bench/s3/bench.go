@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"github.com/dvasilas/proteus/proteus-bench/s3/yelpDataset"
 	"github.com/dvasilas/proteus/proteus_client"
 	"github.com/dvasilas/proteus/src"
+	pbMonitoring "github.com/dvasilas/proteus/src/protos/monitoring"
 	pbS3Cli "github.com/dvasilas/proteus/src/protos/s3client"
 	"google.golang.org/grpc"
 
@@ -31,21 +34,32 @@ const preloadSize = 10
 const workloadRation = 1.0
 const workloadTime = 20
 
+type monitoringServer struct {
+	benchmark *benchmark
+}
+
 type dataset interface {
-	PopulateDB(string, string, int, func(string, string, string, map[string]string) error) error
+	PopulateDB(string, string, int64, int64, func(string, string, string, map[string]string) error) error
 	Update(string, func(string, string, map[string]string) error) error
 	Query() []proteusclient.AttributePredicate
 }
 
 type benchmark struct {
-	workload         *yelp.Workload
-	conf             config
-	proteusClient    *proteusclient.Client
-	s3client         pbS3Cli.S3Client
+	workload      *yelp.Workload
+	conf          config
+	proteusClient *proteusclient.Client
+	datastores    []datastore
+	freshness     freshnessMeasurement
+	responseTime  responseTimeMeasurement
+}
+
+type datastore struct {
+	client           pbS3Cli.S3Client
 	putObjectStream  pbS3Cli.S3_PutObjectClient
 	updateTagsStream pbS3Cli.S3_UpdateTagsClient
-	freshness        freshnessMeasurement
-	responseTime     responseTimeMeasurement
+	conn             *grpc.ClientConn
+	putObjectCancel  context.CancelFunc
+	updateTagsCancel context.CancelFunc
 }
 
 type freshnessMeasurement struct {
@@ -59,27 +73,30 @@ type responseTimeMeasurement struct {
 }
 
 type config struct {
-	datasetSize     int
-	maxAttributeNum int
-	queryWriteRatio float32
-	workloadMaxTime time.Duration
+	datasetSize      int64
+	queryWriteRatio  float32
+	workloadDuration time.Duration
 }
 
-func (b *benchmark) populateDB(input string, doPopulate bool) error {
-	err := b.createBucket(bucket)
-	if err != nil {
-		return err
-	}
-	if b.workload.PopulateDB(input, bucket, b.conf.datasetSize, doPopulate, b.putObject) != nil {
-		return err
+func (b *benchmark) populateDB(fName string, doPopulate bool) error {
+	offset := int64(0)
+	for _, ds := range b.datastores {
+		err := ds.createBucket(bucket)
+		if err != nil {
+			return err
+		}
+		if b.workload.PopulateDB(fName, bucket, offset, b.conf.datasetSize, doPopulate, ds.putObject) != nil {
+			return err
+		}
+		offset += b.conf.datasetSize
 	}
 	return nil
 }
 
-func (b *benchmark) runWorkload() (int64, float64, error) {
+func (b *benchmark) runWorkload(respTimeCh chan time.Duration) (int64, float64, error) {
 	t0 := time.Now()
 	opCount := int64(0)
-	for time.Since(t0) < b.conf.workloadMaxTime {
+	for time.Since(t0) < time.Duration(time.Second*b.conf.workloadDuration) {
 		r := rand.Float32()
 		if r <= b.conf.queryWriteRatio {
 			query := b.workload.Query()
@@ -89,13 +106,16 @@ func (b *benchmark) runWorkload() (int64, float64, error) {
 			}
 			b.responseTime.respTime = append(b.responseTime.respTime, t)
 			opCount++
+			respTimeCh <- t
 		} else {
-			if err := b.workload.Update(bucket, b.updateTags); err != nil {
+			if err := b.workload.Update(bucket, b.datastores[0].updateTags); err != nil {
 				return 0, 0, err
 			}
 		}
+		time.Sleep(time.Second)
 	}
 	t := time.Since(t0)
+	close(respTimeCh)
 	return opCount, t.Seconds(), nil
 }
 
@@ -205,7 +225,7 @@ func (b *benchmark) howFresh() error {
 	j := int64(0)
 	for i := int64(0); i < opCount; i++ {
 		t0 := time.Now()
-		err := b.putObject("local-s3", "obj"+strconv.FormatInt(j, 10), "-------", map[string]string{"i-votes_useful": "0"})
+		err := b.datastores[0].putObject("local-s3", "obj"+strconv.FormatInt(j, 10), "-------", map[string]string{"i-votes_useful": "0"})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -231,101 +251,174 @@ func (b *benchmark) howFresh() error {
 
 //-------------------- main ------------------------
 
-func initialize(queryPort int, s3ClientEndP string) (*benchmark, *grpc.ClientConn, context.CancelFunc, error) {
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: queryPort})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	conn, err := grpc.Dial("localhost:"+string(s3ClientEndP), grpc.WithInsecure())
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
+func initDatastores(dbEndpoints []string) (*benchmark, error) {
 	b := &benchmark{
-		workload:      yelp.New(),
-		proteusClient: c,
-		s3client:      pbS3Cli.NewS3Client(conn),
+		workload: yelp.New(),
 		conf: config{
-			datasetSize:     preloadSize,
-			queryWriteRatio: workloadRation,
-			workloadMaxTime: time.Second * workloadTime,
+			datasetSize:      preloadSize,
+			queryWriteRatio:  workloadRation,
+			workloadDuration: workloadTime,
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	b.putObjectStream, err = b.s3client.PutObject(ctx)
+	datastores := make([]datastore, len(dbEndpoints))
+	for i, endpoint := range dbEndpoints {
+		conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
+		if err != nil {
+			return nil, err
+		}
+		client := pbS3Cli.NewS3Client(conn)
+		ctx, putObjectCancel := context.WithCancel(context.Background())
+		putObjectStr, err := client.PutObject(ctx)
+		if err != nil {
+			putObjectCancel()
+			return nil, err
+		}
+		ctx, updateTagsCancel := context.WithCancel(context.Background())
+		updateTagsStr, err := client.UpdateTags(ctx)
+		if err != nil {
+			putObjectCancel()
+			updateTagsCancel()
+			return nil, err
+		}
+		datastores[i] = datastore{
+			client:           client,
+			putObjectStream:  putObjectStr,
+			updateTagsStream: updateTagsStr,
+			conn:             conn,
+			putObjectCancel:  putObjectCancel,
+			updateTagsCancel: updateTagsCancel,
+		}
+	}
+	b.datastores = datastores
+	return b, nil
+}
+
+func (b *benchmark) initProteus(proteusEndP string) error {
+	proteusEndpoint := strings.Split(proteusEndP, ":")
+	proteusPort, err := strconv.ParseInt(proteusEndpoint[1], 10, 64)
 	if err != nil {
-		cancel()
-		return nil, nil, nil, err
+		log.Fatal(err)
+	}
+	proteusCli, err := proteusclient.NewClient(proteusclient.Host{Name: proteusEndpoint[0], Port: int(proteusPort)})
+	if err != nil {
+		log.Fatal(err)
+	}
+	b.proteusClient = proteusCli
+	return nil
+}
+
+func serve(b *benchmark) {
+	fmt.Println("test")
+	port := "50050"
+	lis, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	pbMonitoring.RegisterMonitoringServer(grpcServer, &monitoringServer{benchmark: b})
+
+	log.WithFields(log.Fields{"port": port}).Info("listening")
+	err = grpcServer.Serve(lis)
+	log.Fatalf("server failed : %v", err)
+}
+
+func (s *monitoringServer) LogResponseTimes(stream pbMonitoring.Monitoring_LogResponseTimesServer) error {
+	respTimeCh := make(chan time.Duration)
+	s.benchmark.responseTime = responseTimeMeasurement{
+		respTime: make([]time.Duration, 0),
+	}
+	go func() {
+		for respT := range respTimeCh {
+			fmt.Println(respT)
+			if err := stream.Send(&pbMonitoring.ResponseTime{Duration: int64(respT)}); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}()
+	opCount, duration, err := s.benchmark.runWorkload(respTimeCh)
+	if err != nil {
+		return err
 	}
 
-	ctx, cancel = context.WithCancel(context.Background())
-	b.updateTagsStream, err = b.s3client.UpdateTags(ctx)
-	if err != nil {
-		cancel()
-		return nil, nil, nil, err
-	}
-
-	return b, conn, cancel, nil
+	percentiles(s.benchmark.responseTime.respTime)
+	fmt.Println("throughput:", float64(opCount)/duration)
+	// if *doPlot {
+	// 	if err := b.plot(); err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// }
+	return nil
 }
 
 func main() {
+	initDebug()
 	rand.Seed(time.Now().UnixNano())
 
-	queryPort := flag.Int("port", 0, "qpu port")
-	s3ClientEndP := flag.String("s3", "", "s3_client server port")
+	proteusEndP := flag.String("proteus", "", "proteus endpoint")
+	dbEndP := flag.String("s3", "", "s3_client server port")
 	dataset := flag.String("data", "", "dataset file")
-	populate := flag.Bool("pp", false, "populate database")
-	doPlot := flag.Bool("plot", false, "plot latency cdf")
+	//doPlot := flag.Bool("plot", false, "plot latency cdf")
 	benchType := flag.String("bench", "", "benchmark type")
 	flag.Parse()
 
-	b, conn, cancel, err := initialize(*queryPort, *s3ClientEndP)
-	defer conn.Close()
-	defer cancel()
+	dbEndpoints := strings.Split(*dbEndP, "/")
+	b, err := initDatastores(dbEndpoints)
+	log.Info("initialize: ", err)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	if *benchType == "preload" {
+		if err := b.populateDB(*dataset, true); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if *benchType == "response" {
+		if err := b.populateDB(*dataset, false); err != nil {
+			log.Fatal(err)
+		}
+		if err := b.initProteus(*proteusEndP); err != nil {
+			log.Fatal(err)
+		}
+		serve(b)
+	}
+
 	if *benchType == "freshness" {
+		if err := b.initProteus(*proteusEndP); err != nil {
+			log.Fatal(err)
+		}
+
 		b.freshness = freshnessMeasurement{
 			objectPutTs:        make(map[int64]time.Time),
 			notificationTs:     make(map[int64]time.Time),
 			freshnessIntervals: make([]time.Duration, opCount),
 		}
 		b.howFresh()
-	} else if *benchType == "response" {
-		b.responseTime = responseTimeMeasurement{
-			respTime: make([]time.Duration, 0),
-		}
-		if err := b.populateDB(*dataset, *populate); err != nil {
-			log.Fatal(err)
-		}
-		opCount, duration, err := b.runWorkload()
-		if err != nil {
-			log.Fatal(err)
-		}
-		percentiles(b.responseTime.respTime)
-		fmt.Println("throughput:", float64(opCount)/duration)
-		if *doPlot {
-			if err := b.plot(); err != nil {
-				log.Fatal(err)
-			}
-		}
 	}
 }
 
 //---------------- S3 operations -------------------
 
-func (b *benchmark) createBucket(bucketName string) error {
+func (ds *datastore) createBucket(bucketName string) error {
+	log.WithFields(log.Fields{"bucket": bucketName}).Debug("createBucket")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err := b.s3client.CreateBucket(ctx, &pbS3Cli.CreateBucketRequest{BucketName: bucketName})
-	return err
+	resp, err := ds.client.CreateBucket(ctx, &pbS3Cli.CreateBucketRequest{BucketName: bucketName})
+	if err != nil {
+		return err
+	}
+	log.WithFields(log.Fields{"reply": resp.GetReply()}).Debug("createBucket response")
+	if resp.GetReply() == 0 {
+		return nil
+	}
+	return errors.New("createBucket err: code= " + strconv.FormatInt(int64(resp.GetReply()), 10))
 }
 
-func (b *benchmark) putObject(bucketName, objName, content string, md map[string]string) error {
-	if err := b.putObjectStream.Send(&pbS3Cli.PutObjectRequest{
+func (ds *datastore) putObject(bucketName, objName, content string, md map[string]string) error {
+	log.WithFields(log.Fields{"bucket": bucketName, "object": objName}).Debug("putObject")
+	if err := ds.putObjectStream.Send(&pbS3Cli.PutObjectRequest{
 		ObjectName: objName,
 		BucketName: bucketName,
 		Content:    content,
@@ -333,25 +426,26 @@ func (b *benchmark) putObject(bucketName, objName, content string, md map[string
 	}); err != nil {
 		return err
 	}
-	resp, err := b.putObjectStream.Recv()
+	resp, err := ds.putObjectStream.Recv()
 	if err != nil {
 		return err
 	}
+	log.WithFields(log.Fields{"reply": resp.GetReply()}).Debug("putObject response")
 	if resp.GetReply() == 0 {
 		return nil
 	}
 	return errors.New("putObject err: code= " + strconv.FormatInt(int64(resp.GetReply()), 10))
 }
 
-func (b *benchmark) updateTags(bucketName, objName string, md map[string]string) error {
-	if err := b.updateTagsStream.Send(&pbS3Cli.UpdateTagsRequest{
+func (ds *datastore) updateTags(bucketName, objName string, md map[string]string) error {
+	if err := ds.updateTagsStream.Send(&pbS3Cli.UpdateTagsRequest{
 		ObjectName: objName,
 		BucketName: bucketName,
 		XAmzMeta:   md,
 	}); err != nil {
 		return err
 	}
-	resp, err := b.updateTagsStream.Recv()
+	resp, err := ds.updateTagsStream.Recv()
 	if err != nil {
 		return err
 	}
@@ -370,4 +464,14 @@ func percentiles(durationArray []time.Duration) {
 	log.Info("p90: ", durationArray[l*90/100])
 	log.Info("p95: ", durationArray[l*95/100])
 	log.Info("p99: ", durationArray[l*99/100])
+}
+
+func initDebug() error {
+	debug := os.Getenv("DEBUG")
+	if debug == "true" {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+	return nil
 }

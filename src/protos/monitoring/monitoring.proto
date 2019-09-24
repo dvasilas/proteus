@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package monitoring;
+
+option go_package = "github.com/dvasilas/proteus/src/protos/monitoring";
+
+service Monitoring {
+  rpc LogResponseTimes (stream workloadRequest) returns (stream responseTime) {}
+}
+
+message workloadRequest {
+}
+
+message responseTime {
+  int64 duration = 1;
+}

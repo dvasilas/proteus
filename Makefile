@@ -24,6 +24,7 @@ proto: $(PROTOC_CMD)
 	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
 	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
 	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/s3client --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/s3client/s3client.proto
+	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/monitoring --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/monitoring/monitoring.proto
 	python3 -m grpc_tools.protoc -I./src/protos/s3client --python_out=./proteus-bench/s3/ --grpc_python_out=./proteus-bench/s3/ ./src/protos/s3client/s3client.proto
 
 build_qpu_server:

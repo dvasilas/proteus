@@ -75,7 +75,7 @@ func (w *Workload) Query() []proteusclient.AttributePredicate {
 }
 
 // PopulateDB ...
-func (w *Workload) PopulateDB(fName, bucket string, datasetSize int, doPopulate bool, putObject func(string, string, string, map[string]string) error) error {
+func (w *Workload) PopulateDB(fName, bucket string, offset int64, datasetSize int64, doPopulate bool, putObject func(string, string, string, map[string]string) error) error {
 	f, err := os.Open(fName)
 	if err != nil {
 		return err
@@ -84,8 +84,12 @@ func (w *Workload) PopulateDB(fName, bucket string, datasetSize int, doPopulate 
 
 	var rev review
 	scanner := bufio.NewScanner(f)
-
-	for i := 0; i < datasetSize && scanner.Scan(); i++ {
+	for i := int64(0); i < offset && scanner.Scan(); i++ {
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	}
+	for i := int64(0); i < datasetSize && scanner.Scan(); i++ {
 		json.Unmarshal([]byte(scanner.Text()), &rev)
 		rev.Datetime, err = time.Parse("2006-01-02", rev.Date)
 
@@ -105,9 +109,9 @@ func (w *Workload) PopulateDB(fName, bucket string, datasetSize int, doPopulate 
 				return err
 			}
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return err
+		if err := scanner.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
