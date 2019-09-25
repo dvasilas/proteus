@@ -1,12 +1,14 @@
-from concurrent import futures
-import time
-import logging
 import argparse
+import logging
+import time
+from concurrent import futures
+
+import boto3
 import grpc
+from botocore.exceptions import ClientError
+
 import s3client_pb2
 import s3client_pb2_grpc
-import boto3
-from botocore.exceptions import ClientError
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
@@ -49,6 +51,14 @@ class S3ClientServer(s3client_pb2_grpc.S3Servicer):
             logging.error(e)
             yield s3client_pb2.Reply(reply=-1)
         yield s3client_pb2.Reply(reply=0)
+
+    def LoadDataset(self, request, context):
+      bucketsResp = self.s3.list_buckets()
+      for bucket in bucketsResp['Buckets']:
+        listResp = self.s3.list_objects_v2(Bucket=bucket['Name'])
+        for object in listResp['Contents']:
+          headResp = self.s3.head_object(Bucket=bucket['Name'], Key=object['Key'])
+          yield s3client_pb2.Object(object_name=object['Key'], bucket_name=bucket['Name'], x_amz_meta=headResp['Metadata'])
 
 def serve(port, s3):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))

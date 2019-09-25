@@ -5,7 +5,7 @@
     "uBound": "10000",
     "consLevel": "async",
     "indexStore": {
-      "store": "in_mem",
+      "store": "antidote",
       "endpoint": "127.0.0.1:8087",
       "bucket": "indexqpu1",
       "indexDataStruct": "btree"

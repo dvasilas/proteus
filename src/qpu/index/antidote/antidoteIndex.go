@@ -2,6 +2,7 @@ package antidoteindex
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type AntidoteIndex struct {
 	attributeType pbUtils.Attribute_AttributeType
 	client        *antidote.Client
 	bucket        antidote.Bucket
+	//mutex         sync.RWMutex
 }
 
 //---------------- API Functions -------------------
@@ -56,74 +58,91 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 	if err != nil {
 		return err
 	}
-	tx, err := i.client.StartTransaction()
-	if err != nil {
-		return err
-	}
-	// if attrOld != nil then the previous value has been indexed
-	// the index entry of the previous value needs to be updated
-	// by creating a new object list version without the given object
-	if attrOld != nil {
-		attrToValIndex, err := i.getAttrToValIndex(attrOld, tx)
+
+	successful := false
+	factor := 1
+	for !successful {
+		//i.mutex.Lock()
+		tx, err := i.client.StartTransaction()
 		if err != nil {
 			return err
 		}
-		valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrOld)
-		if err != nil {
-			return err
-		}
-		lastVRef, err := getLastVersionRef(valToTsIndex)
-		if err != nil {
-			return err
-		}
-		objList, err := i.bucket.ReadSet(tx, lastVRef)
-		if err != nil {
-			return err
-		}
-		newVUpdate, ref := putNewVersion(attrOld, encodeTimestamp(ts.GetVc()), tx)
-		indexStoreUpdates = append(indexStoreUpdates,
-			newVUpdate,
-			antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
-			antidote.SetRemove(antidote.Key([]byte(ref)), objectEncoded),
-		)
-	}
-	if attrNew != nil {
-		attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
-		if err != nil {
-			return err
-		}
-		valToTsIndex, _ := getValtoTsIndex(attrToValIndex, attrNew)
-		// if valIndex == nil the is no entry for this value in the value-to-ts index
-		// a new entry with the given value needs to be created
-		if valToTsIndex == nil {
-			newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
-			indexStoreUpdates = append(indexStoreUpdates,
-				newVUpdate,
-				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-			)
-		} else {
-			// an index entry for this value exists
-			// a new version for the entry needs to created, by added the given object
+		// if attrOld != nil then the previous value has been indexed
+		// the index entry of the previous value needs to be updated
+		// by creating a new object list version without the given object
+		if attrOld != nil {
+			attrToValIndex, err := i.getAttrToValIndex(attrOld, tx)
+			if err != nil {
+				return err
+			}
+			valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrOld)
+			if err != nil {
+				return err
+			}
 			lastVRef, err := getLastVersionRef(valToTsIndex)
 			if err != nil {
-				return nil
+				return err
 			}
 			objList, err := i.bucket.ReadSet(tx, lastVRef)
 			if err != nil {
 				return err
 			}
-			newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
+			newVUpdate, ref := putNewVersion(attrOld, encodeTimestamp(ts.GetVc()), tx)
 			indexStoreUpdates = append(indexStoreUpdates,
 				newVUpdate,
 				antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
-				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+				antidote.SetRemove(antidote.Key([]byte(ref)), objectEncoded),
 			)
 		}
+		if attrNew != nil {
+			attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
+			if err != nil {
+				return err
+			}
+			valToTsIndex, _ := getValtoTsIndex(attrToValIndex, attrNew)
+			// if valIndex == nil the is no entry for this value in the value-to-ts index
+			// a new entry with the given value needs to be created
+			if valToTsIndex == nil {
+				newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
+				indexStoreUpdates = append(indexStoreUpdates,
+					newVUpdate,
+					antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+				)
+			} else {
+				// an index entry for this value exists
+				// a new version for the entry needs to created, by added the given object
+				lastVRef, err := getLastVersionRef(valToTsIndex)
+				if err != nil {
+					return nil
+				}
+				objList, err := i.bucket.ReadSet(tx, lastVRef)
+				if err != nil {
+					return err
+				}
+				newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
+				indexStoreUpdates = append(indexStoreUpdates,
+					newVUpdate,
+					antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
+					antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+				)
+			}
+		}
+		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
+			return err
+		}
+		err = tx.Commit()
+		fmt.Println("______________index:Commit err: ", err)
+		if err == nil {
+			successful = true
+			//i.mutex.Unlock()
+		} else {
+			//i.mutex.Unlock()
+			fmt.Println("retrying after ", time.Millisecond*time.Duration((10*factor)))
+			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
+			factor *= 2
+		}
 	}
-	if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
 // UpdateCatchUp ...
@@ -134,40 +153,54 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 		return err
 	}
 
-	tx, err := i.client.StartTransaction()
-	if err != nil {
-		return err
-	}
-	attrToValIndex, err := i.getAttrToValIndex(attr, tx)
-	if err != nil {
-		return err
-	}
-	valToTsIndex, err := getValtoTsIndex(attrToValIndex, attr)
-	// if valIndex == nil the is no entry for this value in the value-to-ts index
-	// a new entry with the given value needs to be created
-	if valToTsIndex == nil {
-		newVUpdate, ref := putNewVersion(attr, genCatchUpVersion(ts), tx)
-		indexStoreUpdates = append(indexStoreUpdates,
-			newVUpdate,
-			antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-		)
-	} else {
-		catchUpVersion, err := valToTsIndex.Reg(antidote.Key(genCatchUpVersion(ts)))
+	successful := false
+	factor := 1
+	for !successful {
+		tx, err := i.client.StartTransaction()
 		if err != nil {
 			return err
 		}
-		indexStoreUpdates = append(indexStoreUpdates,
-			antidote.SetAdd(catchUpVersion, objectEncoded),
-		)
+		attrToValIndex, err := i.getAttrToValIndex(attr, tx)
+		if err != nil {
+			return err
+		}
+		valToTsIndex, err := getValtoTsIndex(attrToValIndex, attr)
+		// if valIndex == nil the is no entry for this value in the value-to-ts index
+		// a new entry with the given value needs to be created
+		if valToTsIndex == nil {
+			newVUpdate, ref := putNewVersion(attr, genCatchUpVersion(ts), tx)
+			indexStoreUpdates = append(indexStoreUpdates,
+				newVUpdate,
+				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
+			)
+		} else {
+			catchUpVersion, err := valToTsIndex.Reg(antidote.Key(genCatchUpVersion(ts)))
+			if err != nil {
+				return err
+			}
+			indexStoreUpdates = append(indexStoreUpdates,
+				antidote.SetAdd(catchUpVersion, objectEncoded),
+			)
+		}
+		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
+			return nil
+		}
+		err = tx.Commit()
+		fmt.Println("______________index:Commit err: ", err)
+		if err == nil {
+			successful = true
+		} else {
+			fmt.Println("retrying after ", time.Millisecond*time.Duration((10*factor)))
+			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
+			factor *= 2
+		}
 	}
-	if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-		return nil
-	}
-	return tx.Commit()
+	return err
 }
 
 // Lookup ...
 func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
+	//i.mutex.RLock()
 	tx, err := i.client.StartTransaction()
 	if err != nil {
 		return nil, err
@@ -187,8 +220,10 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 	predAttr := attr.GetAttr()
 	predAttr.Value = attr.GetLbound()
 	valToTsIndex, err := getValtoTsIndex(attrToValIndex, predAttr)
-	//valIndex, err := attrToValIndex.Map(antidote.Key(utils.ValueToString(attr.GetLbound())))
-	if valToTsIndex == nil || err != nil {
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return res, nil
+		}
 		return nil, err
 	}
 	lastVRef, err := getLastVersionRef(valToTsIndex)
@@ -202,6 +237,7 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	//i.mutex.RUnlock()
 	for _, objEnc := range objList {
 		obj, err := decodeIndexEntry(objEnc)
 		if err != nil {

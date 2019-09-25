@@ -30,8 +30,8 @@ import (
 
 const opCount = 10
 const bucket = "local-s3"
-const preloadSize = 10
-const workloadRation = 1.0
+const preloadSize = 100
+const workloadRation = 0.8
 const workloadTime = 20
 
 type monitoringServer struct {
@@ -48,7 +48,7 @@ type benchmark struct {
 	workload      *yelp.Workload
 	conf          config
 	proteusClient *proteusclient.Client
-	datastores    []datastore
+	datastores    map[string]datastore
 	freshness     freshnessMeasurement
 	responseTime  responseTimeMeasurement
 }
@@ -85,7 +85,7 @@ func (b *benchmark) populateDB(fName string, doPopulate bool) error {
 		if err != nil {
 			return err
 		}
-		if b.workload.PopulateDB(fName, bucket, offset, b.conf.datasetSize, doPopulate, ds.putObject) != nil {
+		if b.workload.PopulateDB(fName, bucket, offset, b.conf.datasetSize, ds.putObject) != nil {
 			return err
 		}
 		offset += b.conf.datasetSize
@@ -93,26 +93,32 @@ func (b *benchmark) populateDB(fName string, doPopulate bool) error {
 	return nil
 }
 
-func (b *benchmark) runWorkload(respTimeCh chan time.Duration) (int64, float64, error) {
+func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration) (int64, float64, error) {
 	t0 := time.Now()
 	opCount := int64(0)
 	for time.Since(t0) < time.Duration(time.Second*b.conf.workloadDuration) {
+		//	for {
 		r := rand.Float32()
 		if r <= b.conf.queryWriteRatio {
+			t := time.Duration(0)
+			var err error
+			//for t == 0 {
 			query := b.workload.Query()
-			t, err := b.doQuery(query)
+			t, err = b.doQuery(query)
 			if err != nil {
 				return 0, 0, err
 			}
+			//}
 			b.responseTime.respTime = append(b.responseTime.respTime, t)
 			opCount++
 			respTimeCh <- t
 		} else {
-			if err := b.workload.Update(bucket, b.datastores[0].updateTags); err != nil {
+			ds := b.datastores[dsEndpoint]
+			if err := b.workload.Update(bucket, ds.updateTags); err != nil {
 				return 0, 0, err
 			}
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond)
 	}
 	t := time.Since(t0)
 	close(respTimeCh)
@@ -225,7 +231,14 @@ func (b *benchmark) howFresh() error {
 	j := int64(0)
 	for i := int64(0); i < opCount; i++ {
 		t0 := time.Now()
-		err := b.datastores[0].putObject("local-s3", "obj"+strconv.FormatInt(j, 10), "-------", map[string]string{"i-votes_useful": "0"})
+
+		var dsEndpoint string
+		for k := range b.datastores {
+			dsEndpoint = k
+		}
+		ds := b.datastores[dsEndpoint]
+
+		err := ds.putObject("local-s3", "obj"+strconv.FormatInt(j, 10), "-------", map[string]string{"i-votes_useful": "0"})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -261,8 +274,8 @@ func initDatastores(dbEndpoints []string) (*benchmark, error) {
 		},
 	}
 
-	datastores := make([]datastore, len(dbEndpoints))
-	for i, endpoint := range dbEndpoints {
+	datastores := make(map[string]datastore)
+	for _, endpoint := range dbEndpoints {
 		conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
 		if err != nil {
 			return nil, err
@@ -281,7 +294,7 @@ func initDatastores(dbEndpoints []string) (*benchmark, error) {
 			updateTagsCancel()
 			return nil, err
 		}
-		datastores[i] = datastore{
+		datastores[endpoint] = datastore{
 			client:           client,
 			putObjectStream:  putObjectStr,
 			updateTagsStream: updateTagsStr,
@@ -308,9 +321,7 @@ func (b *benchmark) initProteus(proteusEndP string) error {
 	return nil
 }
 
-func serve(b *benchmark) {
-	fmt.Println("test")
-	port := "50050"
+func serve(b *benchmark, port string) {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -336,7 +347,12 @@ func (s *monitoringServer) LogResponseTimes(stream pbMonitoring.Monitoring_LogRe
 			}
 		}
 	}()
-	opCount, duration, err := s.benchmark.runWorkload(respTimeCh)
+	var dsEndpoint string
+	for k := range s.benchmark.datastores {
+		dsEndpoint = k
+	}
+
+	opCount, duration, err := s.benchmark.runWorkload(dsEndpoint, respTimeCh)
 	if err != nil {
 		return err
 	}
@@ -355,6 +371,7 @@ func main() {
 	initDebug()
 	rand.Seed(time.Now().UnixNano())
 
+	port := flag.String("port", "", "port to listen for metric collection RPCs")
 	proteusEndP := flag.String("proteus", "", "proteus endpoint")
 	dbEndP := flag.String("s3", "", "s3_client server port")
 	dataset := flag.String("data", "", "dataset file")
@@ -376,13 +393,11 @@ func main() {
 	}
 
 	if *benchType == "response" {
-		if err := b.populateDB(*dataset, false); err != nil {
-			log.Fatal(err)
-		}
+		b.loadDataset()
 		if err := b.initProteus(*proteusEndP); err != nil {
 			log.Fatal(err)
 		}
-		serve(b)
+		serve(b, *port)
 	}
 
 	if *benchType == "freshness" {
@@ -418,7 +433,7 @@ func (ds *datastore) createBucket(bucketName string) error {
 
 func (ds *datastore) putObject(bucketName, objName, content string, md map[string]string) error {
 	log.WithFields(log.Fields{"bucket": bucketName, "object": objName}).Debug("putObject")
-	if err := ds.putObjectStream.Send(&pbS3Cli.PutObjectRequest{
+	if err := ds.putObjectStream.Send(&pbS3Cli.Object{
 		ObjectName: objName,
 		BucketName: bucketName,
 		Content:    content,
@@ -453,6 +468,37 @@ func (ds *datastore) updateTags(bucketName, objName string, md map[string]string
 		return nil
 	}
 	return errors.New("updateTags err: code= " + strconv.FormatInt(int64(resp.GetReply()), 10))
+}
+
+func (b *benchmark) loadDataset() error {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var dsEndpoint string
+	for k := range b.datastores {
+		dsEndpoint = k
+	}
+	ds := b.datastores[dsEndpoint]
+
+	stream, err := ds.client.LoadDataset(ctx, &pbS3Cli.LoadDatasetRequest{})
+	if err != nil {
+		cancel()
+		return err
+	}
+	ch := b.workload.LoadDataset()
+	for {
+		obj, err := stream.Recv()
+		if err != nil {
+			cancel()
+			break
+		}
+		ch <- yelp.Object{
+			Key:    obj.GetObjectName(),
+			Bucket: obj.GetBucketName(),
+			Md:     obj.GetXAmzMeta(),
+		}
+	}
+	b.workload.PrintDataset()
+	return nil
 }
 
 //----------------- statistics ---------------------

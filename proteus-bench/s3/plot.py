@@ -6,7 +6,7 @@ def live_plotter(x_vec,y1_data,line1,identifier='',pause_time=0.1):
     if line1==[]:
         plt.ion()
         fig = plt.figure(figsize=(13,6))
-        ax = fig.add_subplot(111
+        ax = fig.add_subplot(111)
         line1, = ax.plot(x_vec,y1_data,'-o',alpha=0.8)
         plt.ylabel('Y Label')
         plt.title('Title: {}'.format(identifier))
@@ -25,7 +25,7 @@ line1 = []
 f = open("data.txt", "r")
 while True:
     rand_val = float(f.readline())
-    print rand_val
+    print(rand_val)
     y_vec[-1] = rand_val
     line1 = live_plotter(x_vec,y_vec,line1)
     y_vec = np.append(y_vec[1:],0.0)

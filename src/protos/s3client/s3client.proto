@@ -6,15 +6,19 @@ option go_package = "github.com/dvasilas/proteus/src/protos/s3client";
 
 service S3 {
   rpc CreateBucket (CreateBucketRequest) returns (Reply) {}
-  rpc PutObject (stream PutObjectRequest) returns (stream Reply) {}
+  rpc PutObject (stream Object) returns (stream Reply) {}
   rpc UpdateTags (stream UpdateTagsRequest) returns (stream Reply) {}
+  rpc LoadDataset (LoadDatasetRequest) returns (stream Object) {}
 }
 
 message CreateBucketRequest {
   string bucket_name = 1;
 }
 
-message PutObjectRequest {
+message LoadDatasetRequest {
+}
+
+message Object {
   string object_name = 1;
   string bucket_name = 2;
   map<string, string> x_amz_meta = 3;
@@ -30,4 +34,3 @@ message UpdateTagsRequest {
 message Reply {
   int32 reply = 1;
 }
-

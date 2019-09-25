@@ -55,9 +55,6 @@ func QPU(conf *config.Config) (*IQPU, error) {
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
 	}
-	if len(q.qpu.Conns) > 1 {
-		return nil, errors.New("index QPUs support a single connection")
-	}
 	var index indexStore
 	var err error
 	switch q.qpu.Config.IndexConfig.IndexStore.Store {

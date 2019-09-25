@@ -29,10 +29,10 @@ func init() {
 	prometheus.MustRegister(rpcDurationsHistogram)
 }
 
-func main() {
-	conn, err := grpc.Dial("127.0.0.1:50050", grpc.WithInsecure())
+func runWorkload(endpoint string) (pb.Monitoring_LogResponseTimesClient, context.CancelFunc, error) {
+	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, err
 	}
 	client := pb.NewMonitoringClient(conn)
 
@@ -40,8 +40,19 @@ func main() {
 	stream, err := client.LogResponseTimes(ctx)
 	if err != nil {
 		cancel()
+		return nil, nil, err
+	}
+	return stream, cancel, err
+}
+
+func main() {
+
+	stream, cancel, err := runWorkload("127.0.0.1:50060")
+	if err != nil {
+		cancel()
 		log.Fatal(err)
 	}
+
 	go func() {
 		for {
 			respT, err := stream.Recv()
@@ -52,6 +63,29 @@ func main() {
 		}
 	}()
 
+	/*
+		conn, err := grpc.Dial("127.0.0.1:50050", grpc.WithInsecure())
+		if err != nil {
+			log.Fatal(err)
+		}
+		client := pb.NewMonitoringClient(conn)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		stream, err := client.LogResponseTimes(ctx)
+		if err != nil {
+			cancel()
+			log.Fatal(err)
+		}
+		go func() {
+			for {
+				respT, err := stream.Recv()
+				if err != nil {
+					log.Fatal(err)
+				}
+				rpcDurationsHistogram.Observe(float64(respT.GetDuration()) / 1000000.0)
+			}
+		}()
+	*/
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
