@@ -89,8 +89,8 @@ func (w *Workload) Update(bucket string, updateTags func(string, string, map[str
 	return errors.New("any update")
 }
 
-// Query ...
-func (w *Workload) Query() []proteusclient.AttributePredicate {
+// QueryPoint ...
+func (w *Workload) QueryPoint() []proteusclient.AttributePredicate {
 	reviewInd := rand.Intn(len(w.dataset))
 	q := make([]proteusclient.AttributePredicate, 0)
 	q = append(q, proteusclient.AttributePredicate{
@@ -98,6 +98,19 @@ func (w *Workload) Query() []proteusclient.AttributePredicate {
 		AttrType: proteusclient.S3TAGINT,
 		Lbound:   int64(w.dataset[reviewInd].Votes.Useful),
 		Ubound:   int64(w.dataset[reviewInd].Votes.Useful),
+	})
+	return q
+}
+
+// QueryRange ...
+func (w *Workload) QueryRange() []proteusclient.AttributePredicate {
+	reviewInd := rand.Intn(len(w.dataset))
+	q := make([]proteusclient.AttributePredicate, 0)
+	q = append(q, proteusclient.AttributePredicate{
+		AttrName: "votes_useful",
+		AttrType: proteusclient.S3TAGINT,
+		Lbound:   int64(w.dataset[reviewInd].Votes.Useful),
+		Ubound:   int64(w.dataset[reviewInd].Votes.Useful + 1),
 	})
 	return q
 }

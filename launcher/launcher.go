@@ -92,10 +92,12 @@ func main() {
 		conf.CacheConfig.Size = size
 	case "index":
 		var configFile string
+		var endpoint string
 		indexFlags := flag.NewFlagSet("index QPU flags", flag.ExitOnError)
 		indexFlags.StringVar(&configFile, "config", "noArg", "the index configuration file")
-		indexFlags.Parse(os.Args[3:4])
-		n++
+		indexFlags.StringVar(&endpoint, "endP", "noArg", "the index store endpoint")
+		indexFlags.Parse(os.Args[3:5])
+		n += 2
 
 		var indexConf IndexConfJSON
 		err := readConfigFile(configFile, &indexConf)
@@ -108,7 +110,7 @@ func main() {
 		conf.IndexConfig.UBound = indexConf.UBound
 		conf.IndexConfig.ConsLevel = indexConf.ConsLevel
 		conf.IndexConfig.IndexStore.Store = indexConf.IndexStore.Store
-		conf.IndexConfig.IndexStore.Endpoint = indexConf.IndexStore.Endpoint
+		conf.IndexConfig.IndexStore.Endpoint = endpoint
 		conf.IndexConfig.IndexStore.Bucket = indexConf.IndexStore.Bucket
 		conf.IndexConfig.IndexStore.Implementation = indexConf.IndexStore.Implementation
 	case "network":

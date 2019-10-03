@@ -31,7 +31,7 @@ import (
 const opCount = 10
 const bucket = "local-s3"
 const preloadSize = 100
-const workloadRation = 0.8
+const workloadRation = 0.9
 const workloadTime = 20
 
 type monitoringServer struct {
@@ -41,7 +41,6 @@ type monitoringServer struct {
 type dataset interface {
 	PopulateDB(string, string, int64, int64, func(string, string, string, map[string]string) error) error
 	Update(string, func(string, string, map[string]string) error) error
-	Query() []proteusclient.AttributePredicate
 }
 
 type benchmark struct {
@@ -94,16 +93,29 @@ func (b *benchmark) populateDB(fName string, doPopulate bool) error {
 }
 
 func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration) (int64, float64, error) {
-	t0 := time.Now()
+	var qType int
+	if os.Getenv("QUERY_TYPE") == "RANGE" {
+		qType = 1
+	} else if os.Getenv("QUERY_TYPE") == "POINT" {
+		qType = 2
+	}
+	//t0 := time.Now()
 	opCount := int64(0)
-	for time.Since(t0) < time.Duration(time.Second*b.conf.workloadDuration) {
-		//	for {
+	//for time.Since(t0) < time.Duration(time.Second*b.conf.workloadDuration) {
+	for {
 		r := rand.Float32()
 		if r <= b.conf.queryWriteRatio {
 			t := time.Duration(0)
 			var err error
 			//for t == 0 {
-			query := b.workload.Query()
+			var query []proteusclient.AttributePredicate
+			if qType == 1 {
+				query = b.workload.QueryRange()
+			} else if qType == 2 {
+				query = b.workload.QueryPoint()
+			} else {
+				log.Fatal("unknown value for QUERY_TYPE variable")
+			}
 			t, err = b.doQuery(query)
 			if err != nil {
 				return 0, 0, err
@@ -118,11 +130,11 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 				return 0, 0, err
 			}
 		}
-		time.Sleep(time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
-	t := time.Since(t0)
-	close(respTimeCh)
-	return opCount, t.Seconds(), nil
+	//t := time.Since(t0)
+	//close(respTimeCh)
+	//return opCount, t.Seconds(), nil
 }
 
 func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
@@ -341,7 +353,6 @@ func (s *monitoringServer) LogResponseTimes(stream pbMonitoring.Monitoring_LogRe
 	}
 	go func() {
 		for respT := range respTimeCh {
-			fmt.Println(respT)
 			if err := stream.Send(&pbMonitoring.ResponseTime{Duration: int64(respT)}); err != nil {
 				log.Fatal(err)
 			}

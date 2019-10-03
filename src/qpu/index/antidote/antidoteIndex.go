@@ -2,10 +2,10 @@ package antidoteindex
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/src/protos"
@@ -23,7 +23,7 @@ type AntidoteIndex struct {
 	attributeType pbUtils.Attribute_AttributeType
 	client        *antidote.Client
 	bucket        antidote.Bucket
-	//mutex         sync.RWMutex
+	mutex         sync.RWMutex
 }
 
 //---------------- API Functions -------------------
@@ -62,7 +62,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 	successful := false
 	factor := 1
 	for !successful {
-		//i.mutex.Lock()
+		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
 			return err
@@ -73,18 +73,26 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 		if attrOld != nil {
 			attrToValIndex, err := i.getAttrToValIndex(attrOld, tx)
 			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #1")
 				return err
 			}
 			valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrOld)
 			if err != nil {
-				return err
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getValtoTsIndex")
+				// just allow update not fail when this fails
+				// bug info: always fails with the same message "map entry with key '16' not found"
+				// TOOD: Fix
+				i.mutex.Unlock()
+				return nil
 			}
 			lastVRef, err := getLastVersionRef(valToTsIndex)
 			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #1")
 				return err
 			}
 			objList, err := i.bucket.ReadSet(tx, lastVRef)
 			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: bucket.ReadSet #1")
 				return err
 			}
 			newVUpdate, ref := putNewVersion(attrOld, encodeTimestamp(ts.GetVc()), tx)
@@ -97,6 +105,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 		if attrNew != nil {
 			attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
 			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #2")
 				return err
 			}
 			valToTsIndex, _ := getValtoTsIndex(attrToValIndex, attrNew)
@@ -113,10 +122,12 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 				// a new version for the entry needs to created, by added the given object
 				lastVRef, err := getLastVersionRef(valToTsIndex)
 				if err != nil {
-					return nil
+					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #2")
+					return err
 				}
 				objList, err := i.bucket.ReadSet(tx, lastVRef)
 				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: bucket.ReadSet #2")
 					return err
 				}
 				newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
@@ -131,13 +142,13 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			return err
 		}
 		err = tx.Commit()
-		fmt.Println("______________index:Commit err: ", err)
 		if err == nil {
 			successful = true
-			//i.mutex.Unlock()
+			i.mutex.Unlock()
 		} else {
-			//i.mutex.Unlock()
-			fmt.Println("retrying after ", time.Millisecond*time.Duration((10*factor)))
+			i.mutex.Unlock()
+			log.WithFields(log.Fields{"error": err}).Info("indexUpdate: transaction commit error")
+			log.WithFields(log.Fields{"error": err, "after": time.Millisecond * time.Duration((10 * factor))}).Info("indexUpdate: retrying")
 			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
 			factor *= 2
 		}
@@ -156,6 +167,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 	successful := false
 	factor := 1
 	for !successful {
+		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
 			return err
@@ -186,11 +198,13 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 			return nil
 		}
 		err = tx.Commit()
-		fmt.Println("______________index:Commit err: ", err)
 		if err == nil {
 			successful = true
+			i.mutex.Unlock()
 		} else {
-			fmt.Println("retrying after ", time.Millisecond*time.Duration((10*factor)))
+			i.mutex.Unlock()
+			log.WithFields(log.Fields{"error": err}).Info("indexUpdate: transaction commit error")
+			log.WithFields(log.Fields{"error": err, "after": time.Millisecond * time.Duration((10 * factor))}).Info("indexUpdate: retrying")
 			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
 			factor *= 2
 		}
