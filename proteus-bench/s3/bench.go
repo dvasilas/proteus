@@ -39,7 +39,7 @@ type monitoringServer struct {
 }
 
 type dataset interface {
-	PopulateDB(string, string, int64, int64, func(string, string, string, map[string]string) error) error
+	PopulateDB(string, int64, int64, func(string, string, string, map[string]string) error) error
 	Update(string, func(string, string, map[string]string) error) error
 }
 
@@ -77,14 +77,14 @@ type config struct {
 	workloadDuration time.Duration
 }
 
-func (b *benchmark) populateDB(fName string, doPopulate bool) error {
+func (b *benchmark) populateDB() error {
 	offset := int64(0)
 	for _, ds := range b.datastores {
 		err := ds.createBucket(bucket)
 		if err != nil {
 			return err
 		}
-		if b.workload.PopulateDB(fName, bucket, offset, b.conf.datasetSize, ds.putObject) != nil {
+		if b.workload.PopulateDB(bucket, offset, b.conf.datasetSize, ds.putObject) != nil {
 			return err
 		}
 		offset += b.conf.datasetSize
@@ -99,15 +99,12 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 	} else if os.Getenv("QUERY_TYPE") == "POINT" {
 		qType = 2
 	}
-	//t0 := time.Now()
 	opCount := int64(0)
-	//for time.Since(t0) < time.Duration(time.Second*b.conf.workloadDuration) {
 	for {
 		r := rand.Float32()
 		if r <= b.conf.queryWriteRatio {
 			t := time.Duration(0)
 			var err error
-			//for t == 0 {
 			var query []proteusclient.AttributePredicate
 			if qType == 1 {
 				query = b.workload.QueryRange()
@@ -120,7 +117,6 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 			if err != nil {
 				return 0, 0, err
 			}
-			//}
 			b.responseTime.respTime = append(b.responseTime.respTime, t)
 			opCount++
 			respTimeCh <- t
@@ -132,9 +128,6 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	//t := time.Since(t0)
-	//close(respTimeCh)
-	//return opCount, t.Seconds(), nil
 }
 
 func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
@@ -142,7 +135,6 @@ func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh 
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	eof := false
 	for !eof {
 		select {
@@ -382,46 +374,41 @@ func main() {
 	initDebug()
 	rand.Seed(time.Now().UnixNano())
 
-	port := flag.String("port", "", "port to listen for metric collection RPCs")
 	proteusEndP := flag.String("proteus", "", "proteus endpoint")
 	dbEndP := flag.String("s3", "", "s3_client server port")
-	dataset := flag.String("data", "", "dataset file")
-	//doPlot := flag.Bool("plot", false, "plot latency cdf")
-	benchType := flag.String("bench", "", "benchmark type")
 	flag.Parse()
 
 	dbEndpoints := strings.Split(*dbEndP, "/")
 	b, err := initDatastores(dbEndpoints)
-	log.Info("initialize: ", err)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if *benchType == "preload" {
-		if err := b.populateDB(*dataset, true); err != nil {
-			log.Fatal(err)
-		}
+	if err := b.populateDB(); err != nil {
+		log.Fatal(err)
+	}
+	b.loadDataset()
+	if err := b.initProteus(*proteusEndP); err != nil {
+		log.Fatal(err)
 	}
 
-	if *benchType == "response" {
-		b.loadDataset()
-		if err := b.initProteus(*proteusEndP); err != nil {
-			log.Fatal(err)
+	respTimeCh := make(chan time.Duration)
+	b.responseTime = responseTimeMeasurement{
+		respTime: make([]time.Duration, 0),
+	}
+	go func() {
+		for respT := range respTimeCh {
+			fmt.Println(respT)
 		}
-		serve(b, *port)
+	}()
+	var dsEndpoint string
+	for k := range b.datastores {
+		dsEndpoint = k
 	}
 
-	if *benchType == "freshness" {
-		if err := b.initProteus(*proteusEndP); err != nil {
-			log.Fatal(err)
-		}
-
-		b.freshness = freshnessMeasurement{
-			objectPutTs:        make(map[int64]time.Time),
-			notificationTs:     make(map[int64]time.Time),
-			freshnessIntervals: make([]time.Duration, opCount),
-		}
-		b.howFresh()
+	_, _, err = b.runWorkload(dsEndpoint, respTimeCh)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 

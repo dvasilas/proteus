@@ -116,8 +116,8 @@ func (w *Workload) QueryRange() []proteusclient.AttributePredicate {
 }
 
 // PopulateDB ...
-func (w *Workload) PopulateDB(fName, bucket string, offset int64, datasetSize int64, putObject func(string, string, string, map[string]string) error) error {
-	f, err := os.Open(fName)
+func (w *Workload) PopulateDB(bucket string, offset int64, datasetSize int64, putObject func(string, string, string, map[string]string) error) error {
+	f, err := os.Open("./proteus-bench/s3/yelpDataset/dataset.json")
 	if err != nil {
 		return err
 	}
