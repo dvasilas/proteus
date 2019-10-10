@@ -17,6 +17,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const maxVersionCount = 10
+
 // AntidoteIndex ...
 type AntidoteIndex struct {
 	attributeName string
@@ -51,95 +53,50 @@ func New(conf *config.Config) (*AntidoteIndex, error) {
 	}, nil
 }
 
-// Update ...
-func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+// UpdateCatchUp ...
+func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
 	objectEncoded, err := encodeObject(object)
 	if err != nil {
 		return err
 	}
-
 	successful := false
 	factor := 1
 	for !successful {
 		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
+			i.mutex.Unlock()
 			return err
 		}
-		// if attrOld != nil then the previous value has been indexed
-		// the index entry of the previous value needs to be updated
-		// by creating a new object list version without the given object
-		if attrOld != nil {
-			attrToValIndex, err := i.getAttrToValIndex(attrOld, tx)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #1")
-				return err
-			}
-			valToTsIndex, err := getValtoTsIndex(attrToValIndex, attrOld)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getValtoTsIndex")
-				// just allow update not fail when this fails
-				// bug info: always fails with the same message "map entry with key '16' not found"
-				// TOOD: Fix
-				i.mutex.Unlock()
-				return nil
-			}
-			lastVRef, err := getLastVersionRef(valToTsIndex)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #1")
-				return err
-			}
-			objList, err := i.bucket.ReadSet(tx, lastVRef)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: bucket.ReadSet #1")
-				return err
-			}
-			newVUpdate, ref := putNewVersion(attrOld, encodeTimestamp(ts.GetVc()), tx)
+		valueIndex, err := i.getValueIndex(attr, tx)
+		if err != nil {
+			i.mutex.Unlock()
+			return err
+		}
+		_, versionIndex, err := i.getVersionIndex(valueIndex, attr, tx)
+		var postingListRef []byte
+		if err != nil && strings.Contains(err.Error(), "not found") {
+			valueIndexUpdate, versionIndexRef := updateValueIndex(attr)
+			versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, genCatchUpTs(ts), tx)
 			indexStoreUpdates = append(indexStoreUpdates,
-				newVUpdate,
-				antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
-				antidote.SetRemove(antidote.Key([]byte(ref)), objectEncoded),
+				valueIndexUpdate,
+				versionIndexUpdate,
+				antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
 			)
-		}
-		if attrNew != nil {
-			attrToValIndex, err := i.getAttrToValIndex(attrNew, tx)
+		} else {
+			postingListRef, err = getLatestPostingList(versionIndex)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #2")
+				i.mutex.Unlock()
 				return err
 			}
-			valToTsIndex, _ := getValtoTsIndex(attrToValIndex, attrNew)
-			// if valIndex == nil the is no entry for this value in the value-to-ts index
-			// a new entry with the given value needs to be created
-			if valToTsIndex == nil {
-				newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
-				indexStoreUpdates = append(indexStoreUpdates,
-					newVUpdate,
-					antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-				)
-			} else {
-				// an index entry for this value exists
-				// a new version for the entry needs to created, by added the given object
-				lastVRef, err := getLastVersionRef(valToTsIndex)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #2")
-					return err
-				}
-				objList, err := i.bucket.ReadSet(tx, lastVRef)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: bucket.ReadSet #2")
-					return err
-				}
-				newVUpdate, ref := putNewVersion(attrNew, encodeTimestamp(ts.GetVc()), tx)
-				indexStoreUpdates = append(indexStoreUpdates,
-					newVUpdate,
-					antidote.SetAdd(antidote.Key([]byte(ref)), objList...),
-					antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-				)
-			}
 		}
+		indexStoreUpdates = append(indexStoreUpdates,
+			antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
+		)
 		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-			return err
+			i.mutex.Unlock()
+			return nil
 		}
 		err = tx.Commit()
 		if err == nil {
@@ -156,46 +113,120 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 	return err
 }
 
-// UpdateCatchUp ...
-func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+// Update ...
+func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
 	objectEncoded, err := encodeObject(object)
 	if err != nil {
 		return err
 	}
-
 	successful := false
 	factor := 1
 	for !successful {
 		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
+			i.mutex.Unlock()
 			return err
 		}
-		attrToValIndex, err := i.getAttrToValIndex(attr, tx)
-		if err != nil {
-			return err
-		}
-		valToTsIndex, err := getValtoTsIndex(attrToValIndex, attr)
-		// if valIndex == nil the is no entry for this value in the value-to-ts index
-		// a new entry with the given value needs to be created
-		if valToTsIndex == nil {
-			newVUpdate, ref := putNewVersion(attr, genCatchUpVersion(ts), tx)
-			indexStoreUpdates = append(indexStoreUpdates,
-				newVUpdate,
-				antidote.SetAdd(antidote.Key([]byte(ref)), objectEncoded),
-			)
-		} else {
-			catchUpVersion, err := valToTsIndex.Reg(antidote.Key(genCatchUpVersion(ts)))
+		if attrOld != nil {
+			valueIndex, err := i.getValueIndex(attrOld, tx)
 			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #1")
+				i.mutex.Unlock()
 				return err
 			}
+			versionIndexRef, versionIndex, err := i.getVersionIndex(valueIndex, attrOld, tx)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getValtoTsIndex")
+				i.mutex.Unlock()
+				return err
+			}
+			postingListRefO, err := getLatestPostingList(versionIndex)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #1")
+				i.mutex.Unlock()
+				return err
+			}
+			postingListO, err := i.getPostingList(postingListRefO, tx)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getPostingList #1")
+				i.mutex.Unlock()
+				return err
+			}
+			if len(versionIndex.ListMapKeys()) >= maxVersionCount {
+				valueIndexUpdate, versionIndexRefN := updateValueIndex(attrOld)
+				indexStoreUpdates = append(indexStoreUpdates,
+					antidote.MapUpdate(
+						antidote.Key(versionIndexRefN),
+						antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
+					),
+				)
+				versionIndexRef = versionIndexRefN
+				indexStoreUpdates = append(indexStoreUpdates,
+					valueIndexUpdate,
+				)
+			}
+			versionIndexUpdate, postingListRefN := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
 			indexStoreUpdates = append(indexStoreUpdates,
-				antidote.SetAdd(catchUpVersion, objectEncoded),
+				versionIndexUpdate,
+				antidote.SetAdd(antidote.Key([]byte(postingListRefN)), postingListO...),
+				antidote.SetRemove(antidote.Key([]byte(postingListRefN)), objectEncoded),
 			)
 		}
+		if attrNew != nil {
+			valueIndex, err := i.getValueIndex(attrNew, tx)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #2")
+				i.mutex.Unlock()
+				return err
+			}
+			versionIndexRef, versionIndex, err := i.getVersionIndex(valueIndex, attrNew, tx)
+			if err != nil && strings.Contains(err.Error(), "not found") {
+				valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
+				versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
+				indexStoreUpdates = append(indexStoreUpdates,
+					valueIndexUpdate,
+					versionIndexUpdate,
+					antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
+				)
+			} else {
+				postingListRefO, err := getLatestPostingList(versionIndex)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #2")
+					i.mutex.Unlock()
+					return err
+				}
+				postingListO, err := i.getPostingList(postingListRefO, tx)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getPostingList #2")
+					i.mutex.Unlock()
+					return err
+				}
+				if len(versionIndex.ListMapKeys()) >= maxVersionCount {
+					valueIndexUpdate, versionIndexRefN := updateValueIndex(attrNew)
+					indexStoreUpdates = append(indexStoreUpdates,
+						antidote.MapUpdate(
+							antidote.Key(versionIndexRefN),
+							antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
+						),
+					)
+					versionIndexRef = versionIndexRefN
+					indexStoreUpdates = append(indexStoreUpdates,
+						valueIndexUpdate,
+					)
+				}
+				versionIndexUpdate, postingListRefNewN := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
+				indexStoreUpdates = append(indexStoreUpdates,
+					versionIndexUpdate,
+					antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), postingListO...),
+					antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), objectEncoded),
+				)
+			}
+		}
 		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-			return nil
+			i.mutex.Unlock()
+			return err
 		}
 		err = tx.Commit()
 		if err == nil {
@@ -219,7 +250,7 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 	if err != nil {
 		return nil, err
 	}
-	attrToValIndex, err := i.getAttrToValIndex(attr.GetAttr(), tx)
+	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
 		return nil, err
 	}
@@ -233,18 +264,18 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 	res := make(map[string]utils.ObjectState)
 	predAttr := attr.GetAttr()
 	predAttr.Value = attr.GetLbound()
-	valToTsIndex, err := getValtoTsIndex(attrToValIndex, predAttr)
+	_, versionIndex, err := i.getVersionIndex(valueIndex, predAttr, tx)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return res, nil
 		}
 		return nil, err
 	}
-	lastVRef, err := getLastVersionRef(valToTsIndex)
+	lastVRef, err := getLatestPostingList(versionIndex)
 	if err != nil {
 		return nil, err
 	}
-	objList, err := i.bucket.ReadSet(tx, lastVRef)
+	postingList, err := i.getPostingList(lastVRef, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -252,8 +283,8 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 		return nil, err
 	}
 	//i.mutex.RUnlock()
-	for _, objEnc := range objList {
-		obj, err := decodeIndexEntry(objEnc)
+	for _, objEnc := range postingList {
+		obj, err := decodeObject(objEnc)
 		if err != nil {
 			return nil, err
 		}
@@ -264,44 +295,91 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 
 //---------------- Internal Functions --------------
 
-func (i *AntidoteIndex) getAttrToValIndex(attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) (*antidote.MapReadResult, error) {
-	attributeKey := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
-	return i.bucket.ReadMap(tx, antidote.Key([]byte(attributeKey)))
+func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) (*antidote.MapReadResult, error) {
+	valueIndexRef := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
+	return i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 }
 
-func getValtoTsIndex(i *antidote.MapReadResult, attr *pbUtils.Attribute) (*antidote.MapReadResult, error) {
-	return i.Map(antidote.Key(utils.ValueToString(attr.GetValue())))
+func (i *AntidoteIndex) getVersionIndex(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) ([]byte, *antidote.MapReadResult, error) {
+	versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(attr.GetValue())))
+	if err != nil {
+		return nil, nil, err
+	}
+	versionIndex, err := i.bucket.ReadMap(tx, antidote.Key(versionIndexRef))
+	if err != nil {
+		return nil, nil, err
+	}
+	return versionIndexRef, versionIndex, nil
 }
 
-func putNewVersion(attr *pbUtils.Attribute, tsKey []byte, tx *antidote.InteractiveTransaction) (*antidote.CRDTUpdate, []byte) {
-	attrKey := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
+func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx *antidote.InteractiveTransaction) ([][]byte, error) {
+	return i.bucket.ReadSet(tx, antidote.Key(postingListRef))
+}
+
+func updateValueIndex(attr *pbUtils.Attribute) (*antidote.CRDTUpdate, []byte) {
 	ref := genReference()
+	valueIndexRef := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
 	return antidote.MapUpdate(
-		antidote.Key(attrKey),
-		antidote.MapUpdate(
-			antidote.Key(antidote.Key(utils.ValueToString(attr.GetValue()))),
-			antidote.RegPut(antidote.Key(tsKey), []byte(ref)),
-		),
+		antidote.Key(valueIndexRef),
+		antidote.RegPut(antidote.Key(utils.ValueToString(attr.GetValue())), ref),
 	), ref
 }
 
-func genCatchUpVersion(ts pbUtils.Vectorclock) []byte {
+func appendNewVersion(versionIndexRef []byte, tsKey []byte, tx *antidote.InteractiveTransaction) (*antidote.CRDTUpdate, []byte) {
+	ref := genReference()
+	return antidote.MapUpdate(
+		antidote.Key(versionIndexRef),
+		antidote.RegPut(antidote.Key(tsKey), ref),
+	), ref
+}
+
+func getLatestPostingList(versionIndex *antidote.MapReadResult) ([]byte, error) {
+	versions := versionIndex.ListMapKeys()
+	var latestVRef antidote.Key
+	if len(versions) == 1 {
+		latestVRef = antidote.Key(versions[0].Key)
+	} else {
+		versionsTs, err := decodeTimestamps(versions)
+		if err != nil {
+			return nil, err
+		}
+		latestVTs := lastVersion(versionsTs)
+		latestVRef = antidote.Key([]byte(encodeTimestamp(latestVTs.GetVc())))
+	}
+	return versionIndex.Reg(latestVRef)
+}
+
+func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*pbUtils.Vectorclock, error) {
+	res := make([]*pbUtils.Vectorclock, 0)
+	for _, ts := range tsEncArr {
+		if string(ts.Key) != "prev" {
+			var vcEntries []string
+			if strings.Contains(string(ts.Key), "_") {
+				vcEntries = strings.Split(string(ts.Key), "_")
+			} else {
+				vcEntries = []string{string(ts.Key)}
+			}
+			vcMap := make(map[string]uint64)
+			for _, e := range vcEntries {
+				vc := strings.Split(e, ":")
+				t, err := strconv.ParseInt(vc[1], 10, 64)
+				if err != nil {
+					return nil, err
+				}
+				vcMap[vc[0]] = uint64(t)
+			}
+			res = append(res, protoutils.Vectorclock(vcMap))
+		}
+	}
+	return res, nil
+}
+
+func genCatchUpTs(ts pbUtils.Vectorclock) []byte {
 	zeroTs := make(map[string]uint64)
 	for k := range ts.GetVc() {
 		zeroTs[k] = 0
 	}
 	return encodeTimestamp(zeroTs)
-}
-
-func encodeObject(object utils.ObjectState) ([]byte, error) {
-	return []byte(object.ObjectID), nil
-}
-
-func decodeIndexEntry(data []byte) (utils.ObjectState, error) {
-	var object utils.ObjectState
-	object.ObjectID = string(data)
-	//err := object.UnMarshal(data)
-	return object, nil
 }
 
 func encodeTimestamp(ts map[string]uint64) []byte {
@@ -312,27 +390,14 @@ func encodeTimestamp(ts map[string]uint64) []byte {
 	return []byte(enc[:len(enc)-1])
 }
 
-func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*pbUtils.Vectorclock, error) {
-	res := make([]*pbUtils.Vectorclock, 0)
-	for _, ts := range tsEncArr {
-		var vcEntries []string
-		if strings.Contains(string(ts.Key), "_") {
-			vcEntries = strings.Split(string(ts.Key), "_")
-		} else {
-			vcEntries = []string{string(ts.Key)}
-		}
-		vcMap := make(map[string]uint64)
-		for _, e := range vcEntries {
-			vc := strings.Split(e, ":")
-			t, err := strconv.ParseInt(vc[1], 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			vcMap[vc[0]] = uint64(t)
-		}
-		res = append(res, protoutils.Vectorclock(vcMap))
-	}
-	return res, nil
+func encodeObject(object utils.ObjectState) ([]byte, error) {
+	return []byte(object.ObjectID), nil
+}
+
+func decodeObject(data []byte) (utils.ObjectState, error) {
+	var object utils.ObjectState
+	object.ObjectID = string(data)
+	return object, nil
 }
 
 func genReference() []byte {
@@ -342,16 +407,6 @@ func genReference() []byte {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return b
-}
-
-func getLastVersionRef(versionIndex *antidote.MapReadResult) ([]byte, error) {
-	versions := versionIndex.ListMapKeys()
-	versionList, err := decodeTimestamps(versions)
-	if err != nil {
-		return nil, err
-	}
-	lastV := lastVersion(versionList)
-	return versionIndex.Reg(antidote.Key([]byte(encodeTimestamp(lastV.GetVc()))))
 }
 
 func lastVersion(tsList []*pbUtils.Vectorclock) *pbUtils.Vectorclock {
@@ -378,41 +433,43 @@ func greater(a, b *pbUtils.Vectorclock) bool {
 }
 
 func (i *AntidoteIndex) print() error {
-	log.Debug("Printing index")
-	attributeKey := i.attributeName + "_" + i.attributeType.String()
-
+	valueIndexRef := i.attributeName + "_" + i.attributeType.String()
 	tx, err := i.client.StartTransaction()
 	if err != nil {
 		return err
 	}
-	attrIndex, err := i.bucket.ReadMap(tx, antidote.Key([]byte(attributeKey)))
+	valueIndex, err := i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 	if err != nil {
 		return err
 	}
-	values := attrIndex.ListMapKeys()
+	values := valueIndex.ListMapKeys()
 	for _, val := range values {
-		log.WithFields(log.Fields{"val": string(val.Key)}).Debug("value")
-		tsIndex, err := attrIndex.Map(val.Key)
+		versionIndexRef, err := valueIndex.Reg(antidote.Key(val.Key))
 		if err != nil {
 			return err
 		}
-		versions := tsIndex.ListMapKeys()
+		log.WithFields(log.Fields{"key": string(val.Key), "value": string(versionIndexRef)}).Debug("[index.print] value index entry")
+		versionIndex, err := i.bucket.ReadMap(tx, antidote.Key((versionIndexRef)))
+		if err != nil {
+			return err
+		}
+		versions := versionIndex.ListMapKeys()
 		for _, vers := range versions {
-			log.WithFields(log.Fields{"timestamp": string(vers.Key)}).Debug("posting list version")
-			ref, err := tsIndex.Reg(vers.Key)
+			postingListRef, err := versionIndex.Reg(antidote.Key(vers.Key))
 			if err != nil {
 				return err
 			}
-			objList, err := i.bucket.ReadSet(tx, ref)
+			log.WithFields(log.Fields{"key": string(vers.Key), "value": string(postingListRef)}).Debug("[index.print] version index entry")
+			postingList, err := i.getPostingList(postingListRef, tx)
 			if err != nil {
 				return err
 			}
-			for _, obj := range objList {
-				object, err := decodeIndexEntry(obj)
+			for _, obj := range postingList {
+				object, err := decodeObject(obj)
 				if err != nil {
 					return err
 				}
-				log.Debug("-", object.ObjectID)
+				log.WithFields(log.Fields{"obj": object.ObjectID}).Debug("[index.print][posting list]")
 			}
 		}
 	}
