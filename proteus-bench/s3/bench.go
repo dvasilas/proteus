@@ -77,7 +77,90 @@ type config struct {
 	workloadDuration time.Duration
 }
 
-func (b *benchmark) populateDB(fName string, doPopulate bool) error {
+func main() {
+	initDebug()
+	rand.Seed(time.Now().UnixNano())
+
+	port := flag.String("port", "", "port to listen for metric collection RPCs")
+	proteusEndP := flag.String("proteus", "", "proteus endpoint")
+	dbEndP := flag.String("s3", "", "s3_client server port")
+	dataset := flag.String("data", "", "dataset file")
+	//doPlot := flag.Bool("plot", false, "plot latency cdf")
+	benchType := flag.String("bench", "", "benchmark type")
+	flag.Parse()
+
+	dbEndpoints := strings.Split(*dbEndP, "/")
+	b, err := initDatastores(dbEndpoints)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch *benchType {
+	case "local_test":
+		b.localTest(*dataset, *proteusEndP)
+	case "preload":
+		if err := b.populateDB(*dataset); err != nil {
+			log.Fatal(err)
+		}
+	case "response_monitoring":
+		b.loadDataset()
+		if err := b.initProteus(*proteusEndP); err != nil {
+			log.Fatal(err)
+		}
+		serve(b, *port)
+	case "freshness":
+		if err := b.initProteus(*proteusEndP); err != nil {
+			log.Fatal(err)
+		}
+
+		b.freshness = freshnessMeasurement{
+			objectPutTs:        make(map[int64]time.Time),
+			notificationTs:     make(map[int64]time.Time),
+			freshnessIntervals: make([]time.Duration, opCount),
+		}
+		b.howFresh()
+	default:
+		log.Fatal("unknown benchmark type")
+	}
+}
+
+func (b *benchmark) localTest(datasetF, proteusEndP string) error {
+	log.Info("[local_test] populating datastores")
+	if err := b.populateDB(datasetF); err != nil {
+		return err
+	}
+	log.Info("[local_test] populating datastores: OK")
+	log.Info("[local_test] loading dataset")
+	if err := b.loadDataset(); err != nil {
+		return err
+	}
+	log.Info("[local_test] loading dataset: OK")
+	log.Info("[local_test] connecting to Proteus")
+	if err := b.initProteus(proteusEndP); err != nil {
+		return err
+	}
+	log.Info("[local_test] connecting to Proteus: OK")
+	respTimeCh := make(chan time.Duration)
+	b.responseTime = responseTimeMeasurement{
+		respTime: make([]time.Duration, 0),
+	}
+	go func() {
+		for respT := range respTimeCh {
+			fmt.Println(respT)
+		}
+	}()
+	var dsEndpoint string
+	for k := range b.datastores {
+		dsEndpoint = k
+	}
+	log.Info("[local_test] running workload")
+	if _, _, err := b.runWorkload(dsEndpoint, respTimeCh); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *benchmark) populateDB(fName string) error {
 	offset := int64(0)
 	for _, ds := range b.datastores {
 		err := ds.createBucket(bucket)
@@ -88,6 +171,34 @@ func (b *benchmark) populateDB(fName string, doPopulate bool) error {
 			return err
 		}
 		offset += b.conf.datasetSize
+	}
+	return nil
+}
+
+func (b *benchmark) loadDataset() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	var dsEndpoint string
+	for k := range b.datastores {
+		dsEndpoint = k
+	}
+	ds := b.datastores[dsEndpoint]
+	stream, err := ds.client.LoadDataset(ctx, &pbS3Cli.LoadDatasetRequest{})
+	if err != nil {
+		cancel()
+		return err
+	}
+	ch := b.workload.LoadDataset()
+	for {
+		obj, err := stream.Recv()
+		if err != nil {
+			cancel()
+			break
+		}
+		ch <- yelp.Object{
+			Key:    obj.GetObjectName(),
+			Bucket: obj.GetBucketName(),
+			Md:     obj.GetXAmzMeta(),
+		}
 	}
 	return nil
 }
@@ -135,40 +246,6 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 	//t := time.Since(t0)
 	//close(respTimeCh)
 	//return opCount, t.Seconds(), nil
-}
-
-func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
-	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.NOTIFY)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	eof := false
-	for !eof {
-		select {
-		case err := <-errCh:
-			if err == io.EOF {
-				eof = true
-			} else {
-				log.Fatal(err)
-			}
-		case resp := <-respCh:
-			t1 := time.Now()
-			id, err := strconv.ParseInt(strings.TrimPrefix(resp.ObjectID, "obj"), 10, 64)
-			if err != nil {
-				log.Fatal(err)
-			}
-			b.freshness.notificationTs[id] = t1
-			log.WithFields(log.Fields{
-				"object":       resp.ObjectID,
-				"objectPut ts": b.freshness.notificationTs[id],
-			}).Info("notification")
-			if id == opCount-1 {
-				errorCh <- nil
-				eof = true
-			}
-		}
-	}
 }
 
 func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Duration, error) {
@@ -274,63 +351,38 @@ func (b *benchmark) howFresh() error {
 	return nil
 }
 
-//-------------------- main ------------------------
-
-func initDatastores(dbEndpoints []string) (*benchmark, error) {
-	b := &benchmark{
-		workload: yelp.New(),
-		conf: config{
-			datasetSize:      preloadSize,
-			queryWriteRatio:  workloadRation,
-			workloadDuration: workloadTime,
-		},
-	}
-
-	datastores := make(map[string]datastore)
-	for _, endpoint := range dbEndpoints {
-		conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
-		if err != nil {
-			return nil, err
-		}
-		client := pbS3Cli.NewS3Client(conn)
-		ctx, putObjectCancel := context.WithCancel(context.Background())
-		putObjectStr, err := client.PutObject(ctx)
-		if err != nil {
-			putObjectCancel()
-			return nil, err
-		}
-		ctx, updateTagsCancel := context.WithCancel(context.Background())
-		updateTagsStr, err := client.UpdateTags(ctx)
-		if err != nil {
-			putObjectCancel()
-			updateTagsCancel()
-			return nil, err
-		}
-		datastores[endpoint] = datastore{
-			client:           client,
-			putObjectStream:  putObjectStr,
-			updateTagsStream: updateTagsStr,
-			conn:             conn,
-			putObjectCancel:  putObjectCancel,
-			updateTagsCancel: updateTagsCancel,
-		}
-	}
-	b.datastores = datastores
-	return b, nil
-}
-
-func (b *benchmark) initProteus(proteusEndP string) error {
-	proteusEndpoint := strings.Split(proteusEndP, ":")
-	proteusPort, err := strconv.ParseInt(proteusEndpoint[1], 10, 64)
+func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
+	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.NOTIFY)
 	if err != nil {
 		log.Fatal(err)
 	}
-	proteusCli, err := proteusclient.NewClient(proteusclient.Host{Name: proteusEndpoint[0], Port: int(proteusPort)})
-	if err != nil {
-		log.Fatal(err)
+
+	eof := false
+	for !eof {
+		select {
+		case err := <-errCh:
+			if err == io.EOF {
+				eof = true
+			} else {
+				log.Fatal(err)
+			}
+		case resp := <-respCh:
+			t1 := time.Now()
+			id, err := strconv.ParseInt(strings.TrimPrefix(resp.ObjectID, "obj"), 10, 64)
+			if err != nil {
+				log.Fatal(err)
+			}
+			b.freshness.notificationTs[id] = t1
+			log.WithFields(log.Fields{
+				"object":       resp.ObjectID,
+				"objectPut ts": b.freshness.notificationTs[id],
+			}).Info("notification")
+			if id == opCount-1 {
+				errorCh <- nil
+				eof = true
+			}
+		}
 	}
-	b.proteusClient = proteusCli
-	return nil
 }
 
 func serve(b *benchmark, port string) {
@@ -378,64 +430,73 @@ func (s *monitoringServer) LogResponseTimes(stream pbMonitoring.Monitoring_LogRe
 	return nil
 }
 
-func main() {
-	initDebug()
-	rand.Seed(time.Now().UnixNano())
+//---------------- initialization-------------------
 
-	port := flag.String("port", "", "port to listen for metric collection RPCs")
-	proteusEndP := flag.String("proteus", "", "proteus endpoint")
-	dbEndP := flag.String("s3", "", "s3_client server port")
-	dataset := flag.String("data", "", "dataset file")
-	//doPlot := flag.Bool("plot", false, "plot latency cdf")
-	benchType := flag.String("bench", "", "benchmark type")
-	flag.Parse()
+func initDatastores(dbEndpoints []string) (*benchmark, error) {
+	b := &benchmark{
+		workload: yelp.New(),
+		conf: config{
+			datasetSize:      preloadSize,
+			queryWriteRatio:  workloadRation,
+			workloadDuration: workloadTime,
+		},
+	}
+	datastores := make(map[string]datastore)
+	for _, endpoint := range dbEndpoints {
+		conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
+		if err != nil {
+			return nil, err
+		}
+		client := pbS3Cli.NewS3Client(conn)
+		ctx, putObjectCancel := context.WithCancel(context.Background())
+		putObjectStr, err := client.PutObject(ctx)
+		if err != nil {
+			putObjectCancel()
+			return nil, err
+		}
+		ctx, updateTagsCancel := context.WithCancel(context.Background())
+		updateTagsStr, err := client.UpdateTags(ctx)
+		if err != nil {
+			putObjectCancel()
+			updateTagsCancel()
+			return nil, err
+		}
+		datastores[endpoint] = datastore{
+			client:           client,
+			putObjectStream:  putObjectStr,
+			updateTagsStream: updateTagsStr,
+			conn:             conn,
+			putObjectCancel:  putObjectCancel,
+			updateTagsCancel: updateTagsCancel,
+		}
+	}
+	b.datastores = datastores
+	return b, nil
+}
 
-	dbEndpoints := strings.Split(*dbEndP, "/")
-	b, err := initDatastores(dbEndpoints)
-	log.Info("initialize: ", err)
+func (b *benchmark) initProteus(proteusEndP string) error {
+	proteusEndpoint := strings.Split(proteusEndP, ":")
+	proteusPort, err := strconv.ParseInt(proteusEndpoint[1], 10, 64)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	if *benchType == "preload" {
-		if err := b.populateDB(*dataset, true); err != nil {
-			log.Fatal(err)
-		}
+	proteusCli, err := proteusclient.NewClient(proteusclient.Host{Name: proteusEndpoint[0], Port: int(proteusPort)})
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	if *benchType == "response" {
-		b.loadDataset()
-		if err := b.initProteus(*proteusEndP); err != nil {
-			log.Fatal(err)
-		}
-		serve(b, *port)
-	}
-
-	if *benchType == "freshness" {
-		if err := b.initProteus(*proteusEndP); err != nil {
-			log.Fatal(err)
-		}
-
-		b.freshness = freshnessMeasurement{
-			objectPutTs:        make(map[int64]time.Time),
-			notificationTs:     make(map[int64]time.Time),
-			freshnessIntervals: make([]time.Duration, opCount),
-		}
-		b.howFresh()
-	}
+	b.proteusClient = proteusCli
+	return nil
 }
 
 //---------------- S3 operations -------------------
 
 func (ds *datastore) createBucket(bucketName string) error {
-	log.WithFields(log.Fields{"bucket": bucketName}).Debug("createBucket")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	resp, err := ds.client.CreateBucket(ctx, &pbS3Cli.CreateBucketRequest{BucketName: bucketName})
 	if err != nil {
 		return err
 	}
-	log.WithFields(log.Fields{"reply": resp.GetReply()}).Debug("createBucket response")
 	if resp.GetReply() == 0 {
 		return nil
 	}
@@ -443,7 +504,6 @@ func (ds *datastore) createBucket(bucketName string) error {
 }
 
 func (ds *datastore) putObject(bucketName, objName, content string, md map[string]string) error {
-	log.WithFields(log.Fields{"bucket": bucketName, "object": objName}).Debug("putObject")
 	if err := ds.putObjectStream.Send(&pbS3Cli.Object{
 		ObjectName: objName,
 		BucketName: bucketName,
@@ -456,7 +516,6 @@ func (ds *datastore) putObject(bucketName, objName, content string, md map[strin
 	if err != nil {
 		return err
 	}
-	log.WithFields(log.Fields{"reply": resp.GetReply()}).Debug("putObject response")
 	if resp.GetReply() == 0 {
 		return nil
 	}
@@ -479,37 +538,6 @@ func (ds *datastore) updateTags(bucketName, objName string, md map[string]string
 		return nil
 	}
 	return errors.New("updateTags err: code= " + strconv.FormatInt(int64(resp.GetReply()), 10))
-}
-
-func (b *benchmark) loadDataset() error {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var dsEndpoint string
-	for k := range b.datastores {
-		dsEndpoint = k
-	}
-	ds := b.datastores[dsEndpoint]
-
-	stream, err := ds.client.LoadDataset(ctx, &pbS3Cli.LoadDatasetRequest{})
-	if err != nil {
-		cancel()
-		return err
-	}
-	ch := b.workload.LoadDataset()
-	for {
-		obj, err := stream.Recv()
-		if err != nil {
-			cancel()
-			break
-		}
-		ch <- yelp.Object{
-			Key:    obj.GetObjectName(),
-			Bucket: obj.GetBucketName(),
-			Md:     obj.GetXAmzMeta(),
-		}
-	}
-	b.workload.PrintDataset()
-	return nil
 }
 
 //----------------- statistics ---------------------

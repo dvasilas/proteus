@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -195,14 +194,4 @@ func (w *Workload) LoadDataset() chan Object {
 		}
 	}()
 	return ch
-}
-
-// PrintDataset ...
-func (w *Workload) PrintDataset() {
-	fmt.Println("dataset")
-	fmt.Println(len(w.dataset))
-	// for _, r := range w.dataset {
-	// 	fmt.Println(r.ReviewID)
-	// 	fmt.Println(r.Votes)
-	// }
 }

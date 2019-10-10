@@ -13,7 +13,7 @@ func main() {
 	//port := flag.Int("port", 0, "qpu port")
 	//flag.Parse()
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "10.200.3.126", Port: 50250})
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50250})
 	fmt.Println(c, err)
 	if err != nil {
 		log.Fatal(err)
@@ -35,7 +35,7 @@ func main() {
 	//for {
 	query(c, []proteusclient.AttributePredicate{
 		// proteusclient.AttributePredicate{AttrName: "votes_cool", AttrType: proteusclient.S3TAGINT, Lbound: int64(1), Ubound: int64(2)},
-		proteusclient.AttributePredicate{AttrName: "votes_useful", AttrType: proteusclient.S3TAGINT, Lbound: int64(0), Ubound: int64(3)},
+		proteusclient.AttributePredicate{AttrName: "votesuseful", AttrType: proteusclient.S3TAGINT, Lbound: int64(1), Ubound: int64(1)},
 	}, proteusclient.LATESTSNAPSHOT)
 	// query(c, []proteusclient.AttributePredicate{proteusclient.AttributePredicate{AttrName: "test", AttrType: proteusclient.CRDTCOUNTER, Lbound: int64(0), Ubound: int64(100)}}, proteusclient.LATESTSNAPSHOT)
 
