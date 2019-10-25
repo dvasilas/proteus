@@ -110,7 +110,6 @@ func QPU(conf *config.Config) (*IQPU, error) {
 // Query implements the Query API for the index QPU
 func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
 	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
@@ -212,7 +211,6 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 		} else {
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
 				go func() {
-					log.WithFields(log.Fields{"operation": streamRec, "timestap": streamRec.GetLogOp().GetTimestamp()}).Debug("index QPU received operation")
 					if err := q.updateIndex(streamRec); err != nil {
 						log.WithFields(log.Fields{"error": err, "op": streamRec}).Fatal("opConsumer: index Update failed")
 						return
@@ -238,8 +236,6 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 
 // Given an operation sent from the data store, updates the index
 func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
-	log.WithFields(log.Fields{"stream record": rec, "querying config": q.qpu.QueryingCapabilities}).Debug("updateIndex")
-
 	state := utils.ObjectState{
 		ObjectID:   rec.GetLogOp().GetObjectId(),
 		ObjectType: rec.GetLogOp().GetObjectType(),

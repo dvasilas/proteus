@@ -43,7 +43,6 @@ func New(conf *config.Config) (*AntidoteIndex, error) {
 		return &AntidoteIndex{}, err
 	}
 	buckName := conf.IndexConfig.IndexStore.Bucket + string(genReference())
-	log.Debug(buckName)
 	bucket := antidote.Bucket{Bucket: []byte(buckName)}
 	return &AntidoteIndex{
 		attributeName: conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey(),
@@ -63,6 +62,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 	successful := false
 	factor := 1
 	for !successful {
+		log.WithFields(log.Fields{"value": attr.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
 		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
@@ -104,9 +104,10 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 			i.mutex.Unlock()
 		} else {
 			i.mutex.Unlock()
+			backoff := rand.Intn(10 * factor)
 			log.WithFields(log.Fields{"error": err}).Info("indexUpdate: transaction commit error")
-			log.WithFields(log.Fields{"error": err, "after": time.Millisecond * time.Duration((10 * factor))}).Info("indexUpdate: retrying")
-			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
+			log.WithFields(log.Fields{"error": err, "after": time.Millisecond * time.Duration((backoff))}).Info("indexUpdate: retrying")
+			time.Sleep(time.Millisecond * time.Duration(backoff))
 			factor *= 2
 		}
 	}
@@ -130,6 +131,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			return err
 		}
 		if attrOld != nil {
+			log.WithFields(log.Fields{"value": attrOld.GetValue(), "object": object.ObjectID}).Debug("removing old index entry")
 			valueIndex, err := i.getValueIndex(attrOld, tx)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #1")
@@ -175,6 +177,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			)
 		}
 		if attrNew != nil {
+			log.WithFields(log.Fields{"value": attrNew.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
 			valueIndex, err := i.getValueIndex(attrNew, tx)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #2")
@@ -236,6 +239,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			i.mutex.Unlock()
 			log.WithFields(log.Fields{"error": err}).Info("indexUpdate: transaction commit error")
 			log.WithFields(log.Fields{"error": err, "after": time.Millisecond * time.Duration((10 * factor))}).Info("indexUpdate: retrying")
+
 			time.Sleep(time.Millisecond * time.Duration((10 * factor)))
 			factor *= 2
 		}

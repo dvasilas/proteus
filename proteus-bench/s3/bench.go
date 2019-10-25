@@ -108,6 +108,28 @@ func main() {
 			log.Fatal(err)
 		}
 		serve(b, *port)
+	case "workload":
+		b.loadDataset()
+		if err := b.initProteus(*proteusEndP); err != nil {
+			log.Fatal(err)
+		}
+		respTimeCh := make(chan time.Duration)
+		b.responseTime = responseTimeMeasurement{
+			respTime: make([]time.Duration, 0),
+		}
+		go func() {
+			for respT := range respTimeCh {
+				fmt.Println(respT)
+			}
+		}()
+		var dsEndpoint string
+		for k := range b.datastores {
+			dsEndpoint = k
+		}
+		_, _, err = b.runWorkload(dsEndpoint, respTimeCh)
+		if err != nil {
+			log.Fatal(err)
+		}
 	case "freshness":
 		if err := b.initProteus(*proteusEndP); err != nil {
 			log.Fatal(err)

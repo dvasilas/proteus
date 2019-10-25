@@ -1,5 +1,4 @@
-# ignore files genrated by mockgen
-*mock.go
+__pycache__/
 
 vendor/
 
