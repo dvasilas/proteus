@@ -77,8 +77,9 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 		_, versionIndex, err := i.getVersionIndex(valueIndex, attr, tx)
 		var postingListRef []byte
 		if err != nil && strings.Contains(err.Error(), "not found") {
+			var versionIndexUpdate *antidote.CRDTUpdate
 			valueIndexUpdate, versionIndexRef := updateValueIndex(attr)
-			versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, genCatchUpTs(ts), tx)
+			versionIndexUpdate, postingListRef = appendNewVersion(versionIndexRef, genCatchUpTs(ts), tx)
 			indexStoreUpdates = append(indexStoreUpdates,
 				valueIndexUpdate,
 				versionIndexUpdate,
@@ -96,7 +97,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 		)
 		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
 			i.mutex.Unlock()
-			return nil
+			return err
 		}
 		err = tx.Commit()
 		if err == nil {
