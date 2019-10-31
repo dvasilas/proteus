@@ -1,5 +1,5 @@
 {
-  "bucketName": "local-s3",
+  "bucketName": "ycsb-buck",
   "awsAccessKeyID": "accessKey1",
   "awsSecretAccessKey": "verySecretKey1"
 }

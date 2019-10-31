@@ -4,6 +4,19 @@ vendor/
 
 bin/
 
+# OS X
 .DS_STORE
 
 .vscode
+
+# Gradle
+build
+gradle.properties
+.gradle
+local.properties
+out
+
+# Eclipse
+.classpath
+.project
+.settings
