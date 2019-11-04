@@ -11,11 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"runtime/debug"
+
 	"github.com/dvasilas/proteus/src/config"
 	"github.com/dvasilas/proteus/src/protos"
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	cli "github.com/dvasilas/proteus/src/qpu/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // QPU ...
@@ -222,6 +225,45 @@ func Compare(a, b *pbUtils.Value) (int, error) {
 	return 0, errors.New("unknown Value type")
 }
 
+// AttrMatchesPredicate checks if an object attribute matches a given predicate.
+func AttrMatchesPredicate(predicate *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
+	if keyMatch(predicate.GetAttr().GetAttrKey(), attr) && typeMatch(predicate.GetAttr().GetAttrType(), attr) {
+		return rangeMatch(predicate, attr)
+	}
+	return false, nil
+}
+
+func keyMatch(objectName string, attr *pbUtils.Attribute) bool {
+	if objectName == attr.GetAttrKey() {
+		return true
+	}
+	return false
+}
+
+func typeMatch(t pbUtils.Attribute_AttributeType, attr *pbUtils.Attribute) bool {
+	if t == attr.GetAttrType() {
+		return true
+	}
+	return false
+}
+
+// within the range [greaterOrEqual, lessThan)
+func rangeMatch(pred *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
+	lb, err := Compare(attr.GetValue(), pred.GetLbound())
+	if err != nil {
+		return false, err
+	}
+	ub, err := Compare(attr.GetValue(), pred.GetUbound())
+	if err != nil {
+		return false, err
+	}
+	if lb >= 0 && ub < 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Ping ...
 func Ping(stream pbQPU.QPU_QueryServer, msg *pbQPU.PingMsg) error {
 	seqID := msg.GetSeqId()
 	for {
@@ -320,6 +362,7 @@ func valueType(v *pbUtils.Value) int {
 
 //----------------- responseTime -------------------
 
+// ResponseTime ...
 type ResponseTime []time.Duration
 
 func (t ResponseTime) Len() int {
@@ -330,4 +373,13 @@ func (t ResponseTime) Swap(i, j int) {
 }
 func (t ResponseTime) Less(i, j int) bool {
 	return t[i].Nanoseconds() < t[j].Nanoseconds()
+}
+
+//----------------- responseTime -------------------
+//---------------- error handling ------------------
+
+// ReportError prints the given error and the stack trace returned by runtime.Stack.
+func ReportError(e error) {
+	log.WithFields(log.Fields{"error": e}).Warn("error")
+	debug.PrintStack()
 }

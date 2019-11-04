@@ -25,7 +25,7 @@ type InMemIndex struct {
 type indexImplementation interface {
 	update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
 	updateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error)
+	lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate, chan utils.ObjectState, chan error)
 	print()
 }
 
@@ -53,8 +53,8 @@ func (i *InMemIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectS
 }
 
 // Lookup performs a range lookup on the index and returns the result.
-func (i *InMemIndex) Lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
-	return i.index.lookup(attrPred, tsPred)
+func (i *InMemIndex) Lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
+	i.index.lookup(attrPred, tsPred, lookupResCh, errCh)
 }
 
 //------- indexImplementation interface ------------
@@ -114,25 +114,23 @@ func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectS
 	return nil
 }
 
-func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
-	res := make(map[string]utils.ObjectState)
+func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	it := func(node btree.Item) bool {
 		postings := node.(treeNode).getLatestVersion()
 		for _, obj := range postings.Objects {
-			res[obj.ObjectID] = obj
+			lookupResCh <- obj
 		}
 		return true
 	}
 	lb, ub := i.entry.predicateToIndexEntries(attrPred.GetLbound(), attrPred.GetUbound())
 
-	i.mutex.RLock()
-	i.tree.AscendRange(lb, ub, it)
-	i.mutex.RUnlock()
-
-	if len(res) == 0 {
-		return nil, nil
-	}
-	return res, nil
+	go func() {
+		i.mutex.RLock()
+		i.tree.AscendRange(lb, ub, it)
+		i.mutex.RUnlock()
+		close(lookupResCh)
+		close(errCh)
+	}()
 }
 
 func (i *bTreeIndex) newIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) btree.Item {

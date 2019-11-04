@@ -3,6 +3,7 @@ package index
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"time"
@@ -36,7 +37,7 @@ type persistentQuery struct {
 type indexStore interface {
 	Update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
 	UpdateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	Lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error)
+	Lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate, chan utils.ObjectState, chan error)
 }
 
 //---------------- API Functions -------------------
@@ -110,6 +111,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 // Query implements the Query API for the index QPU
 func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"request": request}).Debug("query request received")
 	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
@@ -120,27 +122,46 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		return errors.New("not supported")
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		indexResult, err := q.index.Lookup(request.GetPredicate()[0], request.GetClock())
-		if err != nil {
-			return err
-		}
+		lookupResCh := make(chan utils.ObjectState)
+		errCh := make(chan error)
+		go q.index.Lookup(request.GetPredicate()[0], request.GetClock(), lookupResCh, errCh)
 		var seqID int64
-		for _, item := range indexResult {
-			logOp := protoutils.LogOperation(
-				item.ObjectID,
-				item.Bucket,
-				item.ObjectType,
-				&item.Timestamp,
-				protoutils.PayloadState(&item.State),
-			)
-			if err := streamOut.Send(protoutils.ResponseStreamRecord(
-				seqID,
-				pbQPU.ResponseStreamRecord_STATE,
-				logOp,
-			)); err != nil {
-				return err
+		for {
+			select {
+			case err, ok := <-errCh:
+				if !ok {
+					errCh = nil
+				} else if err == io.EOF {
+					errCh = nil
+				} else {
+					fmt.Println("err from errCh: ", err)
+					return err
+				}
+			case item, ok := <-lookupResCh:
+				if !ok {
+					lookupResCh = nil
+				} else {
+					logOp := protoutils.LogOperation(
+						item.ObjectID,
+						item.Bucket,
+						item.ObjectType,
+						&item.Timestamp,
+						protoutils.PayloadState(&item.State),
+					)
+					if err := streamOut.Send(protoutils.ResponseStreamRecord(
+						seqID,
+						pbQPU.ResponseStreamRecord_STATE,
+						logOp,
+					)); err != nil {
+						fmt.Println("err from Send(): ", err)
+						return err
+					}
+					seqID++
+				}
 			}
-			seqID++
+			if errCh == nil && lookupResCh == nil {
+				break
+			}
 		}
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
@@ -253,7 +274,7 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 	for _, attr := range state.State.GetAttrs() {
 		toIndex := true
 		for _, pred := range q.qpu.QueryingCapabilities {
-			match, err := filter.AttrMatchesPredicate(pred, attr)
+			match, err := utils.AttrMatchesPredicate(pred, attr)
 			if err != nil {
 				return err
 			}

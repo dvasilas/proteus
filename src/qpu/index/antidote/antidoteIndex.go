@@ -1,7 +1,6 @@
 package antidoteindex
 
 import (
-	"errors"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -62,7 +61,6 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 	successful := false
 	factor := 1
 	for !successful {
-		log.WithFields(log.Fields{"value": attr.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
 		i.mutex.Lock()
 		tx, err := i.client.StartTransaction()
 		if err != nil {
@@ -74,7 +72,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 			i.mutex.Unlock()
 			return err
 		}
-		_, versionIndex, err := i.getVersionIndex(valueIndex, attr, tx)
+		_, versionIndex, err := i.getVersionIndexPoint(valueIndex, attr, tx)
 		var postingListRef []byte
 		if err != nil && strings.Contains(err.Error(), "not found") {
 			var versionIndexUpdate *antidote.CRDTUpdate
@@ -135,26 +133,26 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			log.WithFields(log.Fields{"value": attrOld.GetValue(), "object": object.ObjectID}).Debug("removing old index entry")
 			valueIndex, err := i.getValueIndex(attrOld, tx)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #1")
 				i.mutex.Unlock()
+				utils.ReportError(err)
 				return err
 			}
-			versionIndexRef, versionIndex, err := i.getVersionIndex(valueIndex, attrOld, tx)
+			versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrOld, tx)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getValtoTsIndex")
 				i.mutex.Unlock()
+				utils.ReportError(err)
 				return err
 			}
 			postingListRefO, err := getLatestPostingList(versionIndex)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #1")
 				i.mutex.Unlock()
+				utils.ReportError(err)
 				return err
 			}
 			postingListO, err := i.getPostingList(postingListRefO, tx)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getPostingList #1")
 				i.mutex.Unlock()
+				utils.ReportError(err)
 				return err
 			}
 			if len(versionIndex.ListMapKeys()) >= maxVersionCount {
@@ -185,7 +183,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 				i.mutex.Unlock()
 				return err
 			}
-			versionIndexRef, versionIndex, err := i.getVersionIndex(valueIndex, attrNew, tx)
+			versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrNew, tx)
 			if err != nil && strings.Contains(err.Error(), "not found") {
 				valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
 				versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
@@ -249,53 +247,51 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 }
 
 // Lookup ...
-func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate) (map[string]utils.ObjectState, error) {
+func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	//i.mutex.RLock()
 	tx, err := i.client.StartTransaction()
 	if err != nil {
-		return nil, err
+		utils.ReportError(err)
+		errCh <- err
+		return
 	}
 	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
-		return nil, err
+		utils.ReportError(err)
+		errCh <- err
+		return
 	}
-	c, err := utils.Compare(attr.GetLbound(), attr.GetUbound())
-	if err != nil {
-		return nil, err
-	}
-	if c != 0 {
-		return nil, errors.New("index supports only point queries")
-	}
-	res := make(map[string]utils.ObjectState)
-	predAttr := attr.GetAttr()
-	predAttr.Value = attr.GetLbound()
-	_, versionIndex, err := i.getVersionIndex(valueIndex, predAttr, tx)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return res, nil
+	versionIndexArr, err := i.getVersionIndexRange(valueIndex, attr, tx)
+	for _, vIndex := range versionIndexArr {
+		lastVRef, err := getLatestPostingList(vIndex)
+		if err != nil {
+			utils.ReportError(err)
+			errCh <- err
+			return
 		}
-		return nil, err
-	}
-	lastVRef, err := getLatestPostingList(versionIndex)
-	if err != nil {
-		return nil, err
-	}
-	postingList, err := i.getPostingList(lastVRef, tx)
-	if err != nil {
-		return nil, err
+		postingList, err := i.getPostingList(lastVRef, tx)
+		if err != nil {
+			utils.ReportError(err)
+			errCh <- err
+			return
+		}
+		for _, objEnc := range postingList {
+			obj, err := decodeObject(objEnc)
+			if err != nil {
+				utils.ReportError(err)
+				errCh <- err
+				return
+			}
+			lookupResCh <- obj
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		utils.ReportError(err)
+		errCh <- err
+		return
 	}
-	//i.mutex.RUnlock()
-	for _, objEnc := range postingList {
-		obj, err := decodeObject(objEnc)
-		if err != nil {
-			return nil, err
-		}
-		res[obj.ObjectID] = obj
-	}
-	return res, nil
+	close(lookupResCh)
+	close(errCh)
 }
 
 //---------------- Internal Functions --------------
@@ -305,7 +301,7 @@ func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx *antidote.Inte
 	return i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 }
 
-func (i *AntidoteIndex) getVersionIndex(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) ([]byte, *antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) ([]byte, *antidote.MapReadResult, error) {
 	versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(attr.GetValue())))
 	if err != nil {
 		return nil, nil, err
@@ -315,6 +311,57 @@ func (i *AntidoteIndex) getVersionIndex(valueIndex *antidote.MapReadResult, attr
 		return nil, nil, err
 	}
 	return versionIndexRef, versionIndex, nil
+}
+
+func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult, predicate *pbUtils.AttributePredicate, tx *antidote.InteractiveTransaction) ([]*antidote.MapReadResult, error) {
+	res := make([]*antidote.MapReadResult, 0)
+	c, err := utils.Compare(predicate.GetLbound(), predicate.GetUbound())
+	if err != nil {
+		utils.ReportError(err)
+		return nil, err
+	}
+	if c == 0 {
+		versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(predicate.GetLbound())))
+		if err != nil {
+			utils.ReportError(err)
+			return nil, err
+		}
+		versionIndex, err := i.bucket.ReadMap(tx, antidote.Key(versionIndexRef))
+		if err != nil {
+			utils.ReportError(err)
+			return nil, err
+		}
+		res = append(res, versionIndex)
+	} else {
+		vIndexEntryKeys := valueIndex.ListMapKeys()
+		for _, vIndexEntryK := range vIndexEntryKeys {
+			vIndexEntryKv, err := utils.StringToValue(predicate.GetAttr().GetAttrType(), string(vIndexEntryK.Key))
+			if err != nil {
+				utils.ReportError(err)
+				return nil, err
+			}
+			attr := protoutils.Attribute(predicate.GetAttr().GetAttrKey(), predicate.GetAttr().GetAttrType(), vIndexEntryKv)
+			match, err := utils.AttrMatchesPredicate(predicate, attr)
+			if err != nil {
+				utils.ReportError(err)
+				return nil, err
+			}
+			if match {
+				versionIndexRef, err := valueIndex.Reg(antidote.Key(vIndexEntryK.Key))
+				if err != nil {
+					utils.ReportError(err)
+					return nil, err
+				}
+				versionIndex, err := i.bucket.ReadMap(tx, antidote.Key(versionIndexRef))
+				if err != nil {
+					utils.ReportError(err)
+					return nil, err
+				}
+				res = append(res, versionIndex)
+			}
+		}
+	}
+	return res, nil
 }
 
 func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx *antidote.InteractiveTransaction) ([][]byte, error) {

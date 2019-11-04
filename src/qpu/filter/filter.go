@@ -107,7 +107,7 @@ func Filter(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseSt
 			attrs = streamRec.GetLogOp().GetPayload().GetDelta().GetNew().GetAttrs()
 		}
 		for _, attr := range attrs {
-			match, err := AttrMatchesPredicate(pred, attr)
+			match, err := utils.AttrMatchesPredicate(pred, attr)
 			if err != nil {
 				return false, err
 			}
@@ -115,44 +115,6 @@ func Filter(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseSt
 				return true, nil
 			}
 		}
-	}
-	return false, nil
-}
-
-// AttrMatchesPredicate checks if an object attribute matches a given predicate.
-func AttrMatchesPredicate(predicate *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
-	if keyMatch(predicate.GetAttr().GetAttrKey(), attr) && typeMatch(predicate.GetAttr().GetAttrType(), attr) {
-		return rangeMatch(predicate, attr)
-	}
-	return false, nil
-}
-
-func keyMatch(objectName string, attr *pbUtils.Attribute) bool {
-	if objectName == attr.GetAttrKey() {
-		return true
-	}
-	return false
-}
-
-func typeMatch(t pbUtils.Attribute_AttributeType, attr *pbUtils.Attribute) bool {
-	if t == attr.GetAttrType() {
-		return true
-	}
-	return false
-}
-
-// within the range [greaterOrEqual, lessThan)
-func rangeMatch(pred *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
-	lb, err := utils.Compare(attr.GetValue(), pred.GetLbound())
-	if err != nil {
-		return false, err
-	}
-	ub, err := utils.Compare(attr.GetValue(), pred.GetUbound())
-	if err != nil {
-		return false, err
-	}
-	if lb >= 0 && ub < 0 {
-		return true, nil
 	}
 	return false, nil
 }
