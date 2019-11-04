@@ -22,10 +22,6 @@ import (
 	"google.golang.org/grpc"
 
 	log "github.com/sirupsen/logrus"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/plotutil"
-	"gonum.org/v1/plot/vg"
 )
 
 const opCount = 10
@@ -85,7 +81,6 @@ func main() {
 	proteusEndP := flag.String("proteus", "", "proteus endpoint")
 	dbEndP := flag.String("s3", "", "s3_client server port")
 	dataset := flag.String("data", "", "dataset file")
-	//doPlot := flag.Bool("plot", false, "plot latency cdf")
 	benchType := flag.String("bench", "", "benchmark type")
 	flag.Parse()
 
@@ -297,32 +292,32 @@ func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Dura
 	return elapsed, nil
 }
 
-func (b *benchmark) plot() error {
-	p, err := plot.New()
-	if err != nil {
-		return err
-	}
+// func (b *benchmark) plot() error {
+// 	p, err := plot.New()
+// 	if err != nil {
+// 		return err
+// 	}
 
-	p.Title.Text = "CDF plot"
-	p.X.Label.Text = "latency ms"
-	p.Y.Label.Text = "cdf(x)"
+// 	p.Title.Text = "CDF plot"
+// 	p.X.Label.Text = "latency ms"
+// 	p.Y.Label.Text = "cdf(x)"
 
-	pts := make(plotter.XYs, len(b.responseTime.respTime))
-	for i, t := range b.responseTime.respTime {
-		pts[i].X = t.Seconds() * 1000
-		pts[i].Y = float64(i) / float64(len(b.responseTime.respTime)) * float64(100.0)
-	}
-	err = plotutil.AddLinePoints(p,
-		"", pts,
-	)
-	if err != nil {
-		return err
-	}
-	if err := p.Save(8*vg.Inch, 8*vg.Inch, "plot.pdf"); err != nil {
-		return err
-	}
-	return nil
-}
+// 	pts := make(plotter.XYs, len(b.responseTime.respTime))
+// 	for i, t := range b.responseTime.respTime {
+// 		pts[i].X = t.Seconds() * 1000
+// 		pts[i].Y = float64(i) / float64(len(b.responseTime.respTime)) * float64(100.0)
+// 	}
+// 	err = plotutil.AddLinePoints(p,
+// 		"", pts,
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if err := p.Save(8*vg.Inch, 8*vg.Inch, "plot.pdf"); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 //------------------ freshness ---------------------
 

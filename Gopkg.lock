@@ -8,12 +8,6 @@
   revision = "75786c0ac1961d2292005c8e40b1214295d52355"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/ajstarks/svgo"
-  packages = ["."]
-  revision = "de52242f3d65700ff4fa20a246fd17c8fcfc1d09"
-
-[[projects]]
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -34,31 +28,22 @@
   version = "v1.20.11"
 
 [[projects]]
+  name = "github.com/beorn7/perks"
+  packages = ["quantile"]
+  revision = "37c8de3658fcb183f997c4e13e8337516ab753e6"
+  version = "v1.0.1"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
 
 [[projects]]
-  name = "github.com/fogleman/gg"
-  packages = ["."]
-  revision = "0403632d5b905943a1c2a5b2763aaecd568467ec"
-  version = "v1.3.0"
-
-[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
   version = "v1.4.7"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/golang/freetype"
-  packages = [
-    "raster",
-    "truetype"
-  ]
-  revision = "e2365dfdc4a05e4b8299a783240d4a7d5a65d4e4"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -107,12 +92,6 @@
   revision = "c2b33e84"
 
 [[projects]]
-  name = "github.com/jung-kurt/gofpdf"
-  packages = ["."]
-  revision = "a73f202beea89ea4f3cee7c4965eec8622ca7138"
-  version = "v2.13.0"
-
-[[projects]]
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
   revision = "f55edac94c9bbba5d6182a4be46d86a2c9b5b50e"
@@ -123,6 +102,12 @@
   packages = ["."]
   revision = "de8848e004dd33dc07a2947b3d76f618a7fc7ef1"
   version = "v1.8.1"
+
+[[projects]]
+  name = "github.com/matttproud/golang_protobuf_extensions"
+  packages = ["pbutil"]
+  revision = "c12348ce28de40eed0136aa2b644d0ee0650e56c"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/mitchellh/mapstructure"
@@ -147,6 +132,42 @@
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/prometheus/client_golang"
+  packages = [
+    "prometheus",
+    "prometheus/internal",
+    "prometheus/promhttp"
+  ]
+  revision = "170205fb58decfd011f1550d4cfb737230d7ae4f"
+  version = "v1.1.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/prometheus/client_model"
+  packages = ["go"]
+  revision = "14fe0d1b01d4d5fc031dd4bec1823bd3ebbe8016"
+
+[[projects]]
+  name = "github.com/prometheus/common"
+  packages = [
+    "expfmt",
+    "internal/bitbucket.org/ww/goautoneg",
+    "model"
+  ]
+  revision = "287d3e634a1e550c9e463dd7e5a75a422c614505"
+  version = "v0.7.0"
+
+[[projects]]
+  name = "github.com/prometheus/procfs"
+  packages = [
+    ".",
+    "internal/fs",
+    "internal/util"
+  ]
+  revision = "499c85531f756d1129edd26485a5f73871eeb308"
+  version = "v0.0.5"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -195,28 +216,6 @@
 
 [[projects]]
   branch = "master"
-  name = "golang.org/x/exp"
-  packages = ["rand"]
-  revision = "ac5d2bfcbfe092bf8a1233e37c03571b3047d81b"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/image"
-  packages = [
-    "ccitt",
-    "draw",
-    "font",
-    "font/basicfont",
-    "font/plan9font",
-    "math/f64",
-    "math/fixed",
-    "tiff",
-    "tiff/lzw"
-  ]
-  revision = "69e4b8554b2a817a1f0015867f0858d02801f0f5"
-
-[[projects]]
-  branch = "master"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -232,7 +231,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = [
+    "unix",
+    "windows"
+  ]
   revision = "04f50cda93cbb67f2afa353c52f342100e80e625"
 
 [[projects]]
@@ -257,47 +259,6 @@
   ]
   revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
   version = "v0.3.2"
-
-[[projects]]
-  branch = "master"
-  name = "gonum.org/v1/gonum"
-  packages = [
-    "blas",
-    "blas/blas64",
-    "blas/cblas128",
-    "blas/gonum",
-    "floats",
-    "internal/asm/c128",
-    "internal/asm/c64",
-    "internal/asm/f32",
-    "internal/asm/f64",
-    "internal/cmplx64",
-    "internal/math32",
-    "lapack",
-    "lapack/gonum",
-    "lapack/lapack64",
-    "mat"
-  ]
-  revision = "40d3308efe802a316868b7144afbe5fb9aae4ec8"
-
-[[projects]]
-  branch = "master"
-  name = "gonum.org/v1/plot"
-  packages = [
-    ".",
-    "palette",
-    "plotter",
-    "plotutil",
-    "tools/bezier",
-    "vg",
-    "vg/draw",
-    "vg/fonts",
-    "vg/vgeps",
-    "vg/vgimg",
-    "vg/vgpdf",
-    "vg/vgsvg"
-  ]
-  revision = "9aa86143727f898329b04f9a16882237caa96ddc"
 
 [[projects]]
   branch = "master"
@@ -361,6 +322,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f502bf342b36e084b82917aeb2e7edc2d063949444dde0470b8e3ad2112f62b1"
+  inputs-digest = "36d8df833471360eaa2fb588b57d5ee606eb8bc1628ce11bd358f5ad39f7da0d"
   solver-name = "gps-cdcl"
   solver-version = 1
