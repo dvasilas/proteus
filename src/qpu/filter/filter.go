@@ -39,15 +39,39 @@ func QPU(conf *config.Config) (*FQPU, error) {
 // Query implements the Query API for the filter QPU
 func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
-	errChan := make(chan error)
-	streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), request.GetSync())
-	utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, forward, errChan)
-	err = <-errChan
-	if err != io.EOF {
-		return err
+	log.WithFields(log.Fields{"request": request}).Debug("query request received")
+	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+	if err != nil {
+		return nil
 	}
-	return nil
+	streamIn, cancel, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), nil, request.GetSync())
+	seqID := int64(0)
+	for {
+		streamRec, err := streamIn.Recv()
+		if err == io.EOF {
+			return streamOut.Send(
+				protoutils.ResponseStreamRecord(
+					seqID,
+					pbQPU.ResponseStreamRecord_END_OF_STREAM,
+					&pbUtils.LogOperation{},
+				),
+			)
+		} else if err != nil {
+			return err
+		}
+		if err = filterAndForward(request.GetPredicate(), streamRec, streamOut, &seqID); err != nil {
+			return err
+		}
+		if maxResponseCount > 0 && seqID >= maxResponseCount {
+			cancel()
+			return streamOut.Send(
+				protoutils.ResponseStreamRecord(
+					seqID,
+					pbQPU.ResponseStreamRecord_END_OF_STREAM,
+					&pbUtils.LogOperation{},
+				))
+		}
+	}
 }
 
 // GetConfig implements the GetConfig API for the filter QPU
@@ -66,20 +90,14 @@ func (q *FQPU) Cleanup() {
 
 //---------------- Internal Functions --------------
 
-//forward checks if a given object matches a given predicate
+// filterAndForward checks if a given object matches a given predicate
 // if yes, it sends it to a given stream
-func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
-	log.WithFields(log.Fields{
-		"record": streamRec,
-		"pred":   pred,
-	}).Debug("FQPU: received input stream record")
-
+func filterAndForward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
 	match, err := Filter(pred, streamRec)
 	if err != nil {
 		return err
 	}
 	if match {
-		log.WithFields(log.Fields{"Object": streamRec.GetLogOp()}).Debug("Object matches query")
 		err := streamOut.Send(
 			protoutils.ResponseStreamRecord(
 				*seqID,
@@ -89,7 +107,6 @@ func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStream
 		(*seqID)++
 		return err
 	}
-	log.WithFields(log.Fields{"Object": streamRec.GetLogOp()}).Debug("Object does not match query")
 	return nil
 }
 

@@ -49,15 +49,15 @@ func QPU(conf *config.Config) (*CQPU, error) {
 // Query implements the Query API for the cache QPU
 func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
+	log.WithFields(log.Fields{"request": request}).Debug("query request received")
+	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+	if err != nil {
+		return nil
+	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		cachedResult, hit := q.cache.Get(request.GetPredicate())
 		if hit {
-			log.WithFields(log.Fields{
-				"cache entry": cachedResult,
-			}).Debug("cache hit, responding")
-
-			var seqID int64
+			seqID := int64(0)
 			for _, item := range cachedResult {
 				logOp := protoutils.LogOperation(
 					item.ObjectID,
@@ -70,22 +70,58 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 					return err
 				}
 				seqID++
+				if maxResponseCount > 0 && seqID >= maxResponseCount {
+					return streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						))
+				}
 			}
 			return nil
 		}
-		log.WithFields(log.Fields{}).Debug("cache miss")
-
-		errChan := make(chan error)
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), nil, false)
 		if err != nil {
 			return err
 		}
-		utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, q.storeAndRespond, errChan)
-		err = <-errChan
-		if err != io.EOF {
-			return err
+		respond := true
+		seqID := int64(0)
+		for {
+			streamRec, err := streamIn.Recv()
+			if err == io.EOF {
+				if respond {
+					if err := streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						),
+					); err != nil {
+						return nil
+					}
+				}
+				return err
+			} else if err != nil {
+				return err
+			}
+			if err = q.storeAndRespond(request.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
+				return err
+			}
+			if maxResponseCount > 0 && seqID >= maxResponseCount {
+				if respond {
+					if err := streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						)); err != nil {
+						return err
+					}
+				}
+				respond = false
+			}
 		}
-		return nil
 	}
 	return errors.New("not supported")
 }
@@ -107,7 +143,7 @@ func (q *CQPU) Cleanup() {
 
 // Stores an object that is part of a query response in the cache
 // and forwards to the response stream
-func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
+func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64, respond bool) error {
 	if streamRec.GetType() == pbQPU.ResponseStreamRecord_STATE {
 		obj := utils.ObjectState{
 			ObjectID:   streamRec.GetLogOp().GetObjectId(),
@@ -120,5 +156,15 @@ func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRe
 			return err
 		}
 	}
-	return streamOut.Send(streamRec)
+	if respond {
+		err := streamOut.Send(
+			protoutils.ResponseStreamRecord(
+				*seqID,
+				streamRec.GetType(),
+				streamRec.GetLogOp(),
+			))
+		(*seqID)++
+		return err
+	}
+	return nil
 }

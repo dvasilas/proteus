@@ -84,26 +84,48 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.Req
 
 		errsConsm := q.opConsumer(streamOut, opCh, ack, request.GetSync())
 		conn, errsSub := q.ds.SubscribeOps(opCh, ack, request.GetSync())
-
-		select {
-		case err := <-errsConsm:
-			conn.Close()
-			return err
-		case err := <-errsSub:
-			return err
+		for {
+			select {
+			case err, ok := <-errsConsm:
+				if !ok {
+					errsConsm = nil
+				} else {
+					conn.Close()
+					return err
+				}
+			case err, ok := <-errsSub:
+				if !ok {
+					errsSub = nil
+				} else {
+					return err
+				}
+			}
+			if errsConsm == nil && errsSub == nil {
+				break
+			}
 		}
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
 		errsGetSn := q.ds.GetSnapshot(streamCh)
-
-		select {
-		case err := <-errsGetSn:
-			if err != nil {
-				return err
+		for {
+			select {
+			case err, ok := <-errsGetSn:
+				if !ok {
+					errsConsm = nil
+				} else {
+					return err
+				}
+			case err, ok := <-errsConsm:
+				if !ok {
+					errsConsm = nil
+				} else {
+					return err
+				}
 			}
-		case err := <-errsConsm:
-			return err
+			if errsGetSn == nil && errsConsm == nil {
+				break
+			}
 		}
 	}
 	return nil
@@ -136,11 +158,10 @@ func (q *DriverQPU) snapshotConsumer(stream pbQPU.QPU_QueryServer) (chan *pbUtil
 
 	go func() {
 		for streamRec := range streamChan {
-			log.WithFields(log.Fields{"object": streamRec}).Debug("dataStoreQPU: received object")
-
 			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, streamRec)); err != nil {
-				errChan <- err
+				utils.Warn(err)
 				close(errChan)
+				return
 			}
 			seqID++
 		}

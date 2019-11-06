@@ -8,6 +8,8 @@ import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import java.util.Map;
+
 public class ProteusClient {
   private final ManagedChannel channel;
   private final QPUStub asyncStub;
@@ -25,7 +27,7 @@ public class ProteusClient {
     channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
   }
 
-  public void query(QueryPredicate []predicates, CountDownLatch finishLatch, final StreamObserver<ResponseStreamRecord> requestObserver) {
+  public void query(QueryPredicate []predicates, Map<String, String> metadata, CountDownLatch finishLatch, final StreamObserver<ResponseStreamRecord> requestObserver) {
     SnapshotTimePredicate clock = SnapshotTimePredicate.newBuilder()
       .setLbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
       .setUbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
@@ -64,6 +66,7 @@ public class ProteusClient {
       builder.addPredicate(predicate);
     }
 
+    builder.putAllMetadata(metadata);
     QueryRequest qreq = builder.build();
     RequestStream req = RequestStream.newBuilder().setRequest(qreq).build();
 

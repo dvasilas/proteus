@@ -2,6 +2,7 @@ package federation
 
 import (
 	"io"
+	"sync"
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
@@ -35,32 +36,76 @@ func QPU(conf *config.Config) (*FQPU, error) {
 // Query implements the Query API for the federation dispatcher QPU
 func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
-	forwardTo, err := q.generateSubQueries(request.GetPredicate())
+	log.WithFields(log.Fields{"request": request}).Debug("query request received")
+	subQueries, err := q.generateSubQueries(request.GetPredicate())
 	if err != nil {
 		return err
 	}
-	errChan := make(chan error)
-	for _, frwTo := range forwardTo {
-		streamIn, _, err := frwTo.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
+	subQueryCount := len(subQueries)
+	var mutex sync.Mutex
+	subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+	errCh := make(chan error)
+	seqID := int64(0)
+	for _, subQ := range subQueries {
+		streamIn, _, err := subQ.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
 		if err != nil {
 			return err
 		}
-		utils.QueryResponseConsumer(request.GetPredicate(), streamIn, streamOut, forward, errChan)
+		go func() {
+			for {
+				streamRec, err := streamIn.Recv()
+				if err == io.EOF {
+					mutex.Lock()
+					subQueryCount--
+					if subQueryCount == 0 {
+						close(subQueryResponseRecordCh)
+						close(errCh)
+					}
+					mutex.Unlock()
+					return
+				} else if err != nil {
+					errCh <- err
+					return
+				}
+				subQueryResponseRecordCh <- streamRec
+			}
+		}()
 	}
-
-	streamCnt := len(forwardTo)
-	for streamCnt > 0 {
+	for {
 		select {
-		case err := <-errChan:
-			if err == io.EOF {
-				streamCnt--
-			} else if err != nil {
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else {
 				return err
 			}
+		case streamRec, ok := <-subQueryResponseRecordCh:
+			if !ok {
+				subQueryResponseRecordCh = nil
+			} else {
+				if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+				} else {
+					if err := streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							streamRec.GetType(),
+							streamRec.GetLogOp(),
+						)); err != nil {
+						return err
+					}
+					seqID++
+				}
+			}
+		}
+		if errCh == nil && subQueryResponseRecordCh == nil {
+			return streamOut.Send(
+				protoutils.ResponseStreamRecord(
+					seqID,
+					pbQPU.ResponseStreamRecord_END_OF_STREAM,
+					&pbUtils.LogOperation{},
+				))
 		}
 	}
-	return nil
 }
 
 // GetConfig implements the GetConfig API for the filter QPU

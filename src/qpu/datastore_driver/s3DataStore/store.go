@@ -112,11 +112,6 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 				errs <- err
 				break
 			}
-
-			log.WithFields(log.Fields{
-				"op": op,
-			}).Debug("S3DataStore:opConsumer received op")
-
 			formattedOp, err := ds.formatOperation(op)
 			if err != nil {
 				errs <- err
@@ -176,9 +171,6 @@ func (ds S3DataStore) readSnapshot(msg chan *pbUtils.LogOperation, errs chan err
 	}
 	var res listBucketResult
 	xml.Unmarshal(body, &res)
-
-	log.WithFields(log.Fields{"contents": res.Contents}).Debug("s3DataStore: response")
-
 	go func() {
 		for _, r := range res.Contents {
 			buff := bytes.NewBuffer([]byte{})
@@ -244,10 +236,6 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(ts.UnixNano())}),
 		payload,
 	)
-
-	log.WithFields(log.Fields{
-		"object": obj,
-	}).Debug("s3DataStore: snapshot")
 	msg <- obj
 }
 

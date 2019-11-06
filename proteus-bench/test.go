@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -10,11 +11,10 @@ import (
 
 func main() {
 
-	//port := flag.Int("port", 0, "qpu port")
-	//flag.Parse()
+	port := flag.Int("port", 0, "qpu port")
+	flag.Parse()
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50250})
-	fmt.Println(c, err)
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: *port})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,23 +61,31 @@ func main() {
 //}
 
 func query(c *proteusclient.Client, pred []proteusclient.AttributePredicate, qType proteusclient.QueryType) {
-	respCh, errCh, err := c.Query(pred, qType)
-	fmt.Println(err)
+	queryMetadata := map[string]string{"maxResponseCount": "3"}
+	respCh, errCh, err := c.Query(pred, qType, queryMetadata)
+	// respCh, errCh, err := c.Query(pred, qType, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	eof := false
-	for !eof {
+	for {
 		select {
-		case err := <-errCh:
-			if err == io.EOF {
-				fmt.Println("end of results")
-				eof = true
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else if err == io.EOF {
 			} else {
 				log.Fatal(err)
 			}
-		case resp := <-respCh:
-			fmt.Println(resp)
+		case resp, ok := <-respCh:
+			if !ok {
+				respCh = nil
+			} else {
+				fmt.Println(resp)
+			}
+		}
+		if errCh == nil && respCh == nil {
+			fmt.Println("end of results")
+			break
 		}
 	}
 }

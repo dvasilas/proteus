@@ -93,6 +93,7 @@ func QPU(conf *config.Config) (*LQPU, error) {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 			),
+			nil,
 			false,
 		)
 		if err != nil {

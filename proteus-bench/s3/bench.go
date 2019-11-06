@@ -267,7 +267,7 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 
 func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Duration, error) {
 	t0 := time.Now()
-	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.LATESTSNAPSHOT)
+	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.LATESTSNAPSHOT, nil)
 	if err != nil {
 		return time.Since(t0), err
 	}
@@ -369,7 +369,7 @@ func (b *benchmark) howFresh() error {
 }
 
 func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
-	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.NOTIFY)
+	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.NOTIFY, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

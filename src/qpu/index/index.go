@@ -92,6 +92,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 			),
+			nil,
 			sync,
 		)
 		if err != nil {
@@ -121,11 +122,15 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
+	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+	if err != nil {
+		return nil
+	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		lookupResCh := make(chan utils.ObjectState)
 		errCh := make(chan error)
 		go q.index.Lookup(request.GetPredicate()[0], request.GetClock(), lookupResCh, errCh)
-		var seqID int64
+		seqID := int64(0)
 		for {
 			select {
 			case err, ok := <-errCh:
@@ -157,6 +162,14 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 						return err
 					}
 					seqID++
+					if maxResponseCount > 0 && seqID >= maxResponseCount {
+						return streamOut.Send(
+							protoutils.ResponseStreamRecord(
+								seqID,
+								pbQPU.ResponseStreamRecord_END_OF_STREAM,
+								&pbUtils.LogOperation{},
+							))
+					}
 				}
 			}
 			if errCh == nil && lookupResCh == nil {
@@ -314,6 +327,7 @@ func (q *IQPU) catchUp() error {
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
 			),
+			nil,
 			false,
 		)
 		defer cancel()

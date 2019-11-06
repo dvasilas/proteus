@@ -255,6 +255,8 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 		errCh <- err
 		return
 	}
+	defer tx.Commit()
+
 	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
 		utils.ReportError(err)
@@ -284,11 +286,6 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 			}
 			lookupResCh <- obj
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		utils.ReportError(err)
-		errCh <- err
-		return
 	}
 	close(lookupResCh)
 	close(errCh)

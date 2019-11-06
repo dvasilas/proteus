@@ -105,7 +105,7 @@ func (c *Client) Close() {
 }
 
 // Query ...
-func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType) (<-chan ResponseRecord, <-chan error, error) {
+func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType, Metadata map[string]string) (<-chan ResponseRecord, <-chan error, error) {
 	pred, err := inputToAttributePredicate(AttrPredicate)
 	if err != nil {
 		return nil, nil, err
@@ -123,7 +123,7 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 		)
 	}
-	stream, _, err := c.client.Query(pred, tsPred, false)
+	stream, _, err := c.client.Query(pred, tsPred, Metadata, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,6 +140,9 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 			}
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_HEARTBEAT {
 			} else if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+				close(respChan)
+				close(errChan)
+				return
 			} else {
 				respChan <- ResponseRecord{
 					SequenceID: streamRec.GetSequenceId(),

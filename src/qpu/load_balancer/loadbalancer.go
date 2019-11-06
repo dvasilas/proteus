@@ -54,7 +54,7 @@ func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.Request
 
 	errChan := make(chan error)
 	for _, frwTo := range forwardTo {
-		streamIn, _, err := frwTo.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
+		streamIn, _, err := frwTo.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), nil, false)
 		if err != nil {
 			return err
 		}

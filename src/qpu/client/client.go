@@ -16,13 +16,13 @@ type Client struct {
 }
 
 //Query ...
-func (c *Client) Query(predicate []*pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+func (c *Client) Query(predicate []*pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, metadata map[string]string, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
 		return nil, cancel, nil
 	}
-	err = stream.Send(protoutils.RequestStreamRequest(ts, predicate, sync))
+	err = stream.Send(protoutils.RequestStreamRequest(ts, predicate, metadata, sync))
 	return stream, cancel, err
 }
 

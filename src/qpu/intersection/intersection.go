@@ -57,7 +57,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	errCh := make(chan error)
 
 	for _, subQ := range subQueries {
-		streamIn, _, err := subQ.Endpoint.Client.Query(subQ.SubQuery, protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), false)
+		streamIn, _, err := subQ.Endpoint.Client.Query(subQ.SubQuery, protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), nil, false)
 		if err != nil {
 			return err
 		}

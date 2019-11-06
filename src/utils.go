@@ -375,11 +375,33 @@ func (t ResponseTime) Less(i, j int) bool {
 	return t[i].Nanoseconds() < t[j].Nanoseconds()
 }
 
-//----------------- responseTime -------------------
 //---------------- error handling ------------------
 
 // ReportError prints the given error and the stack trace returned by runtime.Stack.
 func ReportError(e error) {
 	log.WithFields(log.Fields{"error": e}).Warn("error")
 	debug.PrintStack()
+}
+
+// Warn prints the given error
+func Warn(e error) {
+	log.WithFields(log.Fields{"error": e}).Warn("warning")
+	debug.PrintStack()
+}
+
+//----------- query metadata parameters ------------
+
+// MaxResponseCount ..
+func MaxResponseCount(metadata map[string]string) (int64, error) {
+	maxResponseCount := int64(-1)
+	if metadata != nil {
+		if val, ok := metadata["maxResponseCount"]; ok {
+			mdMaxResponseCountVal, err := strconv.ParseInt(val, 10, 0)
+			if err != nil {
+				return maxResponseCount, err
+			}
+			maxResponseCount = mdMaxResponseCountVal
+		}
+	}
+	return maxResponseCount, nil
 }
