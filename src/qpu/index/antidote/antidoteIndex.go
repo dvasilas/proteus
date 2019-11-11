@@ -248,14 +248,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 
 // Lookup ...
 func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
-	//i.mutex.RLock()
-	tx, err := i.client.StartTransaction()
-	if err != nil {
-		utils.ReportError(err)
-		errCh <- err
-		return
-	}
-	defer tx.Commit()
+	tx := i.client.CreateStaticTransaction()
 
 	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
@@ -293,12 +286,12 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 
 //---------------- Internal Functions --------------
 
-func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) (*antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx antidote.Transaction) (*antidote.MapReadResult, error) {
 	valueIndexRef := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
 	return i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 }
 
-func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx *antidote.InteractiveTransaction) ([]byte, *antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx antidote.Transaction) ([]byte, *antidote.MapReadResult, error) {
 	versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(attr.GetValue())))
 	if err != nil {
 		return nil, nil, err
@@ -310,7 +303,7 @@ func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult,
 	return versionIndexRef, versionIndex, nil
 }
 
-func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult, predicate *pbUtils.AttributePredicate, tx *antidote.InteractiveTransaction) ([]*antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult, predicate *pbUtils.AttributePredicate, tx antidote.Transaction) ([]*antidote.MapReadResult, error) {
 	res := make([]*antidote.MapReadResult, 0)
 	c, err := utils.Compare(predicate.GetLbound(), predicate.GetUbound())
 	if err != nil {
@@ -361,7 +354,7 @@ func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult,
 	return res, nil
 }
 
-func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx *antidote.InteractiveTransaction) ([][]byte, error) {
+func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx antidote.Transaction) ([][]byte, error) {
 	return i.bucket.ReadSet(tx, antidote.Key(postingListRef))
 }
 
@@ -374,7 +367,7 @@ func updateValueIndex(attr *pbUtils.Attribute) (*antidote.CRDTUpdate, []byte) {
 	), ref
 }
 
-func appendNewVersion(versionIndexRef []byte, tsKey []byte, tx *antidote.InteractiveTransaction) (*antidote.CRDTUpdate, []byte) {
+func appendNewVersion(versionIndexRef []byte, tsKey []byte, tx antidote.Transaction) (*antidote.CRDTUpdate, []byte) {
 	ref := genReference()
 	return antidote.MapUpdate(
 		antidote.Key(versionIndexRef),
