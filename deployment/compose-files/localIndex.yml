@@ -1,0 +1,28 @@
+version: '3'
+services:
+  antidote:
+    image: dvasilas/antidote:proteus
+    networks:
+      - proteus_net
+    deploy:
+      placement:
+        constraints: [node.labels.node2 == true ]
+  qpuindex:
+    image: dvasilas/proteus:swarm
+    networks:
+      - proteus_net
+    ports:
+      - "50250:50250"
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=dsdriver-0 --port=50150 --timeout=0
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote:8087 --conns=dsdriver-0:50150"
+    depends_on:
+      - dsdriver-0
+      - antidote
+    deploy:
+      placement:
+        constraints: [node.labels.node2 == true ]
+
+networks:
+  proteus_net:
+    external: true
