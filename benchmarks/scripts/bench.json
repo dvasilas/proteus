@@ -1,0 +1,39 @@
+{
+  "deployment": {
+    "storage_engine": "1dataStore.yml",
+    "query_engine": "localIndex.yml"
+  },  
+  "global_config": {
+    "table": "ycsb-buck",    
+    "s3_host": "cloudserver-0",
+    "s3_port": "8000",
+    "s3_access_key_id": "accessKey1",
+    "s3_secret_key": "verySecretKey1",
+    "proteus_host": "qpuindex",
+    "proteus_port": "50250",
+    "workload": "workloada",
+    "record_count": 1000,
+    "execution_time": 60,
+    "warmup_time": 10
+  },
+  "placement": {
+    "storage_engine_cloudserver-0": "swarm1.novalocal",
+    "storage_engine_dsdriver-0": "swarm1.novalocal",
+    "query_engine_antidote": "swarm2.novalocal",
+    "query_engine_qpuindex": "swarm2.novalocal"
+  },
+  "benchmarks":[
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.0,
+      "threads": 1
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.0,
+      "threads": 2
+    }
+  ]
+}
