@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/src"
@@ -25,6 +26,7 @@ type IQPU struct {
 	index        indexStore
 	cancelFuncs  []context.CancelFunc
 	persistentQs map[int]persistentQuery
+	mutex        sync.RWMutex
 }
 
 type persistentQuery struct {
@@ -139,7 +141,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				} else if err == io.EOF {
 					errCh = nil
 				} else {
-					fmt.Println("err from errCh: ", err)
+					utils.ReportError(err)
 					return err
 				}
 			case item, ok := <-lookupResCh:
@@ -179,20 +181,44 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		chID := rand.Int()
+		q.mutex.Lock()
 		q.persistentQs[chID] = persistentQuery{
 			predicate: request.GetPredicate(),
 			stream:    streamOut,
 		}
-		for {
+		q.mutex.Unlock()
+		heartbeatCh := make(chan int)
+		go q.heartbeat(heartbeatCh)
+		heartbeatCh <- 0
+		for i := range heartbeatCh {
 			err := streamOut.Send(protoutils.ResponseStreamRecord(int64(0), pbQPU.ResponseStreamRecord_HEARTBEAT, nil))
 			if err != nil {
+				q.mutex.Lock()
 				delete(q.persistentQs, chID)
+				q.mutex.Unlock()
+				heartbeatCh <- 1
 				break
 			}
-			time.Sleep(time.Second)
+			heartbeatCh <- i
 		}
 	}
 	return nil
+}
+
+func (q *IQPU) heartbeat(heartbeatCh chan int) {
+	checkIfClosed := <-heartbeatCh
+	if checkIfClosed == 1 {
+		return
+	}
+	heartbeatCh <- 0
+	f := q.newHeartbeat(heartbeatCh)
+	time.AfterFunc(100*time.Millisecond, f)
+}
+
+func (q *IQPU) newHeartbeat(heartbeatCh chan int) func() {
+	return func() {
+		q.heartbeat(heartbeatCh)
+	}
 }
 
 // GetConfig implements the GetConfig API for the index QPU
@@ -215,17 +241,21 @@ func (q *IQPU) Cleanup() {
 //----------- Stream Consumer Functions ------------
 
 func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
-	for _, q := range q.persistentQs {
-		match, err := filter.Filter(q.predicate, record)
+	q.mutex.RLock()
+	for _, query := range q.persistentQs {
+		match, err := filter.Filter(query.predicate, record)
 		if err != nil {
+			q.mutex.Unlock()
 			return err
 		}
 		if match {
-			if err := q.stream.Send(record); err != nil {
+			if err := query.stream.Send(record); err != nil {
+				q.mutex.Unlock()
 				return nil
 			}
 		}
 	}
+	q.mutex.Unlock()
 	return nil
 }
 

@@ -72,7 +72,6 @@ type ObjectState struct {
 	Timestamp  pbUtils.Vectorclock
 }
 
-// encodeObject
 // Marshal ...
 func (o *ObjectState) Marshal() ([]byte, error) {
 	marshalledState, err := marshalState(&o.State)
@@ -89,7 +88,7 @@ func (o *ObjectState) Marshal() ([]byte, error) {
 	marshalledParts = append(marshalledParts, []byte(o.Bucket))
 	marshalledParts = append(marshalledParts, marshalledState)
 	marshalledParts = append(marshalledParts, marshalledVC)
-	marshalledObjetState := bytes.Join(marshalledParts, []byte{'_'})
+	marshalledObjetState := bytes.Join(marshalledParts, []byte{'|'})
 	return marshalledObjetState, nil
 }
 
@@ -123,8 +122,9 @@ func UnmarshalVectorClock(encodedVC []byte) (pbUtils.Vectorclock, error) {
 	return vc, err
 }
 
+// UnmarshalObject ...
 func UnmarshalObject(data []byte) (ObjectState, error) {
-	marshalledParts := bytes.Split(data, []byte{'_'})
+	marshalledParts := bytes.Split(data, []byte{'|'})
 	state, err := unmarshalState(marshalledParts[3])
 	if err != nil {
 		return ObjectState{}, err

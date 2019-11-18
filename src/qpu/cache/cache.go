@@ -10,6 +10,7 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	"github.com/dvasilas/proteus/src/qpu/cache/lruCache"
+	"github.com/dvasilas/proteus/src/qpu/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,7 +24,7 @@ type CQPU struct {
 // Describes the interface that any cache implementation needs to expose
 // to work with this module.
 type cacheImplementation interface {
-	Put(predicate []*pbUtils.AttributePredicate, obj utils.ObjectState) error
+	Put(predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
 	Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
 }
 
@@ -87,6 +88,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		}
 		respond := true
 		seqID := int64(0)
+		tempCacheEntry := make([]utils.ObjectState, 0)
+		tempCacheEntrySize := 0
 		for {
 			streamRec, err := streamIn.Recv()
 			if err == io.EOF {
@@ -101,11 +104,16 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 						return nil
 					}
 				}
-				return err
+				break
 			} else if err != nil {
 				return err
 			}
-			if err = q.storeAndRespond(request.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
+			if streamRec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+				object := responseStreamRecordToObjectState(streamRec)
+				tempCacheEntry = append(tempCacheEntry, object)
+				tempCacheEntrySize += len(streamRec.GetLogOp().GetPayload().GetState().GetAttrs()) + 1
+			}
+			if err = q.forward(request.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
 				return err
 			}
 			if maxResponseCount > 0 && seqID >= maxResponseCount {
@@ -122,6 +130,10 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				respond = false
 			}
 		}
+		if err := q.cache.Put(request.GetPredicate(), tempCacheEntry, tempCacheEntrySize, q.qpu.Conns[0].Client); err != nil {
+			return err
+		}
+		return nil
 	}
 	return errors.New("not supported")
 }
@@ -143,19 +155,7 @@ func (q *CQPU) Cleanup() {
 
 // Stores an object that is part of a query response in the cache
 // and forwards to the response stream
-func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64, respond bool) error {
-	if streamRec.GetType() == pbQPU.ResponseStreamRecord_STATE {
-		obj := utils.ObjectState{
-			ObjectID:   streamRec.GetLogOp().GetObjectId(),
-			ObjectType: streamRec.GetLogOp().GetObjectType(),
-			Bucket:     streamRec.GetLogOp().GetBucket(),
-			State:      *streamRec.GetLogOp().GetPayload().GetState(),
-			Timestamp:  *streamRec.GetLogOp().GetTimestamp(),
-		}
-		if err := q.cache.Put(predicate, obj); err != nil {
-			return err
-		}
-	}
+func (q *CQPU) forward(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64, respond bool) error {
 	if respond {
 		err := streamOut.Send(
 			protoutils.ResponseStreamRecord(
@@ -167,4 +167,14 @@ func (q *CQPU) storeAndRespond(predicate []*pbUtils.AttributePredicate, streamRe
 		return err
 	}
 	return nil
+}
+
+func responseStreamRecordToObjectState(streamRec *pbQPU.ResponseStreamRecord) utils.ObjectState {
+	return utils.ObjectState{
+		ObjectID:   streamRec.GetLogOp().GetObjectId(),
+		ObjectType: streamRec.GetLogOp().GetObjectType(),
+		Bucket:     streamRec.GetLogOp().GetBucket(),
+		State:      *streamRec.GetLogOp().GetPayload().GetState(),
+		Timestamp:  *streamRec.GetLogOp().GetTimestamp(),
+	}
 }
