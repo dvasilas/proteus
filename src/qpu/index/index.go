@@ -274,6 +274,7 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 		ObjectID:   rec.GetLogOp().GetObjectId(),
 		ObjectType: rec.GetLogOp().GetObjectType(),
 		Bucket:     rec.GetLogOp().GetBucket(),
+		Timestamp:  *rec.GetLogOp().GetTimestamp(),
 	}
 	if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
 		if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {

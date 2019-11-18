@@ -54,7 +54,7 @@ func New(conf *config.Config) (*AntidoteIndex, error) {
 // UpdateCatchUp ...
 func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
-	objectEncoded, err := encodeObject(object)
+	objectEncoded, err := object.Marshal()
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,13 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 		if err != nil && strings.Contains(err.Error(), "not found") {
 			var versionIndexUpdate *antidote.CRDTUpdate
 			valueIndexUpdate, versionIndexRef := updateValueIndex(attr)
-			versionIndexUpdate, postingListRef = appendNewVersion(versionIndexRef, genCatchUpTs(ts), tx)
+			marshalledVC, err := utils.MarshalVectorClock(&ts)
+			if err != nil {
+				i.mutex.Unlock()
+				utils.ReportError(err)
+				return err
+			}
+			versionIndexUpdate, postingListRef = appendNewVersion(versionIndexRef, marshalledVC, tx)
 			indexStoreUpdates = append(indexStoreUpdates,
 				valueIndexUpdate,
 				versionIndexUpdate,
@@ -116,7 +122,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 // Update ...
 func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
-	objectEncoded, err := encodeObject(object)
+	objectEncoded, err := object.Marshal()
 	if err != nil {
 		return err
 	}
@@ -168,7 +174,13 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 					valueIndexUpdate,
 				)
 			}
-			versionIndexUpdate, postingListRefN := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
+			marshalledVC, err := utils.MarshalVectorClock(&ts)
+			if err != nil {
+				i.mutex.Unlock()
+				utils.ReportError(err)
+				return err
+			}
+			versionIndexUpdate, postingListRefN := appendNewVersion(versionIndexRef, marshalledVC, tx)
 			indexStoreUpdates = append(indexStoreUpdates,
 				versionIndexUpdate,
 				antidote.SetAdd(antidote.Key([]byte(postingListRefN)), postingListO...),
@@ -186,7 +198,13 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrNew, tx)
 			if err != nil && strings.Contains(err.Error(), "not found") {
 				valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
-				versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
+				marshalledVC, err := utils.MarshalVectorClock(&ts)
+				if err != nil {
+					i.mutex.Unlock()
+					utils.ReportError(err)
+					return err
+				}
+				versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, marshalledVC, tx)
 				indexStoreUpdates = append(indexStoreUpdates,
 					valueIndexUpdate,
 					versionIndexUpdate,
@@ -218,7 +236,13 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 						valueIndexUpdate,
 					)
 				}
-				versionIndexUpdate, postingListRefNewN := appendNewVersion(versionIndexRef, encodeTimestamp(ts.GetVc()), tx)
+				marshalledVC, err := utils.MarshalVectorClock(&ts)
+				if err != nil {
+					i.mutex.Unlock()
+					utils.ReportError(err)
+					return err
+				}
+				versionIndexUpdate, postingListRefNewN := appendNewVersion(versionIndexRef, marshalledVC, tx)
 				indexStoreUpdates = append(indexStoreUpdates,
 					versionIndexUpdate,
 					antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), postingListO...),
@@ -271,7 +295,7 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 			return
 		}
 		for _, objEnc := range postingList {
-			obj, err := decodeObject(objEnc)
+			obj, err := utils.UnmarshalObject(objEnc)
 			if err != nil {
 				utils.ReportError(err)
 				errCh <- err
@@ -386,7 +410,11 @@ func getLatestPostingList(versionIndex *antidote.MapReadResult) ([]byte, error) 
 			return nil, err
 		}
 		latestVTs := lastVersion(versionsTs)
-		latestVRef = antidote.Key([]byte(encodeTimestamp(latestVTs.GetVc())))
+		marshalledVC, err := utils.MarshalVectorClock(latestVTs)
+		if err != nil {
+			return nil, err
+		}
+		latestVRef = antidote.Key(marshalledVC)
 	}
 	return versionIndex.Reg(latestVRef)
 }
@@ -395,51 +423,14 @@ func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*pbUtils.Vectorclock, 
 	res := make([]*pbUtils.Vectorclock, 0)
 	for _, ts := range tsEncArr {
 		if string(ts.Key) != "prev" {
-			var vcEntries []string
-			if strings.Contains(string(ts.Key), "_") {
-				vcEntries = strings.Split(string(ts.Key), "_")
-			} else {
-				vcEntries = []string{string(ts.Key)}
+			vc, err := utils.UnmarshalVectorClock(ts.Key)
+			if err != nil {
+				return nil, err
 			}
-			vcMap := make(map[string]uint64)
-			for _, e := range vcEntries {
-				vc := strings.Split(e, ":")
-				t, err := strconv.ParseInt(vc[1], 10, 64)
-				if err != nil {
-					return nil, err
-				}
-				vcMap[vc[0]] = uint64(t)
-			}
-			res = append(res, protoutils.Vectorclock(vcMap))
+			res = append(res, &vc)
 		}
 	}
 	return res, nil
-}
-
-func genCatchUpTs(ts pbUtils.Vectorclock) []byte {
-	zeroTs := make(map[string]uint64)
-	for k := range ts.GetVc() {
-		zeroTs[k] = 0
-	}
-	return encodeTimestamp(zeroTs)
-}
-
-func encodeTimestamp(ts map[string]uint64) []byte {
-	enc := ""
-	for k, v := range ts {
-		enc += k + ":" + strconv.FormatInt(int64(v), 10) + "_"
-	}
-	return []byte(enc[:len(enc)-1])
-}
-
-func encodeObject(object utils.ObjectState) ([]byte, error) {
-	return []byte(object.ObjectID), nil
-}
-
-func decodeObject(data []byte) (utils.ObjectState, error) {
-	var object utils.ObjectState
-	object.ObjectID = string(data)
-	return object, nil
 }
 
 func genReference() []byte {
@@ -507,11 +498,11 @@ func (i *AntidoteIndex) print() error {
 				return err
 			}
 			for _, obj := range postingList {
-				object, err := decodeObject(obj)
+				object, err := utils.UnmarshalObject(obj)
 				if err != nil {
 					return err
 				}
-				log.WithFields(log.Fields{"obj": object.ObjectID}).Debug("[index.print][posting list]")
+				log.WithFields(log.Fields{"obj": object}).Debug("[index.print][posting list]")
 			}
 		}
 	}

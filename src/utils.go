@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +18,7 @@ import (
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
 	cli "github.com/dvasilas/proteus/src/qpu/client"
+	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,21 +29,6 @@ type QPU struct {
 	Dataset              *pbQPU.DataSet
 	QueryingCapabilities []*pbUtils.AttributePredicate
 	Config               *config.Config
-}
-
-// ObjectState ...
-type ObjectState struct {
-	ObjectID   string
-	ObjectType pbUtils.LogOperation_ObjectType
-	Bucket     string
-	State      pbUtils.ObjectState
-	Timestamp  pbUtils.Vectorclock
-}
-
-// SubQuery ...
-type SubQuery struct {
-	SubQuery []*pbUtils.AttributePredicate
-	Endpoint *QPU
 }
 
 //---------------- API Functions -------------------
@@ -75,6 +61,94 @@ func ConnectToQPUGraph(q *QPU) error {
 	return nil
 }
 
+//----------------- ObjectState --------------------
+
+// ObjectState ...
+type ObjectState struct {
+	ObjectID   string
+	ObjectType pbUtils.LogOperation_ObjectType
+	Bucket     string
+	State      pbUtils.ObjectState
+	Timestamp  pbUtils.Vectorclock
+}
+
+// encodeObject
+// Marshal ...
+func (o *ObjectState) Marshal() ([]byte, error) {
+	marshalledState, err := marshalState(&o.State)
+	if err != nil {
+		return nil, err
+	}
+	marshalledVC, err := MarshalVectorClock(&o.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+	marshalledParts := make([][]byte, 0)
+	marshalledParts = append(marshalledParts, []byte(o.ObjectID))
+	marshalledParts = append(marshalledParts, marshalObjectType(o.ObjectType))
+	marshalledParts = append(marshalledParts, []byte(o.Bucket))
+	marshalledParts = append(marshalledParts, marshalledState)
+	marshalledParts = append(marshalledParts, marshalledVC)
+	marshalledObjetState := bytes.Join(marshalledParts, []byte{'_'})
+	return marshalledObjetState, nil
+}
+
+func marshalObjectType(t pbUtils.LogOperation_ObjectType) []byte {
+	return []byte(pbUtils.LogOperation_ObjectType_name[int32(t)])
+}
+
+func marshalState(objectState *pbUtils.ObjectState) ([]byte, error) {
+	return proto.Marshal(objectState)
+}
+
+func unmarshalObjectType(encodedType []byte) pbUtils.LogOperation_ObjectType {
+	return pbUtils.LogOperation_ObjectType(pbUtils.LogOperation_ObjectType_value[string(encodedType)])
+}
+
+// MarshalVectorClock ...
+func MarshalVectorClock(vc *pbUtils.Vectorclock) ([]byte, error) {
+	return proto.Marshal(vc)
+}
+
+func unmarshalState(encodedObjectState []byte) (pbUtils.ObjectState, error) {
+	var objectState pbUtils.ObjectState
+	err := proto.Unmarshal(encodedObjectState, &objectState)
+	return objectState, err
+}
+
+// UnmarshalVectorClock ...
+func UnmarshalVectorClock(encodedVC []byte) (pbUtils.Vectorclock, error) {
+	var vc pbUtils.Vectorclock
+	err := proto.Unmarshal(encodedVC, &vc)
+	return vc, err
+}
+
+func UnmarshalObject(data []byte) (ObjectState, error) {
+	marshalledParts := bytes.Split(data, []byte{'_'})
+	state, err := unmarshalState(marshalledParts[3])
+	if err != nil {
+		return ObjectState{}, err
+	}
+	vectorclock, err := UnmarshalVectorClock(marshalledParts[4])
+	if err != nil {
+		return ObjectState{}, err
+	}
+	objectState := ObjectState{
+		ObjectID:   string(marshalledParts[0]),
+		ObjectType: unmarshalObjectType(marshalledParts[1]),
+		Bucket:     string(marshalledParts[2]),
+		State:      state,
+		Timestamp:  vectorclock,
+	}
+	return objectState, nil
+}
+
+// SubQuery ...
+type SubQuery struct {
+	SubQuery []*pbUtils.AttributePredicate
+	Endpoint *QPU
+}
+
 // ObjectStateJSON ...
 type ObjectStateJSON struct {
 	ObjectID   string
@@ -86,53 +160,6 @@ type ObjectStateJSON struct {
 		AttrValue string
 	}
 	Timestamp map[string]uint64
-}
-
-// Marshal ...
-func (o *ObjectState) Marshal() ([]byte, error) {
-	objJ := ObjectStateJSON{
-		ObjectID:   o.ObjectID,
-		ObjectType: o.ObjectType.String(),
-		Bucket:     o.Bucket,
-		Timestamp:  o.Timestamp.GetVc(),
-	}
-	state := make([]struct {
-		AttrKey   string
-		AttrType  string
-		AttrValue string
-	}, len(o.State.Attrs))
-	for i, attr := range o.State.Attrs {
-		state[i].AttrKey = attr.GetAttrKey()
-		state[i].AttrType = attr.GetAttrType().String()
-		state[i].AttrValue = ValueToString(attr.GetValue())
-	}
-	objJ.State = state
-	return json.Marshal(objJ)
-}
-
-// UnMarshal ...
-func (o *ObjectState) UnMarshal(data []byte) error {
-	var objJ ObjectStateJSON
-	err := json.Unmarshal(data, &objJ)
-	if err != nil {
-		return err
-	}
-	o.ObjectID = objJ.ObjectID
-	o.ObjectType = pbUtils.LogOperation_ObjectType(pbUtils.LogOperation_ObjectType_value[objJ.ObjectType])
-	o.Bucket = objJ.Bucket
-	o.Timestamp = *protoutils.Vectorclock(objJ.Timestamp)
-
-	attrs := make([]*pbUtils.Attribute, len(objJ.State))
-	for i, attr := range objJ.State {
-		t := pbUtils.Attribute_AttributeType(pbUtils.Attribute_AttributeType_value[attr.AttrType])
-		val, err := StringToValue(t, attr.AttrValue)
-		if err != nil {
-			return err
-		}
-		attrs[i] = protoutils.Attribute(attr.AttrKey, t, val)
-	}
-	o.State = *protoutils.ObjectState(attrs)
-	return nil
 }
 
 // ValueToString converts an attribute value to a string
