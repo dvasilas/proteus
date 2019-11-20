@@ -223,7 +223,7 @@ def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
     + 'dvasilas/ycsb:%s' % (ycsbTag) ], log)
   cleanup(log, 2)
 
-def runCmd(cmd, log):
+def runCmd(cmd, log, okToFail=False):
   print(cmd)
   p = subprocess.Popen(cmd, stdout = subprocess.PIPE, universal_newlines=True, shell=True)
   output = ''
@@ -234,7 +234,7 @@ def runCmd(cmd, log):
     output += stdout_line
   p.stdout.close()
   returnCode = p.wait()
-  if returnCode:
+  if returnCode and not okToFail:
       print("error\n%s\nreturn code: %d" % (cmd, returnCode))
       cleanup(log, 0)
       sys.exit()
@@ -242,6 +242,7 @@ def runCmd(cmd, log):
 
 if __name__ == '__main__':
   args = parseArgs()
+
 
   if not os.path.isabs(args.dest):
     print('--dest needs an absolute path')
@@ -253,6 +254,8 @@ if __name__ == '__main__':
     sys.exit()
 
   log = open(os.path.join(args.dest, "log"), "w")
+
+  runCmd('docker stack rm query_engine && docker stack rm storage_engine && docker network rm proteus_net', log, True)
 
   proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
   ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
