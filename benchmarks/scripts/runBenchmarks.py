@@ -83,16 +83,9 @@ def pasteToSpreadsheet(credFile, spreadsheet_id, data, metadata):
     pasteData = request.execute()
     print(pasteData)
 
-def listFiles(path):
-  files = []
-  for r, d, f in os.walk(path):
-    for file in f:
-      files.append(os.path.join(r, file))
-  return files
-
 def parseFile(path):
+  output = ''
   with open(path) as fp:
-    output = ''
     overallMeasurements = {}
     queryMeasurements = {}
     line = fp.readline()
@@ -105,25 +98,20 @@ def parseFile(path):
       line = fp.readline()
   output += overallMeasurements['RunTime(ms)'] + ", "
   output += overallMeasurements['Throughput(ops/sec)'] + ", "
-  output += queryMeasurements['AverageLatency(us)'] + ", "
-  output += queryMeasurements['MinLatency(us)'] + ", "
-  output += queryMeasurements['MaxLatency(us)'] + ", "
-  output += queryMeasurements['95thPercentileLatency(us)'] + ", "
-  output += queryMeasurements['99thPercentileLatency(us)']
+  output += str(float(queryMeasurements['AverageLatency(us)']) / 1000) + ", "
+  output += str(float(queryMeasurements['MinLatency(us)']) / 1000) + ", "
+  output += str(float(queryMeasurements['MaxLatency(us)']) / 1000) + ", "
+  output += str(float(queryMeasurements['95thPercentileLatency(us)']) / 1000) + ", "
+  output += str(float(queryMeasurements['99thPercentileLatency(us)']) / 1000)
   return output
 
-def natural_keys(text):
-    fileName = text.split("/")[-1].split('.')[0]
-    threadId = fileName.split("_")[-1]
-    return int(threadId)
-
-def parseMetadata(metadataFile):
-  with open(metadataFile) as json_file:
-    benchmarkMD = json.load(json_file)
-    metadata = ''
-    for key in benchmarkMD['benchmarks'][0]:
-      metadata += key + ', ' + str(benchmarkMD['benchmarks'][0][key]) + '\n'
-    return metadata
+def globalConfigToCsv(config):
+  output = 'execution_time=%d \n' % (config['global_config']['execution_time'])
+  output += 'warmup_time=%d \n' % (config['global_config']['warmup_time'])
+  output += 'record_count=%d \n' % (config['global_config']['record_count'])
+  output += 'storage_engine=%s \n' % (config['deployment']['storage_engine'])
+  output += 'query_engine=%s \n' % (config['deployment']['query_engine'])
+  return output
 
 def parseArgs():
   parser = argparse.ArgumentParser()
@@ -134,54 +122,60 @@ def parseArgs():
   parser.add_argument('--spreadid')
   return parser.parse_args()
 
-def initBenchmarks(config, log):
-  proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
-  ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
-  print(proteusTag, ycsbTag)
+def initBenchmarks(config, proteusTag, ycsbTag, log):
   createOverlayNetwork(log)
-  deploy('storage_engine', config, log)
-  cleanup(log, 0) 
-  loadDataset(config, log)
+  deploy('storage_engine', proteusTag, config, log)
+  loadDataset(config, ycsbTag, log)
 
 def getLatestCommitTag(project, branch, log):
-  output = runCmd(['cd %s' % (project) + ' && git pull origin %s' % (branch) + ' && git log -1 --pretty=%h'], log)
+  output = runCmd(['cd %s' % (project) + ' && git pull origin %s' % (branch) + ' && git log -1 --pretty=%H'], log)
   output = output.split('\n')
-  return output[len(output)-2]
+  return output[len(output)-2][0:8]
 
 def createOverlayNetwork(log):
   global STATE
   runCmd(['docker network create -d overlay --attachable proteus_net'], log)
   STATE += 1
 
-def deploy(target, config, log):
+def deploy(target, tag, config, log):
   global STATE
   compose_file = config['deployment'][target]
-  runCmd(['docker stack deploy --compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
+  runCmd(['env PROTEUS_IMAGE_TAG=%s ' % (tag)
+    + 'docker stack deploy ' 
+    + '--compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
   STATE += 1
   checkPlacement(target, config, log)
 
-def loadDataset(config, log):
+def loadDataset(config, tag, log):
   table = config['global_config']['table']
   s3_host = config['global_config']['s3_host']
   s3_port = config['global_config']['s3_port']
   s3_access_key_id = config['global_config']['s3_access_key_id']
-  s3_secret_key = config['global_config']['s3_secret_key'],
   workload = config['global_config']['workload']
   record_count = config['global_config']['record_count']
-  runCmd(['docker', 'run', '--name', 'ycsb', '--rm', '--network=proteus_net', '-e', 'TYPE=load', '-e', 'TABLE=%s' % (table),
-    '-e', 'S3HOST=%s' % (s3_host), '-e', 'S3PORT=%s' % (s3_port),
-    '-e', 'S3ACCESSKEYID=%s' % (s3_access_key_id), '-e', 'S3SECRETKEY=%s' % (s3_secret_key),
-    '-e', 'WORKLOAD=%s' % (workload),
-    '-e', 'RECORDCOUNT=%d' % (record_count), 'dvasilas/ycsb:proteus'], log)
+  s3_secret_key = config['global_config']['s3_secret_key']
+  print(s3_access_key_id)
+  print(s3_secret_key)
+  print(workload)
+  runCmd(['docker run --name ycsb --rm --network=proteus_net -e TYPE=load '
+    + '-e TABLE=%s ' % (table)
+    + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
+    + '-e S3ACCESSKEYID=%s -e S3SECRETKEY=%s ' % (s3_access_key_id, s3_secret_key)
+    + '-e WORKLOAD=%s ' % (workload)
+    + '-e RECORDCOUNT=%d dvasilas/ycsb:%s' %(record_count, tag) ], log)
 
 def checkPlacement(tier, config, log):
   for service in config['placement']:
     if service.startswith(tier):
-      output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
+      output = ""
+      while output.split('\n')[0]  != config['placement'][service]:
+      	output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
       if output.split('\n')[0]  != config['placement'][service]:
-        print('placement error: service %s should be deployed on node %s, but is deployed on node %s' 
-          % (service, config['placement'][service], output.split('\n')[0].split('"')[1]))
+        print('placement error: '
+          + 'service %s should be deployed on node %s, ' % (service, config['placement'][service])
+          + 'but is deployed on node %s' % ( output.split('\n')[0]))
         cleanup(log, 0)
+        sys.exit()
 
 def cleanup(log, target):
   global STATE
@@ -195,11 +189,8 @@ def cleanup(log, target):
     else:
      print('state should not be %d' % (STATE))
     STATE -= 1
-  if target == 0:
-    print('Cleanup done. Exiting.')
-    sys.exit()
 
-def runOneBenchmark(config, configBench, outDir, log):
+def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
   table = config['global_config']['table']
   s3_host = config['global_config']['s3_host']
   s3_port = config['global_config']['s3_port']
@@ -217,23 +208,24 @@ def runOneBenchmark(config, configBench, outDir, log):
   threads= configBench['threads']
   output_file= "%dK_%.1f_%.1f_%.1f_%d" % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
 
-  deploy('query_engine', config, log)
-
-  runCmd(['docker', 'run', '--name', 'ycsb', '--rm', '--network=proteus_net', '-v', '%s:/ycsb' % (outDir),
-    '-e', 'TYPE=run', '-e', 'TABLE=%s' % (table),
-    '-e', 'S3HOST=%s' % (s3_host), '-e', 'S3PORT=%s' % (s3_port),
-    '-e', 'S3ACCESSKEYID=%s' % (s3_access_key_id), '-e', 'S3SECRETKEY=%s' % (s3_secret_key),
-    '-e', 'PROTEUSHOST=%s' % (proteus_host), '-e', 'PROTEUSPORT=%s' % (proteus_port), 
-    '-e', 'WORKLOAD=%s' % (workload),
-    '-e', 'RECORDCOUNT=%d' % (record_count),
-    '-e', 'QUERYPROPORTION=%.1f' % (query_proportion), '-e', 'UPDATEPROPORTION=%.1f' % (update_proportion),
-    '-e', 'CACHEDQUERYPROPORTION=%.1f' % (cached_query_proportion),
-    '-e', 'EXECUTIONTIME=%d' % (execution_time), '-e', 'WARMUPTIME=%d' % (warmup_time),
-    '-e', 'THREADS=%d' % (threads), '-e', 'OUTPUT_FILE_NAME=%s' % (output_file),  'dvasilas/ycsb:proteus'], log)
+  deploy('query_engine', proteusTag, config, log)
+  
+  runCmd(['docker run --name ycsb --rm --network=proteus_net -v %s:/ycsb ' % (outDir)
+    + '-e TYPE=run -e TABLE=%s ' % (table)
+    + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
+    + '-e S3ACCESSKEYID=%s -e S3SECRETKEY=%s ' % (s3_access_key_id, s3_secret_key)
+    + '-e PROTEUSHOST=%s -e PROTEUSPORT=%s ' % (proteus_host, proteus_port)
+    + '-e WORKLOAD=%s ' % (workload)
+    + '-e RECORDCOUNT=%d ' % (record_count)
+    + '-e QUERYPROPORTION=%.1f -e UPDATEPROPORTION=%.1f ' % (query_proportion, update_proportion)
+    + '-e CACHEDQUERYPROPORTION=%.1f ' % (cached_query_proportion)
+    + '-e EXECUTIONTIME=%d -e WARMUPTIME=%d ' % (execution_time, warmup_time)
+    + '-e THREADS=%d -e OUTPUT_FILE_NAME=%s ' % (threads, output_file)
+    + 'dvasilas/ycsb:%s' % (ycsbTag) ], log)
   cleanup(log, 2)
 
 def runCmd(cmd, log):
-  print('___', cmd)
+  print(cmd)
   p = subprocess.Popen(cmd, stdout = subprocess.PIPE, universal_newlines=True, shell=True)
   output = ''
   for stdout_line in iter(p.stdout.readline, ""):
@@ -246,6 +238,7 @@ def runCmd(cmd, log):
   if returnCode:
       print("error\n%s\nreturn code: %d" % (cmd, returnCode))
       cleanup(log, 0)
+      sys.exit()
   return output
 
 if __name__ == '__main__':
@@ -262,44 +255,28 @@ if __name__ == '__main__':
 
   log = open(os.path.join(args.dest, "log"), "w")
 
+  proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
+  ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
+  print(proteusTag, ycsbTag)
+
   with open(args.config) as json_file:
     benchmarkConfig = json.load(json_file)
-    initBenchmarks(benchmarkConfig, log)
+    initBenchmarks(benchmarkConfig, proteusTag, ycsbTag, log)
+    data = 'query_proportion, update_proportion, cached_query_proportion, threads, RunTime(ms), [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
     for benchConfig in benchmarkConfig['benchmarks']:
-      runOneBenchmark(benchmarkConfig, benchConfig, args.dest, log)
- 
+      record_count = benchmarkConfig['global_config']['record_count']
+      query_proportion= benchConfig['query_proportion']
+      update_proportion= benchConfig['update_proportion']
+      cached_query_proportion= benchConfig['cached_query_proportion']
+      threads= benchConfig['threads']
+      output_file= '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
+      runOneBenchmark(benchmarkConfig, benchConfig, proteusTag, ycsbTag, args.dest, log)
+      data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads) 
+      data += parseFile(os.path.join(args.dest, output_file)) + '\n'
+
+    data = data[:-1]
+    global_config = globalConfigToCsv(benchmarkConfig)
+    pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
+
   cleanup(log, 0)
   log.close()
-
-    # for benchConfig in benchmarkConfig['benchmarks']:
-    #   returnCode = runOneBenchmark(benchmarkConfig, benchConfig, args.dest, log)
-    #   if returnCode:
-    #     print('error in running a benchmark')
-    #     cleanupBenchmarks(log)
-    #     sys.exit()
-
-    # cleanupBenchmarks(log)
-
-    # metadata = parseMetadata(args.metadata)
-
-    # bashCommand = "./startBenchmarks"
-    # process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-    # output, error = process.communicate()
-    # print(output)
-    # print(error)
-    # if error != None:
-    #   sys.exit()
-
-    # metadata = parseMetadata(args.metadata)
-    # if args.parse:
-    #   data = ""
-    #   files = listFiles(sys.argv[1])
-    #   files.sort(key=natural_keys)
-    #   for f in files:
-    #     data += parseFile(f) + '\n'
-    #     data = data[:-1]
-    # else:
-    #   with open(args.data, 'r') as f:
-    #     data = f.read()
-    # pasteToSpreadsheet(args.cred, args.spreadid, data, metadata)
-

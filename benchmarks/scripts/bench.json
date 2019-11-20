@@ -24,16 +24,22 @@
   },
   "benchmarks":[
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
-      "cached_query_proportion": 0.0,
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "cached_query_proportion": 0.2,
       "threads": 1
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
-      "cached_query_proportion": 0.0,
-      "threads": 2
+      "query_proportion": 0.5,
+      "update_proportion": 0.5,
+      "cached_query_proportion": 0.2,
+      "threads": 1
+    },
+    {
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
+      "cached_query_proportion": 0.2,
+      "threads": 1
     }
   ]
 }
