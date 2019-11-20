@@ -245,17 +245,17 @@ func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
 	for _, query := range q.persistentQs {
 		match, err := filter.Filter(query.predicate, record)
 		if err != nil {
-			q.mutex.Unlock()
+			q.mutex.RUnlock()
 			return err
 		}
 		if match {
 			if err := query.stream.Send(record); err != nil {
-				q.mutex.Unlock()
+				q.mutex.RUnlock()
 				return nil
 			}
 		}
 	}
-	q.mutex.Unlock()
+	q.mutex.RUnlock()
 	return nil
 }
 

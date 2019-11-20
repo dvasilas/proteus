@@ -3,6 +3,9 @@ all: dep build_qpu_server
 
 PROTOC := $(shell which protoc)
 UNAME := $(shell uname)
+DOCKERREPONAME := dvasilas/proteus
+TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
+IMG := ${DOCKERREPONAME}:${TAG}
 
 $(PROTOC_CMD):
 ifeq ($(UNAME), Darwin)
@@ -50,4 +53,13 @@ clean:
 	rm ./protos/utils/utils.pb.go ./protos/datastore/datastore.pb.go ./protos/s3/s3.pb.go ./protos/qpu/qpu.pb.go
 	rm -rf ./bin
 
-.PHONY: build_qpu_server build_qpu_server test clean local
+docker_build:
+	echo ${TAG}
+	echo ${IMG}
+	docker build -t proteus:local .
+	docker tag proteus:local ${IMG}
+
+docker_push:
+	docker push ${IMG}
+
+.PHONY: build_qpu_server build_qpu_server test clean local docker_build docker_push
