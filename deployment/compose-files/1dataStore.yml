@@ -13,7 +13,7 @@ services:
       placement:
         constraints: [node.labels.node1 == true ]
   dsdriver-0:
-    image: dvasilas/proteus:swarm
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
     networks:
       - proteus_net
     command: >

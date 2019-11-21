@@ -17,29 +17,65 @@
     "warmup_time": 10
   },
   "placement": {
-    "storage_engine_cloudserver-0": "swarm1.novalocal",
-    "storage_engine_dsdriver-0": "swarm1.novalocal",
-    "query_engine_antidote": "swarm2.novalocal",
-    "query_engine_qpuindex": "swarm2.novalocal"
+    "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
+    "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
+    "query_engine_antidote": "ip-172-31-13-145.us-east-2.compute.internal",
+    "query_engine_qpuindex": "ip-172-31-13-145.us-east-2.compute.internal"
   },
   "benchmarks":[
     {
-      "query_proportion": 0.9,
-      "update_proportion": 0.1,
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
       "cached_query_proportion": 0.2,
       "threads": 1
     },
     {
-      "query_proportion": 0.5,
-      "update_proportion": 0.5,
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
       "cached_query_proportion": 0.2,
-      "threads": 1
+      "threads": 2
     },
     {
-      "query_proportion": 0.1,
-      "update_proportion": 0.9,
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
       "cached_query_proportion": 0.2,
-      "threads": 1
+      "threads": 4
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 8
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 16
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 32
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 64
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 128
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 256
     }
   ]
 }
