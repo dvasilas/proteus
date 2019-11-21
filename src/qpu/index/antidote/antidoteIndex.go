@@ -87,7 +87,6 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 			indexStoreUpdates = append(indexStoreUpdates,
 				valueIndexUpdate,
 				versionIndexUpdate,
-				antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
 			)
 		} else {
 			postingListRef, err = getLatestPostingList(versionIndex)
@@ -97,7 +96,8 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 			}
 		}
 		indexStoreUpdates = append(indexStoreUpdates,
-			antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
+			antidote.SetAdd(antidote.Key([]byte(postingListRef)), []byte(object.ObjectID)),
+			antidote.RegPut(antidote.Key([]byte(object.ObjectID)), objectEncoded),
 		)
 		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
 			i.mutex.Unlock()
@@ -119,6 +119,107 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 	return err
 }
 
+func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
+	log.WithFields(log.Fields{"value": attrOld.GetValue(), "object": object.ObjectID}).Debug("removing old index entry")
+	valueIndex, err := i.getValueIndex(attrOld, tx)
+	if err != nil {
+		return indexStoreUpdates, true, err
+	}
+	versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrOld, tx)
+	if err != nil {
+		return indexStoreUpdates, true, err
+	}
+	postingListRefO, err := getLatestPostingList(versionIndex)
+	if err != nil {
+		return indexStoreUpdates, true, err
+	}
+	postingListO, err := i.getPostingList(postingListRefO, tx)
+	if err != nil {
+		return indexStoreUpdates, true, err
+	}
+	if len(versionIndex.ListMapKeys()) >= maxVersionCount {
+		valueIndexUpdate, versionIndexRefN := updateValueIndex(attrOld)
+		indexStoreUpdates = append(indexStoreUpdates,
+			antidote.MapUpdate(
+				antidote.Key(versionIndexRefN),
+				antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
+			),
+		)
+		versionIndexRef = versionIndexRefN
+		indexStoreUpdates = append(indexStoreUpdates,
+			valueIndexUpdate,
+		)
+	}
+	marshalledVC, err := utils.MarshalVectorClock(&ts)
+	if err != nil {
+		return indexStoreUpdates, false, err
+	}
+	versionIndexUpdate, postingListRefN := appendNewVersion(versionIndexRef, marshalledVC, tx)
+	indexStoreUpdates = append(indexStoreUpdates,
+		versionIndexUpdate,
+		antidote.SetAdd(antidote.Key([]byte(postingListRefN)), postingListO...),
+		antidote.SetRemove(antidote.Key([]byte(postingListRefN)), []byte(object.ObjectID)),
+	)
+	return indexStoreUpdates, false, nil
+}
+
+func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
+	log.WithFields(log.Fields{"value": attrNew.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
+	valueIndex, err := i.getValueIndex(attrNew, tx)
+	if err != nil {
+		return indexStoreUpdates, true, err
+	}
+	versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrNew, tx)
+	if err != nil && strings.Contains(err.Error(), "not found") {
+		valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
+		marshalledVC, err := utils.MarshalVectorClock(&ts)
+		if err != nil {
+			return indexStoreUpdates, true, err
+		}
+		versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, marshalledVC, tx)
+		indexStoreUpdates = append(indexStoreUpdates,
+			valueIndexUpdate,
+			versionIndexUpdate,
+			antidote.SetAdd(antidote.Key([]byte(postingListRef)), []byte(object.ObjectID)),
+			antidote.RegPut(antidote.Key([]byte(object.ObjectID)), objectEncoded),
+		)
+	} else {
+		postingListRefO, err := getLatestPostingList(versionIndex)
+		if err != nil {
+			return indexStoreUpdates, true, err
+		}
+		postingListO, err := i.getPostingList(postingListRefO, tx)
+		if err != nil {
+			return indexStoreUpdates, true, err
+		}
+		if len(versionIndex.ListMapKeys()) >= maxVersionCount {
+			valueIndexUpdate, versionIndexRefN := updateValueIndex(attrNew)
+			indexStoreUpdates = append(indexStoreUpdates,
+				antidote.MapUpdate(
+					antidote.Key(versionIndexRefN),
+					antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
+				),
+			)
+			versionIndexRef = versionIndexRefN
+			indexStoreUpdates = append(indexStoreUpdates,
+				valueIndexUpdate,
+			)
+		}
+		marshalledVC, err := utils.MarshalVectorClock(&ts)
+		if err != nil {
+			return indexStoreUpdates, false, err
+		}
+		versionIndexUpdate, postingListRefNewN := appendNewVersion(versionIndexRef, marshalledVC, tx)
+		indexStoreUpdates = append(indexStoreUpdates,
+			versionIndexUpdate,
+			antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), postingListO...),
+			antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), []byte(object.ObjectID)),
+			antidote.RegPut(antidote.Key([]byte(object.ObjectID)), objectEncoded),
+		)
+	}
+	return indexStoreUpdates, false, nil
+}
+
 // Update ...
 func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
@@ -135,124 +236,32 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 			i.mutex.Unlock()
 			return err
 		}
+		var okToFail bool
 		if attrOld != nil {
-			log.WithFields(log.Fields{"value": attrOld.GetValue(), "object": object.ObjectID}).Debug("removing old index entry")
-			valueIndex, err := i.getValueIndex(attrOld, tx)
+			indexStoreUpdates, okToFail, err = i.updateOldIndexEntry(attrOld, object, ts, tx, indexStoreUpdates, objectEncoded)
 			if err != nil {
-				i.mutex.Unlock()
 				utils.ReportError(err)
-				return err
+				if !okToFail {
+					i.mutex.Unlock()
+					return err
+				}
 			}
-			versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrOld, tx)
-			if err != nil {
-				i.mutex.Unlock()
-				utils.ReportError(err)
-				return err
-			}
-			postingListRefO, err := getLatestPostingList(versionIndex)
-			if err != nil {
-				i.mutex.Unlock()
-				utils.ReportError(err)
-				return err
-			}
-			postingListO, err := i.getPostingList(postingListRefO, tx)
-			if err != nil {
-				i.mutex.Unlock()
-				utils.ReportError(err)
-				return err
-			}
-			if len(versionIndex.ListMapKeys()) >= maxVersionCount {
-				valueIndexUpdate, versionIndexRefN := updateValueIndex(attrOld)
-				indexStoreUpdates = append(indexStoreUpdates,
-					antidote.MapUpdate(
-						antidote.Key(versionIndexRefN),
-						antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
-					),
-				)
-				versionIndexRef = versionIndexRefN
-				indexStoreUpdates = append(indexStoreUpdates,
-					valueIndexUpdate,
-				)
-			}
-			marshalledVC, err := utils.MarshalVectorClock(&ts)
-			if err != nil {
-				i.mutex.Unlock()
-				utils.ReportError(err)
-				return err
-			}
-			versionIndexUpdate, postingListRefN := appendNewVersion(versionIndexRef, marshalledVC, tx)
-			indexStoreUpdates = append(indexStoreUpdates,
-				versionIndexUpdate,
-				antidote.SetAdd(antidote.Key([]byte(postingListRefN)), postingListO...),
-				antidote.SetRemove(antidote.Key([]byte(postingListRefN)), objectEncoded),
-			)
 		}
 		if attrNew != nil {
-			log.WithFields(log.Fields{"value": attrNew.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
-			valueIndex, err := i.getValueIndex(attrNew, tx)
+			indexStoreUpdates, okToFail, err = i.updateNewIndexEntry(attrNew, object, ts, tx, indexStoreUpdates, objectEncoded)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getAttrToValIndex #2")
+				utils.ReportError(err)
+				if !okToFail {
+					i.mutex.Unlock()
+					return err
+				}
+			}
+		}
+		if len(indexStoreUpdates) > 0 {
+			if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
 				i.mutex.Unlock()
 				return err
 			}
-			versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrNew, tx)
-			if err != nil && strings.Contains(err.Error(), "not found") {
-				valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
-				marshalledVC, err := utils.MarshalVectorClock(&ts)
-				if err != nil {
-					i.mutex.Unlock()
-					utils.ReportError(err)
-					return err
-				}
-				versionIndexUpdate, postingListRef := appendNewVersion(versionIndexRef, marshalledVC, tx)
-				indexStoreUpdates = append(indexStoreUpdates,
-					valueIndexUpdate,
-					versionIndexUpdate,
-					antidote.SetAdd(antidote.Key([]byte(postingListRef)), objectEncoded),
-				)
-			} else {
-				postingListRefO, err := getLatestPostingList(versionIndex)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getLastVersionRef #2")
-					i.mutex.Unlock()
-					return err
-				}
-				postingListO, err := i.getPostingList(postingListRefO, tx)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Info("indexUpdate: getPostingList #2")
-					i.mutex.Unlock()
-					return err
-				}
-				if len(versionIndex.ListMapKeys()) >= maxVersionCount {
-					valueIndexUpdate, versionIndexRefN := updateValueIndex(attrNew)
-					indexStoreUpdates = append(indexStoreUpdates,
-						antidote.MapUpdate(
-							antidote.Key(versionIndexRefN),
-							antidote.RegPut(antidote.Key([]byte("prev")), versionIndexRef),
-						),
-					)
-					versionIndexRef = versionIndexRefN
-					indexStoreUpdates = append(indexStoreUpdates,
-						valueIndexUpdate,
-					)
-				}
-				marshalledVC, err := utils.MarshalVectorClock(&ts)
-				if err != nil {
-					i.mutex.Unlock()
-					utils.ReportError(err)
-					return err
-				}
-				versionIndexUpdate, postingListRefNewN := appendNewVersion(versionIndexRef, marshalledVC, tx)
-				indexStoreUpdates = append(indexStoreUpdates,
-					versionIndexUpdate,
-					antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), postingListO...),
-					antidote.SetAdd(antidote.Key([]byte(postingListRefNewN)), objectEncoded),
-				)
-			}
-		}
-		if err := i.bucket.Update(tx, indexStoreUpdates...); err != nil {
-			i.mutex.Unlock()
-			return err
 		}
 		err = tx.Commit()
 		if err == nil {
@@ -294,7 +303,13 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 			errCh <- err
 			return
 		}
-		for _, objEnc := range postingList {
+		for _, objectID := range postingList {
+			objEnc, err := i.bucket.ReadReg(tx, antidote.Key(objectID))
+			if err != nil {
+				utils.ReportError(err)
+				errCh <- err
+				return
+			}
 			obj, err := utils.UnmarshalObject(objEnc)
 			if err != nil {
 				utils.ReportError(err)
@@ -466,6 +481,7 @@ func greater(a, b *pbUtils.Vectorclock) bool {
 }
 
 func (i *AntidoteIndex) print() error {
+	log.Debug("printing index")
 	valueIndexRef := i.attributeName + "_" + i.attributeType.String()
 	tx, err := i.client.StartTransaction()
 	if err != nil {
@@ -492,19 +508,29 @@ func (i *AntidoteIndex) print() error {
 			if err != nil {
 				return err
 			}
-			log.WithFields(log.Fields{"key": string(vers.Key), "value": string(postingListRef)}).Debug("[index.print] version index entry")
+			vs, err := utils.UnmarshalVectorClock(vers.Key)
+			if err != nil {
+				return err
+			}
+			log.WithFields(log.Fields{"key": vs, "value": string(postingListRef)}).Debug("[index.print] version index entry")
 			postingList, err := i.getPostingList(postingListRef, tx)
 			if err != nil {
 				return err
 			}
-			for _, obj := range postingList {
-				object, err := utils.UnmarshalObject(obj)
+			for _, objectID := range postingList {
+				log.WithFields(log.Fields{"obj": string(objectID)}).Debug("[index.print][posting list]")
+				objEnc, err := i.bucket.ReadReg(tx, antidote.Key(objectID))
 				if err != nil {
 					return err
 				}
-				log.WithFields(log.Fields{"obj": object}).Debug("[index.print][posting list]")
+				object, err := utils.UnmarshalObject(objEnc)
+				if err != nil {
+					return err
+				}
+				log.WithFields(log.Fields{"obj": object}).Debug("[index.print][posting list][object]")
 			}
 		}
 	}
+	log.Debug("printing index done")
 	return tx.Commit()
 }

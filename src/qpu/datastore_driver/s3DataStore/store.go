@@ -233,7 +233,7 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 		key,
 		ds.bucketName,
 		pbUtils.LogOperation_S3OBJECT,
-		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(ts.UnixNano())}),
+		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(ts.UnixNano() / int64(time.Millisecond))}),
 		payload,
 	)
 	msg <- obj

@@ -276,7 +276,7 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
 				go func() {
 					if err := q.updateIndex(streamRec); err != nil {
-						log.WithFields(log.Fields{"error": err, "op": streamRec}).Fatal("opConsumer: index Update failed")
+						utils.ReportError(err)
 						return
 					}
 					if sync {
