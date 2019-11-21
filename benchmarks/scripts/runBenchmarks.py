@@ -97,7 +97,7 @@ def parseFile(path):
         overallMeasurements[line[1]] = line[2]
       line = fp.readline()
   output += overallMeasurements['RunTime(ms)'] + ", "
-  output += overallMeasurements['Throughput(ops/sec)'] + ", "
+  output += queryMeasurements['Throughput(ops/sec)'] + ", "
   output += str(float(queryMeasurements['AverageLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['MinLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['MaxLatency(us)']) / 1000) + ", "
@@ -105,8 +105,10 @@ def parseFile(path):
   output += str(float(queryMeasurements['99thPercentileLatency(us)']) / 1000)
   return output
 
-def globalConfigToCsv(config):
-  output = 'execution_time=%d \n' % (config['global_config']['execution_time'])
+def globalConfigToCsv(config, proteusTag, ycsbTag):
+  output = 'proteus commit used=%s \n' %(proteusTag)
+  output += 'ycsb commit used=%s \n' %(ycsbTag)
+  output += 'execution_time=%d \n' % (config['global_config']['execution_time'])
   output += 'warmup_time=%d \n' % (config['global_config']['warmup_time'])
   output += 'record_count=%d \n' % (config['global_config']['record_count'])
   output += 'storage_engine=%s \n' % (config['deployment']['storage_engine'])
@@ -154,9 +156,6 @@ def loadDataset(config, tag, log):
   workload = config['global_config']['workload']
   record_count = config['global_config']['record_count']
   s3_secret_key = config['global_config']['s3_secret_key']
-  print(s3_access_key_id)
-  print(s3_secret_key)
-  print(workload)
   runCmd(['docker run --name ycsb --rm --network=proteus_net -e TYPE=load '
     + '-e TABLE=%s ' % (table)
     + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
@@ -257,7 +256,6 @@ if __name__ == '__main__':
 
   proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
   ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
-  print(proteusTag, ycsbTag)
 
   with open(args.config) as json_file:
     benchmarkConfig = json.load(json_file)
@@ -275,7 +273,7 @@ if __name__ == '__main__':
       data += parseFile(os.path.join(args.dest, output_file)) + '\n'
 
     data = data[:-1]
-    global_config = globalConfigToCsv(benchmarkConfig)
+    global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
     pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
 
   cleanup(log, 0)
