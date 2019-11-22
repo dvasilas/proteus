@@ -282,7 +282,6 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 // Lookup ...
 func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	tx := i.client.CreateStaticTransaction()
-
 	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
 		utils.ReportError(err)
@@ -290,6 +289,11 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 		return
 	}
 	versionIndexArr, err := i.getVersionIndexRange(valueIndex, attr, tx)
+	if err != nil {
+		utils.ReportError(err)
+		errCh <- err
+		return
+	}
 	for _, vIndex := range versionIndexArr {
 		lastVRef, err := getLatestPostingList(vIndex)
 		if err != nil {
@@ -351,9 +355,8 @@ func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult,
 	}
 	if c == 0 {
 		versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(predicate.GetLbound())))
-		if err != nil {
-			utils.ReportError(err)
-			return nil, err
+		if err != nil && strings.Contains(err.Error(), "not found") {
+			return res, nil
 		}
 		versionIndex, err := i.bucket.ReadMap(tx, antidote.Key(versionIndexRef))
 		if err != nil {
