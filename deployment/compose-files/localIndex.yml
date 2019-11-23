@@ -1,7 +1,7 @@
 version: '3'
 services:
   antidote:
-    image: dvasilas/antidote:proteus
+    image: antidotedb/antidote:0.2.1
     networks:
       - proteus_net
     deploy:

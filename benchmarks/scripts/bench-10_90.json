@@ -22,58 +22,57 @@
     "query_engine_antidote": "swarm2.novalocal",
     "query_engine_qpuindex": "swarm2.novalocal"
   },
-  "benchmarks":[
-    {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+  "benchmarks": [{
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 1
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 2
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 4
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 8
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 16
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 32
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 64
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 128
     },
     {
-      "query_proportion": 1.0,
-      "update_proportion": 0.0,
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "cached_query_proportion": 0.2,
       "threads": 256
     }
