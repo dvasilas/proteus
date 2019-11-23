@@ -143,7 +143,7 @@ def deploy(target, tag, config, log):
   global STATE
   compose_file = config['deployment'][target]
   runCmd(['env PROTEUS_IMAGE_TAG=%s ' % (tag)
-    + 'docker stack deploy ' 
+    + 'docker stack deploy '
     + '--compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
   STATE += 1
   checkPlacement(target, config, log)
@@ -168,7 +168,7 @@ def checkPlacement(tier, config, log):
     if service.startswith(tier):
       output = ""
       while output.split('\n')[0]  != config['placement'][service]:
-      	output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
+        output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
       if output.split('\n')[0]  != config['placement'][service]:
         print('placement error: '
           + 'service %s should be deployed on node %s, ' % (service, config['placement'][service])
@@ -186,7 +186,7 @@ def cleanup(log, target):
     elif STATE == 3:
       runCmd(['docker stack rm query_engine'], log)
     else:
-     print('state should not be %d' % (STATE))
+      print('state should not be %d' % (STATE))
     STATE -= 1
 
 def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
@@ -199,16 +199,16 @@ def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
   proteus_port = config['global_config']['proteus_port']
   workload = config['global_config']['workload']
   record_count = config['global_config']['record_count']
-  execution_time= config['global_config']['execution_time']
-  warmup_time= config['global_config']['warmup_time']
-  query_proportion= configBench['query_proportion']
-  update_proportion= configBench['update_proportion']
-  cached_query_proportion= configBench['cached_query_proportion']
-  threads= configBench['threads']
-  output_file= "%dK_%.1f_%.1f_%.1f_%d" % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
+  execution_time = config['global_config']['execution_time']
+  warmup_time = config['global_config']['warmup_time']
+  query_proportion = configBench['query_proportion']
+  update_proportion = configBench['update_proportion']
+  cached_query_proportion = configBench['cached_query_proportion']
+  threads = configBench['threads']
+  output_file = "%dK_%.1f_%.1f_%.1f_%d" % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
 
   deploy('query_engine', proteusTag, config, log)
-  
+
   runCmd(['docker run --name ycsb --rm --network=proteus_net -v %s:/ycsb ' % (outDir)
     + '-e TYPE=run -e TABLE=%s ' % (table)
     + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
@@ -242,13 +242,11 @@ def runCmd(cmd, log, okToFail=False):
 
 if __name__ == '__main__':
   args = parseArgs()
-
-
   if not os.path.isabs(args.dest):
-    print('--dest needs an absolute path')
-    sys.exit()
-
-  returnCode = runCmd(['mkdir -p %s' % (args.dest)], None)
+    resultDirPath = os.path.join(os.path.abspath(os.path.dirname(__file__)), args.dest)
+  else:
+    resultDirPath = args.dest
+  returnCode = runCmd(['mkdir -p %s' %  (resultDirPath)], None)
   if returnCode:
     print('could not create destination directory')
     sys.exit()
@@ -262,17 +260,20 @@ if __name__ == '__main__':
 
   with open(args.config) as json_file:
     benchmarkConfig = json.load(json_file)
+    # have config object
+    # have bench object
     initBenchmarks(benchmarkConfig, proteusTag, ycsbTag, log)
     data = 'query_proportion, update_proportion, cached_query_proportion, threads, RunTime(ms), [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
+    # make list comprehension: list of bench -> list of results
     for benchConfig in benchmarkConfig['benchmarks']:
       record_count = benchmarkConfig['global_config']['record_count']
       query_proportion= benchConfig['query_proportion']
       update_proportion= benchConfig['update_proportion']
       cached_query_proportion= benchConfig['cached_query_proportion']
-      threads= benchConfig['threads']
-      output_file= '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
+      threads = benchConfig['threads']
+      output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
       runOneBenchmark(benchmarkConfig, benchConfig, proteusTag, ycsbTag, args.dest, log)
-      data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads) 
+      data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
       data += parseFile(os.path.join(args.dest, output_file)) + '\n'
 
     data = data[:-1]
