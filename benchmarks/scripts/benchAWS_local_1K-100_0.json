@@ -1,0 +1,81 @@
+{
+  "deployment": {
+    "storage_engine": "1dataStore.yml",
+    "query_engine": "localIndex.yml"
+  },
+  "global_config": {
+    "table": "ycsb-buck",
+    "s3_host": "cloudserver-0",
+    "s3_port": "8000",
+    "s3_access_key_id": "accessKey1",
+    "s3_secret_key": "verySecretKey1",
+    "proteus_host": "qpuindex",
+    "proteus_port": "50250",
+    "workload": "workloada",
+    "record_count": 1000,
+    "execution_time": 60,
+    "warmup_time": 10
+  },
+  "placement": {
+    "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
+    "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
+    "query_engine_antidote": "ip-172-31-13-145.us-east-2.compute.internal",
+    "query_engine_qpuindex": "ip-172-31-13-145.us-east-2.compute.internal"
+  },
+  "benchmarks":[
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 1
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 2
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 4
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 8
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 16
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 32
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 64
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 128
+    },
+    {
+      "query_proportion": 1.0,
+      "update_proportion": 0.0,
+      "cached_query_proportion": 0.2,
+      "threads": 256
+    }
+  ]
+}
