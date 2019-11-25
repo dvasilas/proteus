@@ -10,6 +10,8 @@ services:
     - REMOTE_MANAGEMENT_DISABLE=1
     - S3BACKEND=mem
     deploy:
+      restart_policy:
+        condition: none
       placement:
         constraints: [node.labels.node1 == true ]
   dsdriver-0:
@@ -22,6 +24,8 @@ services:
     depends_on:
       - cloudserver-0
     deploy:
+      restart_policy:
+        condition: none
       placement:
         constraints: [node.labels.node1 == true ]
 

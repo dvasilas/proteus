@@ -5,6 +5,8 @@ services:
     networks:
       - proteus_net
     deploy:
+      restart_policy:
+        condition: none
       placement:
         constraints: [node.labels.node2 == true ]
   qpuindex:
@@ -20,6 +22,8 @@ services:
       - dsdriver-0
       - antidote
     deploy:
+      restart_policy:
+        condition: none
       placement:
         constraints: [node.labels.node2 == true ]
 
