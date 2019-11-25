@@ -161,6 +161,7 @@ def loadDataset(config, tag, log):
     + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
     + '-e S3ACCESSKEYID=%s -e S3SECRETKEY=%s ' % (s3_access_key_id, s3_secret_key)
     + '-e WORKLOAD=%s ' % (workload)
+    + '-e EXECUTIONTIME=0 -e WARMUPTIME=0 '
     + '-e RECORDCOUNT=%d dvasilas/ycsb:%s' %(record_count, tag) ], log)
 
 def checkPlacement(tier, config, log):
