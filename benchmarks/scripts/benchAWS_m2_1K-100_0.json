@@ -1,7 +1,7 @@
 {
   "deployment": {
-    "storage_engine": "1dataStore.yml",
-    "query_engine": "remoteIndex.yml"
+    "storage_engine": "storage_m.yml",
+    "query_engine": "query_m2.yml"
   },
   "global_config": {
     "table": "ycsb-buck",
