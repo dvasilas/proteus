@@ -3,7 +3,6 @@ package cache
 import (
 	"errors"
 	"io"
-	"sync"
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
@@ -17,12 +16,9 @@ import (
 
 // CQPU implements a cache QPU.
 type CQPU struct {
-	qpu         *utils.QPU
-	cache       cacheImplementation
-	config      *config.Config
-	hitCounter  int
-	missCounter int
-	mutex       sync.RWMutex
+	qpu    *utils.QPU
+	cache  cacheImplementation
+	config *config.Config
 }
 
 // Describes the interface that any cache implementation needs to expose
@@ -61,10 +57,6 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		cachedResult, hit := q.cache.Get(request.GetPredicate())
 		if hit {
-			q.mutex.Lock()
-			q.hitCounter++
-			q.mutex.Unlock()
-			log.WithFields(log.Fields{"hit": q.hitCounter, "miss": q.missCounter}).Debug("hit")
 			seqID := int64(0)
 			for _, item := range cachedResult {
 				logOp := protoutils.LogOperation(
@@ -89,10 +81,6 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 			}
 			return nil
 		}
-		q.mutex.Lock()
-		q.missCounter++
-		q.mutex.Unlock()
-		log.WithFields(log.Fields{"hit": q.hitCounter, "miss": q.missCounter}).Debug("miss")
 		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), nil, false)
 		if err != nil {
 			return err
