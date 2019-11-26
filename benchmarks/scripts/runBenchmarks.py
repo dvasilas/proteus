@@ -140,9 +140,12 @@ def createOverlayNetwork(log):
   STATE += 1
 
 def deploy(target, tag, config, log):
+  record_count = config['global_config']['record_count']
+  cache_size = record_count * 5 * 0.2
   global STATE
   compose_file = config['deployment'][target]
   runCmd(['env PROTEUS_IMAGE_TAG=%s ' % (tag)
+    + 'env CACHE_SIZE=%d ' % (cache_size)
     + 'docker stack deploy '
     + '--compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
   STATE += 1

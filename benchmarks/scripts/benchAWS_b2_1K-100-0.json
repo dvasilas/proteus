@@ -19,8 +19,8 @@
   "placement": {
     "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
     "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "query_engine_antidote": "ip-173-31-60-255.eu-west-3.compute.internal",
-    "query_engine_qpuindex": "ip-173-31-60-255.eu-west-3.compute.internal"
+    "query_engine_antidote": "ip-173-31-225-151.eu-west-3.compute.internal",
+    "query_engine_qpuindex": "ip-173-31-225-151.eu-west-3.compute.internal"
   },
   "benchmarks":[
     {
