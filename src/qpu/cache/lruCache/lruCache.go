@@ -22,7 +22,7 @@ type Cache struct {
 	ll           *list.List
 	items        map[string]*list.Element
 	onEvict      func(key []*pbUtils.AttributePredicate)
-	mutex        sync.RWMutex
+	mutex        sync.Mutex
 }
 
 type entry struct {
@@ -89,15 +89,15 @@ func (c *Cache) Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
 		return nil, false
 	}
 	key := predicateToCacheKey(p)
-	c.mutex.RLock()
+	c.mutex.Lock()
 	if item, ok := c.items[key]; ok {
 		c.ll.MoveToFront(item)
 		resp := make([]utils.ObjectState, len(item.Value.(*entry).value))
 		copy(resp, item.Value.(*entry).value)
-		c.mutex.RUnlock()
+		c.mutex.Unlock()
 		return resp, true
 	}
-	c.mutex.RUnlock()
+	c.mutex.Unlock()
 	return nil, false
 }
 
