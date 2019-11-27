@@ -4,8 +4,6 @@ services:
     image: dvasilas/cloudserver:latest
     networks:
       - proteus_net
-    ports:
-      - "8001:8000"
     environment:
     - REMOTE_MANAGEMENT_DISABLE=1
     - S3BACKEND=mem
@@ -14,6 +12,7 @@ services:
         condition: none
       placement:
         constraints: [ node.labels.dc1_node1 == true ]
+
   dsdriver-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
     networks:

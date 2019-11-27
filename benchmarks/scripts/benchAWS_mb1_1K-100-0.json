@@ -1,7 +1,7 @@
 {
   "deployment": {
-    "storage_engine": "storage_b.yml",
-    "query_engine": "query_b1.yml"
+    "storage_engine": "storage_mb.yml",
+    "query_engine": "query_mb1.yml"
   },
   "global_config": {
     "table": "ycsb-buck",

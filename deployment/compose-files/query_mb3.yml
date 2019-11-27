@@ -9,12 +9,11 @@ services:
         condition: none
       placement:
         constraints: [ node.labels.dc2_node2 == true ]
+
   qpuindex:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
     networks:
       - proteus_net
-    ports:
-      - "50250:50250"
     command: >
         bash -c "./deployment/wait-for-it.sh --host=dsdriver-0 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=antidote --port=8087 --timeout=0
@@ -27,6 +26,22 @@ services:
         condition: none
       placement:
         constraints: [ node.labels.dc2_node2 == true ]
+
+  qpucache:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex:50250"
+    depends_on:
+      - dsdriver-0
+      - antidote
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
 
 networks:
   proteus_net:

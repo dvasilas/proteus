@@ -1,7 +1,7 @@
 {
   "deployment": {
-    "storage_engine": "storage_b.yml",
-    "query_engine": "query_b2.yml"
+    "storage_engine": "storage_rb.yml",
+    "query_engine": "query_rb1.yml"
   },
   "global_config": {
     "table": "ycsb-buck",
@@ -18,9 +18,13 @@
   },
   "placement": {
     "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
+    "storage_engine_cloudserver-1": "ip-173-31-135-164.eu-west-3.compute.internal",
+    "storage_engine_cloudserver-2": "ip-174-31-120-42.ap-northeast-1.compute.internal",
     "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "query_engine_antidote": "ip-173-31-225-151.eu-west-3.compute.internal",
-    "query_engine_qpuindex": "ip-173-31-225-151.eu-west-3.compute.internal"
+    "storage_engine_dsdriver-1": "ip-173-31-135-164.eu-west-3.compute.internal",
+    "storage_engine_dsdriver-2": "ip-174-31-120-42.ap-northeast-1.compute.internal",
+    "query_engine_antidote": "ip-172-31-13-145.us-east-2.compute.internal",
+    "query_engine_qpuindex": "ip-172-31-13-145.us-east-2.compute.internal"
   },
   "benchmarks":[
     {

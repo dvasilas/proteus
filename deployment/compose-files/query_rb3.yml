@@ -1,0 +1,229 @@
+version: '3'
+services:
+  antidote-0:
+    image: antidotedb/antidote:0.2.1
+    networks:
+      - proteus_net
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
+
+  antidote-1:
+    image: antidotedb/antidote:0.2.1
+    networks:
+      - proteus_net
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [node.labels.dc2_node2 == true ]
+
+  antidote-2:
+    image: antidotedb/antidote:0.2.1
+    networks:
+      - proteus_net
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc3_node2 == true ]
+
+  qpuindex-0:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=dsdriver-0 --port=50150 --timeout=0
+        && ./deployment/wait-for-it.sh --host=antidote-0 --port=8087 --timeout=0
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-0:8087 --conns=dsdriver-0:50150"
+    depends_on:
+      - antidote-0
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
+
+  qpucache-0-1:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250"
+    depends_on:
+      - qpuindex-0
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc2_node2 == true ]
+
+  qpucache-0-2:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250"
+    depends_on:
+      - qpuindex-0
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc3_node2 == true ]
+
+  qpuindex-1:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=dsdriver-1 --port=50150 --timeout=0
+        && ./deployment/wait-for-it.sh --host=antidote-1 --port=8087 --timeout=0
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-1:8087 --conns=dsdriver-1:50150"
+    depends_on:
+      - antidote-1
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc2_node2 == true ]
+
+  qpucache-1-0:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250"
+    depends_on:
+      - qpuindex-1
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
+
+  qpucache-1-2:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250"
+    depends_on:
+      - qpuindex-1
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc3_node2 == true ]
+
+  qpuindex-2:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=dsdriver-2 --port=50150 --timeout=0
+        && ./deployment/wait-for-it.sh --host=antidote-2 --port=8087 --timeout=0
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-2:8087 --conns=dsdriver-2:50150"
+    depends_on:
+      - antidote-2
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc3_node2 == true ]
+
+  qpucache-2-0:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250"
+    depends_on:
+      - qpuindex-2
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
+
+  qpucache-2-1:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250"
+    depends_on:
+      - qpuindex-2
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc2_node2 == true ]
+
+  federation-0:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-1-0 --port=50350 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-2-0 --port=50350 --timeout=0
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-0:50250/qpucache-1-0:50350/qpucache-2-0:50350"
+    depends_on:
+      - qpuindex-0
+      - qpucache-1-0
+      - qpucache-2-0
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc1_node2 == true ]
+
+  federation-1:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-0-1 --port=50350 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-2-1 --port=50350 --timeout=0
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-1:50250/qpucache-0-1:50350/qpucache-2-1:50350"
+    depends_on:
+      - qpuindex-1
+      - qpucache-0-1
+      - qpucache-2-1
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc2_node2 == true ]
+  federation-2:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-0-2 --port=50350 --timeout=0
+        && ./deployment/wait-for-it.sh --host=qpucache-1-2 --port=50350 --timeout=0
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-2:50250/qpucache-0-2:50350/qpucache-1-2:50350"
+    depends_on:
+      - qpuindex-2
+      - qpucache-0-2
+      - qpucache-1-2
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc3_node2 == true ]
+
+networks:
+  proteus_net:
+    external: true
