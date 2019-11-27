@@ -11,7 +11,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node1 == true ]
+        constraints: [ node.labels.dc0_node1 == true ]
 
   dsdriver-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -26,7 +26,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node1 == true ]
+        constraints: [ node.labels.dc0_node1 == true ]
 
 networks:
   proteus_net:

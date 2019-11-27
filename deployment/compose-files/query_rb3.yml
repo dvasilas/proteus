@@ -8,7 +8,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   antidote-1:
     image: antidotedb/antidote:0.2.1
@@ -18,7 +18,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [node.labels.dc2_node2 == true ]
+        constraints: [node.labels.dc1_node2 == true ]
 
   antidote-2:
     image: antidotedb/antidote:0.2.1
@@ -28,7 +28,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node2 == true ]
+        constraints: [ node.labels.dc2_node2 == true ]
 
   qpuindex-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -44,7 +44,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   qpucache-0-1:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -59,7 +59,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node2 == true ]
+        constraints: [ node.labels.dc1_node2 == true ]
 
   qpucache-0-2:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -74,7 +74,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node2 == true ]
+        constraints: [ node.labels.dc2_node2 == true ]
 
   qpuindex-1:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -90,7 +90,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node2 == true ]
+        constraints: [ node.labels.dc1_node2 == true ]
 
   qpucache-1-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -105,7 +105,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   qpucache-1-2:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -120,7 +120,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node2 == true ]
+        constraints: [ node.labels.dc2_node2 == true ]
 
   qpuindex-2:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -136,7 +136,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node2 == true ]
+        constraints: [ node.labels.dc2_node2 == true ]
 
   qpucache-2-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -151,7 +151,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   qpucache-2-1:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -166,7 +166,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node2 == true ]
+        constraints: [ node.labels.dc1_node2 == true ]
 
   federation-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -185,7 +185,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   federation-1:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -204,7 +204,8 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node2 == true ]
+        constraints: [ node.labels.dc1_node2 == true ]
+
   federation-2:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
     networks:
@@ -222,7 +223,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node2 == true ]
+        constraints: [ node.labels.dc2_node2 == true ]
 
 networks:
   proteus_net:

@@ -11,7 +11,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node1 == true ]
+        constraints: [ node.labels.dc0_node1 == true ]
 
   cloudserver-1:
     image: dvasilas/cloudserver:latest
@@ -24,7 +24,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node1 == true ]
+        constraints: [ node.labels.dc1_node1 == true ]
 
   cloudserver-2:
     image: dvasilas/cloudserver:latest
@@ -37,7 +37,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node1 == true ]
+        constraints: [ node.labels.dc2_node1 == true ]
 
   dsdriver-0:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -52,7 +52,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node1 == true ]
+        constraints: [ node.labels.dc0_node1 == true ]
 
   dsdriver-1:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -67,7 +67,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc2_node1 == true ]
+        constraints: [ node.labels.dc1_node1 == true ]
 
   dsdriver-2:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -82,7 +82,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc3_node1 == true ]
+        constraints: [ node.labels.dc2_node1 == true ]
 
 networks:
   proteus_net:

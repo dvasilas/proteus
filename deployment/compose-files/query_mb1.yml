@@ -8,7 +8,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
   qpuindex:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
@@ -25,7 +25,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc1_node2 == true ]
+        constraints: [ node.labels.dc0_node2 == true ]
 
 networks:
   proteus_net:
