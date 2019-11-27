@@ -27,6 +27,23 @@ services:
       placement:
         constraints: [ node.labels.dc1_node2 == true ]
 
+  federation:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250"
+    depends_on:
+      - qpuindex-0
+      - qpuindex-1
+      - qpuindex-2
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node2 == true ]
+
 networks:
   proteus_net:
     external: true

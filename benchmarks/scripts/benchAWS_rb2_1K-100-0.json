@@ -1,7 +1,7 @@
 {
   "deployment": {
-    "storage_engine": "storage_mb.yml",
-    "query_engine": "query_mb2.yml"
+    "storage_engine": "storage_rb.yml",
+    "query_engine": "query_rb2.yml"
   },
   "global_config": {
     "table": "ycsb-buck",
@@ -9,7 +9,7 @@
     "s3_port": "8000",
     "s3_access_key_id": "accessKey1",
     "s3_secret_key": "verySecretKey1",
-    "proteus_host": "federation",
+    "proteus_host": "federation-0",
     "proteus_port": "50450",
     "workload": "workloada",
     "record_count": 1000,
@@ -18,10 +18,20 @@
   },
   "placement": {
     "storage_engine_cloudserver-0": "dc0_node1",
+    "storage_engine_cloudserver-1": "dc1_node1",
+    "storage_engine_cloudserver-2": "dc2_node1",
     "storage_engine_dsdriver-0": "dc0_node1",
-    "query_engine_antidote": "dc1_node2",
-    "query_engine_qpuindex": "dc1_node2",
-    "query_engine_federation": "dc0_node2"
+    "storage_engine_dsdriver-1": "dc1_node1",
+    "storage_engine_dsdriver-2": "dc2_node1",
+    "query_engine_antidote-0": "dc0_node2",
+    "query_engine_antidote-1": "dc1_node2",
+    "query_engine_antidote-2": "dc2_node2",
+    "query_engine_qpuindex-0": "dc0_node2",
+    "query_engine_qpuindex-1": "dc1_node2",
+    "query_engine_qpuindex-2": "dc2_node2",
+    "query_engine_federation-0": "dc0_node2",
+    "query_engine_federation-1": "dc1_node2",
+    "query_engine_federation-2": "dc2_node2"
   },
   "benchmarks":[
     {

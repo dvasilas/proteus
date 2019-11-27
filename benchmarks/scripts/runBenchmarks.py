@@ -9,6 +9,7 @@ import os
 import os.path
 import pickle
 import json
+import time
 from datetime import datetime
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -120,13 +121,14 @@ def parseArgs():
   parser.add_argument('--parse', action='store_true')
   parser.add_argument('--dest')
   parser.add_argument('--config')
+  parser.add_argument('--mapping')
   parser.add_argument('--cred')
   parser.add_argument('--spreadid')
   return parser.parse_args()
 
-def initBenchmarks(config, proteusTag, ycsbTag, log):
+def initBenchmarks(config, nodeLabelMapping, proteusTag, ycsbTag, log):
   createOverlayNetwork(log)
-  deploy('storage_engine', proteusTag, config, log)
+  deploy('storage_engine', proteusTag, config, nodeLabelMapping, log)
   loadDataset(config, ycsbTag, log)
 
 def getLatestCommitTag(project, branch, log):
@@ -139,7 +141,7 @@ def createOverlayNetwork(log):
   runCmd(['docker network create -d overlay --attachable proteus_net'], log)
   STATE += 1
 
-def deploy(target, tag, config, log):
+def deploy(target, tag, config, nodeLabelMapping, log):
   record_count = config['global_config']['record_count']
   cache_size = record_count * 5 * 0.2
   global STATE
@@ -149,7 +151,7 @@ def deploy(target, tag, config, log):
     + 'docker stack deploy '
     + '--compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
   STATE += 1
-  checkPlacement(target, config, log)
+  checkPlacement(target, config, nodeLabelMapping, log)
 
 def loadDataset(config, tag, log):
   table = config['global_config']['table']
@@ -167,18 +169,23 @@ def loadDataset(config, tag, log):
     + '-e EXECUTIONTIME=0 -e WARMUPTIME=0 '
     + '-e RECORDCOUNT=%d dvasilas/ycsb:%s' %(record_count, tag) ], log)
 
-def checkPlacement(tier, config, log):
+def checkPlacement(tier, config, nodeLabelMapping, log):
   for service in config['placement']:
     if service.startswith(tier):
+      targetLabel = config['placement'][service]
+      targetNode = nodeLabelMapping[targetLabel]
       output = ""
-      while output.split('\n')[0]  != config['placement'][service]:
+      countRetries = 0
+      while output.split('\n')[0]  != targetNode:
         output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
-      if output.split('\n')[0]  != config['placement'][service]:
-        print('placement error: '
-          + 'service %s should be deployed on node %s, ' % (service, config['placement'][service])
-          + 'but is deployed on node %s' % ( output.split('\n')[0]))
-        cleanup(log, 0)
-        sys.exit()
+        countRetries += 1
+        time.sleep(1)
+        if countRetries > 10:
+          print('placement error: '
+            + 'service %s should be deployed on node %s, ' % (service, targetNode)
+            + 'but is deployed on node %s' % ( output.split('\n')[0]))
+          cleanup(log, 0)
+          sys.exit()
 
 def cleanup(log, target):
   global STATE
@@ -193,7 +200,7 @@ def cleanup(log, target):
       print('state should not be %d' % (STATE))
     STATE -= 1
 
-def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
+def runOneBenchmark(config, configBench, nodeLabelMapping, proteusTag, ycsbTag, outDir, log):
   table = config['global_config']['table']
   s3_host = config['global_config']['s3_host']
   s3_port = config['global_config']['s3_port']
@@ -211,7 +218,7 @@ def runOneBenchmark(config, configBench, proteusTag, ycsbTag, outDir, log):
   threads = configBench['threads']
   output_file = "%dK_%.1f_%.1f_%.1f_%d" % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
 
-  deploy('query_engine', proteusTag, config, log)
+  deploy('query_engine', proteusTag, config, nodeLabelMapping, log)
 
   runCmd(['docker run --name ycsb --rm --network=proteus_net -v %s:/ycsb ' % (outDir)
     + '-e TYPE=run -e TABLE=%s ' % (table)
@@ -262,27 +269,29 @@ if __name__ == '__main__':
   proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
   ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
 
-  with open(args.config) as json_file:
-    benchmarkConfig = json.load(json_file)
-    # have config object
-    # have bench object
-    initBenchmarks(benchmarkConfig, proteusTag, ycsbTag, log)
-    data = 'query_proportion, update_proportion, cached_query_proportion, threads, RunTime(ms), [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
-    # make list comprehension: list of bench -> list of results
-    for benchConfig in benchmarkConfig['benchmarks']:
-      record_count = benchmarkConfig['global_config']['record_count']
-      query_proportion= benchConfig['query_proportion']
-      update_proportion= benchConfig['update_proportion']
-      cached_query_proportion= benchConfig['cached_query_proportion']
-      threads = benchConfig['threads']
-      output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
-      runOneBenchmark(benchmarkConfig, benchConfig, proteusTag, ycsbTag, args.dest, log)
-      data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
-      data += parseFile(os.path.join(args.dest, output_file)) + '\n'
+  with open(args.config) as config_file:
+    with open(args.mapping) as label_file:
+      benchmarkConfig = json.load(config_file)
+      nodeLabelMapping = json.load(label_file)
+      # have config object
+      # have bench object
+      initBenchmarks(benchmarkConfig, nodeLabelMapping, proteusTag, ycsbTag, log)
+      data = 'query_proportion, update_proportion, cached_query_proportion, threads, RunTime(ms), [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
+      # make list comprehension: list of bench -> list of results
+      for benchConfig in benchmarkConfig['benchmarks']:
+        record_count = benchmarkConfig['global_config']['record_count']
+        query_proportion= benchConfig['query_proportion']
+        update_proportion= benchConfig['update_proportion']
+        cached_query_proportion= benchConfig['cached_query_proportion']
+        threads = benchConfig['threads']
+        output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
+        runOneBenchmark(benchmarkConfig, benchConfig, nodeLabelMapping, proteusTag, ycsbTag, args.dest, log)
+        data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
+        data += parseFile(os.path.join(args.dest, output_file)) + '\n'
 
-    data = data[:-1]
-    global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
-    pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
+      data = data[:-1]
+      global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
+      pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
 
   cleanup(log, 0)
   log.close()

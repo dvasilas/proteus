@@ -17,11 +17,11 @@
     "warmup_time": 10
   },
   "placement": {
-    "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "query_engine_antidote": "ip-173-31-225-151.eu-west-3.compute.internal",
-    "query_engine_qpuindex": "ip-173-31-225-151.eu-west-3.compute.internal",
-    "query_engine_qpucache": "ip-172-31-13-145.us-east-2.compute.internal"
+    "storage_engine_cloudserver-0": "dc0_node1",
+    "storage_engine_dsdriver-0": "dc0_node1",
+    "query_engine_antidote": "dc1_node2",
+    "query_engine_qpuindex": "dc1_node2",
+    "query_engine_qpucache": "dc0_node2"
   },
   "benchmarks":[
     {

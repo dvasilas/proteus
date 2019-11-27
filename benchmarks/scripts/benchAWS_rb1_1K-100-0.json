@@ -9,22 +9,25 @@
     "s3_port": "8000",
     "s3_access_key_id": "accessKey1",
     "s3_secret_key": "verySecretKey1",
-    "proteus_host": "qpuindex",
-    "proteus_port": "50250",
+    "proteus_host": "federation-0",
+    "proteus_port": "50450",
     "workload": "workloada",
     "record_count": 1000,
     "execution_time": 60,
     "warmup_time": 10
   },
   "placement": {
-    "storage_engine_cloudserver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "storage_engine_cloudserver-1": "ip-173-31-135-164.eu-west-3.compute.internal",
-    "storage_engine_cloudserver-2": "ip-174-31-120-42.ap-northeast-1.compute.internal",
-    "storage_engine_dsdriver-0": "ip-172-31-11-90.us-east-2.compute.internal",
-    "storage_engine_dsdriver-1": "ip-173-31-135-164.eu-west-3.compute.internal",
-    "storage_engine_dsdriver-2": "ip-174-31-120-42.ap-northeast-1.compute.internal",
-    "query_engine_antidote": "ip-172-31-13-145.us-east-2.compute.internal",
-    "query_engine_qpuindex": "ip-172-31-13-145.us-east-2.compute.internal"
+    "storage_engine_cloudserver-0": "dc0_node1",
+    "storage_engine_cloudserver-1": "dc1_node1",
+    "storage_engine_cloudserver-2": "dc2_node1",
+    "storage_engine_dsdriver-0": "dc0_node1",
+    "storage_engine_dsdriver-1": "dc1_node1",
+    "storage_engine_dsdriver-2": "dc2_node1",
+    "query_engine_antidote": "dc0_node2",
+    "query_engine_qpuindex": "dc0_node2",
+    "query_engine_federation-0": "dc0_node2",
+    "query_engine_federation-1": "dc1_node2",
+    "query_engine_federation-2": "dc2_node2"
   },
   "benchmarks":[
     {
