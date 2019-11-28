@@ -1,17 +1,11 @@
 {
   "deployment": {
     "storage_engine": "storage_mb.yml",
-    "query_engine": "query_mb2.yml"
+    "query_engine": "query_mb2.yml",
+    "dataset": "load_mb.yml",
+    "workload": "run_mb.yml"
   },
   "global_config": {
-    "table": "ycsb-buck",
-    "s3_host": "cloudserver-0",
-    "s3_port": "8000",
-    "s3_access_key_id": "accessKey1",
-    "s3_secret_key": "verySecretKey1",
-    "proteus_host": "federation",
-    "proteus_port": "50450",
-    "workload": "workloada",
     "record_count": 1000,
     "execution_time": 60,
     "warmup_time": 10

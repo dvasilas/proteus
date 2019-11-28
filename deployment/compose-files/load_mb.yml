@@ -1,0 +1,26 @@
+version: '3'
+services:
+  ycsb-0:
+    image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
+    networks:
+      - proteus_net
+    environment:
+      - TYPE=load
+      - EXECUTIONTIME=0
+      - WARMUPTIME=0
+      - TABLE=ycsb-buck
+      - S3HOST=cloudserver-0
+      - S3PORT=8000
+      - S3ACCESSKEYID=accessKey1
+      - S3SECRETKEY=verySecretKey1
+      - WORKLOAD=workloada
+      - RECORDCOUNT=${RECORDCOUNT}
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node0 == true ]
+
+networks:
+  proteus_net:
+    external: true

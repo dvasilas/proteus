@@ -138,8 +138,7 @@ def getLatestCommitTag(project, branch, log):
 
 def createOverlayNetwork(log):
   global STATE
-  runCmd(['docker network create -d overlay --attachable proteus_net'], log)
-  STATE += 1
+  runCmd(['docker network create -d overlay --attachable proteus_net'], log, True)
 
 def deploy(target, tag, config, nodeLabelMapping, log):
   record_count = config['global_config']['record_count']
@@ -154,20 +153,34 @@ def deploy(target, tag, config, nodeLabelMapping, log):
   checkPlacement(target, config, nodeLabelMapping, log)
 
 def loadDataset(config, tag, log):
-  table = config['global_config']['table']
-  s3_host = config['global_config']['s3_host']
-  s3_port = config['global_config']['s3_port']
-  s3_access_key_id = config['global_config']['s3_access_key_id']
-  workload = config['global_config']['workload']
+  dataset = config['deployment']['dataset']
   record_count = config['global_config']['record_count']
-  s3_secret_key = config['global_config']['s3_secret_key']
-  runCmd(['docker run --name ycsb --rm --network=proteus_net -e TYPE=load '
-    + '-e TABLE=%s ' % (table)
-    + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
-    + '-e S3ACCESSKEYID=%s -e S3SECRETKEY=%s ' % (s3_access_key_id, s3_secret_key)
-    + '-e WORKLOAD=%s ' % (workload)
-    + '-e EXECUTIONTIME=0 -e WARMUPTIME=0 '
-    + '-e RECORDCOUNT=%d dvasilas/ycsb:%s' %(record_count, tag) ], log)
+  runCmd(['env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s ' % (tag, record_count)
+    + 'docker stack deploy '
+    + '--compose-file proteus/deployment/compose-files/%s ycsb_load' % (dataset)
+    ], log)
+  if '_mb' in dataset:
+    waitTermination('ycsb_load_ycsb-0', log)
+  elif '_rb' in dataset:
+    waitTermination('ycsb_load_ycsb-0', log)
+    waitTermination('ycsb_load_ycsb-1', log)
+    waitTermination('ycsb_load_ycsb-2', log)
+  else:
+    print('unknown dataset compose-file name')
+    cleanup(log, 0)
+    sys.exit()
+  runCmd(['docker stack rm ycsb_load'], log)
+
+def waitTermination(service, log):
+  complete = False
+  while not complete:
+    result = runCmd(['docker service ps %s' % (service)
+    + " --format '{{.CurrentState}}'"], log, showProgress=True)
+    if result.split(' ')[0] == 'Complete':
+      complete = True
+    else:
+      time.sleep(1)
+
 
 def checkPlacement(tier, config, nodeLabelMapping, log):
   for service in config['placement']:
@@ -191,24 +204,15 @@ def cleanup(log, target):
   global STATE
   while STATE > target:
     if STATE == 1:
-      runCmd(['docker network rm proteus_net'], log)
-    elif STATE == 2:
       runCmd(['docker stack rm storage_engine'], log)
-    elif STATE == 3:
+    elif STATE == 2:
       runCmd(['docker stack rm query_engine'], log)
-    else:
+    elif STATE == 3:
       print('state should not be %d' % (STATE))
     STATE -= 1
 
 def runOneBenchmark(config, configBench, nodeLabelMapping, proteusTag, ycsbTag, outDir, log):
-  table = config['global_config']['table']
-  s3_host = config['global_config']['s3_host']
-  s3_port = config['global_config']['s3_port']
-  s3_access_key_id = config['global_config']['s3_access_key_id']
-  s3_secret_key = config['global_config']['s3_secret_key']
-  proteus_host = config['global_config']['proteus_host']
-  proteus_port = config['global_config']['proteus_port']
-  workload = config['global_config']['workload']
+  workload = config['deployment']['workload']
   record_count = config['global_config']['record_count']
   execution_time = config['global_config']['execution_time']
   warmup_time = config['global_config']['warmup_time']
@@ -220,26 +224,43 @@ def runOneBenchmark(config, configBench, nodeLabelMapping, proteusTag, ycsbTag, 
 
   deploy('query_engine', proteusTag, config, nodeLabelMapping, log)
 
-  runCmd(['docker run --name ycsb --rm --network=proteus_net -v %s:/ycsb ' % (outDir)
-    + '-e TYPE=run -e TABLE=%s ' % (table)
-    + '-e S3HOST=%s -e S3PORT=%s ' % (s3_host, s3_port)
-    + '-e S3ACCESSKEYID=%s -e S3SECRETKEY=%s ' % (s3_access_key_id, s3_secret_key)
-    + '-e PROTEUSHOST=%s -e PROTEUSPORT=%s ' % (proteus_host, proteus_port)
-    + '-e WORKLOAD=%s ' % (workload)
-    + '-e RECORDCOUNT=%d ' % (record_count)
-    + '-e QUERYPROPORTION=%.1f -e UPDATEPROPORTION=%.1f ' % (query_proportion, update_proportion)
-    + '-e CACHEDQUERYPROPORTION=%.1f ' % (cached_query_proportion)
-    + '-e EXECUTIONTIME=%d -e WARMUPTIME=%d ' % (execution_time, warmup_time)
-    + '-e THREADS=%d -e OUTPUT_FILE_NAME=%s ' % (threads, output_file)
-    + 'dvasilas/ycsb:%s' % (ycsbTag) ], log)
-  cleanup(log, 2)
+  runCmd(['env YCSB_IMAGE_TAG=%s ' % (ycsbTag)
+    + 'env RECORDCOUNT=%s ' % (record_count)
+    + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (query_proportion, update_proportion)
+    + 'env CACHEDQUERYPROPORTION=%.1f ' % (cached_query_proportion)
+    + 'env EXECUTIONTIME=%d env WARMUPTIME=%d ' % (execution_time, warmup_time)
+    + 'env THREADS=%d env OUTPUT_FILE_NAME=%s ' % (threads, output_file)
+    + 'env OUTDIR=%s ' % (outDir)
+    + 'docker stack deploy '
+    + '--compose-file proteus/deployment/compose-files/%s ycsb_run' % (workload)
+    ], log)
 
-def runCmd(cmd, log, okToFail=False):
-  print(cmd)
+  if '_mb' in workload:
+    waitTermination('ycsb_run_client-0', log)
+  elif '_rb' in workload:
+    waitTermination('ycsb_run_client-0', log)
+    waitTermination('ycsb_run_client-1', log)
+    waitTermination('ycsb_run_client-2', log)
+  else:
+    print('unknown workload compose-file name')
+    cleanup(log, 0)
+    sys.exit()
+  runCmd(['docker stack rm ycsb_run'], log)
+  cleanup(log, 1)
+
+def runCmd(cmd, log, okToFail=False, showProgress=False):
+  if not showProgress:
+    print(cmd)
   p = subprocess.Popen(cmd, stdout = subprocess.PIPE, universal_newlines=True, shell=True)
   output = ''
   for stdout_line in iter(p.stdout.readline, ""):
-    sys.stdout.write(stdout_line)
+    if showProgress:
+      sys.stdout.write('\r' + " " * 100)
+      sys.stdout.flush()
+      sys.stdout.write('\r' + stdout_line[:-1])
+      sys.stdout.flush()
+    else:
+      print(stdout_line[:-1])
     if not log == None:
       log.write(stdout_line)
     output += stdout_line
@@ -257,14 +278,23 @@ if __name__ == '__main__':
     resultDirPath = os.path.join(os.path.abspath(os.path.dirname(__file__)), args.dest)
   else:
     resultDirPath = args.dest
-  returnCode = runCmd(['mkdir -p %s' %  (resultDirPath)], None)
+
+  returnCode = runCmd(['mkdir -p %s ' %  (resultDirPath)
+    + "&& ssh dc1_node0 'mkdir -p %s' " %  (resultDirPath)
+    + "&& ssh dc2_node0 'mkdir -p %s'" %  (resultDirPath)
+  ], None)
   if returnCode:
-    print('could not create destination directory')
+    print('could not create result output directorie')
     sys.exit()
 
-  log = open(os.path.join(args.dest, "log"), "w")
+  configFileName = args.config.split(".")[0]
+  timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+  log = open(os.path.join(args.dest, 'log_'+configFileName+"_"+timestamp), "w")
 
-  runCmd('docker stack rm query_engine && docker stack rm storage_engine && docker network rm proteus_net', log, True)
+  runCmd('docker stack rm query_engine '
+    + '&& docker stack rm storage_engine '
+    + '&& docker stack rm ycsb_load '
+    + '&& docker stack rm ycsb_run ', log, True)
 
   proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
   ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
@@ -284,14 +314,29 @@ if __name__ == '__main__':
         update_proportion= benchConfig['update_proportion']
         cached_query_proportion= benchConfig['cached_query_proportion']
         threads = benchConfig['threads']
-        output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
         runOneBenchmark(benchmarkConfig, benchConfig, nodeLabelMapping, proteusTag, ycsbTag, args.dest, log)
-        data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
-        data += parseFile(os.path.join(args.dest, output_file)) + '\n'
+        break
 
-      data = data[:-1]
-      global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
-      pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
+      returnCode = runCmd(['scp dc1_node0:%s/* %s ' %  (resultDirPath, resultDirPath)
+        + '&& scp dc2_node0:%s/* %s' %  (resultDirPath, resultDirPath)
+      ], None)
+      if returnCode:
+        print('could not fetch results')
+        sys.exit()
+
+      # for benchConfig in benchmarkConfig['benchmarks']:
+      #   record_count = benchmarkConfig['global_config']['record_count']
+      #   query_proportion= benchConfig['query_proportion']
+      #   update_proportion= benchConfig['update_proportion']
+      #   cached_query_proportion= benchConfig['cached_query_proportion']
+      #   threads = benchConfig['threads']
+      #   output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
+      #   data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
+      #   data += parseFile(os.path.join(args.dest, output_file)) + '\n'
+
+      # data = data[:-1]
+      # global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
+      # pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
 
   cleanup(log, 0)
   log.close()

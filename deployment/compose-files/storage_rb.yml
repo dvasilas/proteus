@@ -5,8 +5,8 @@ services:
     networks:
       - proteus_net
     environment:
-    - REMOTE_MANAGEMENT_DISABLE=1
-    - S3BACKEND=mem
+      - REMOTE_MANAGEMENT_DISABLE=1
+      - S3BACKEND=mem
     deploy:
       restart_policy:
         condition: none
@@ -18,8 +18,8 @@ services:
     networks:
       - proteus_net
     environment:
-    - REMOTE_MANAGEMENT_DISABLE=1
-    - S3BACKEND=mem
+      - REMOTE_MANAGEMENT_DISABLE=1
+      - S3BACKEND=mem
     deploy:
       restart_policy:
         condition: none
@@ -31,8 +31,8 @@ services:
     networks:
       - proteus_net
     environment:
-    - REMOTE_MANAGEMENT_DISABLE=1
-    - S3BACKEND=mem
+      - REMOTE_MANAGEMENT_DISABLE=1
+      - S3BACKEND=mem
     deploy:
       restart_policy:
         condition: none

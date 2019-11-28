@@ -1,7 +1,9 @@
 {
   "deployment": {
     "storage_engine": "storage_rb.yml",
-    "query_engine": "query_rb2.yml"
+    "query_engine": "query_rb2.yml",
+    "dataset": "load_rb.yml",
+    "workload": "run_rb.yml"
   },
   "global_config": {
     "table": "ycsb-buck",
