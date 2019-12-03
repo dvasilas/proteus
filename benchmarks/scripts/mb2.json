@@ -18,14 +18,38 @@
     "execution_time": 60,
     "warmup_time": 10,
     "record_count": 1000,
-    "query_proportion": 1.0,
-    "update_proportion": 0.0,
+    "query_proportion": 0.9,
+    "update_proportion": 0.1,
     "cached_query_proportion": 0.2,
     "threads": 1
   },
   "benchmark_configs": [
     {
       "threads": 1
+    },
+    {
+      "threads": 2
+    },
+    {
+      "threads": 4
+    },
+    {
+      "threads": 8
+    },
+    {
+      "threads": 16
+    },
+    {
+      "threads": 32
+    },
+    {
+      "threads": 64
+    },
+    {
+      "threads": 128
+    },
+    {
+      "threads": 256
     }
   ]
 }

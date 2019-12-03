@@ -211,6 +211,12 @@ def loadDataset(benchToolTag, recordCount, datasetComposeFile, log):
     waitTermination(['ycsb_load_ycsb-0', 'ycsb_load_ycsb-1', 'ycsb_load_ycsb-2'], log)
   runCmd(['docker stack rm ycsb_load'], log)
 
+def createResultDir(resultDirPath):
+  if makeDirLocalRemote(resultDirPath, ['dc1_node0', 'dc2_node0']):
+    print('could not create result output directories')
+    sys.exit()
+
+
 class BenchmarkSuite(dict):
   def __getattr__(self, key):
     return self[key]
@@ -232,16 +238,11 @@ class BenchmarkSuite(dict):
       benchmark = Benchmark(self, config)
       self.benchmarks.append(benchmark)
 
-  def createResultDir(self):
-    if makeDirLocalRemote(self.resultDirPath, ['dc1_node0', 'dc2_node0']):
-      print('could not create result output directorie')
-      sys.exit()
-
   def cleanupPreviousRun(self):
     runCmd('docker stack rm query_engine '
     + '&& docker stack rm storage_engine '
     + '&& docker stack rm ycsb_load '
-    + '&& docker stack rm ycsb_run ', self.log, True)
+    + '&& docker stack rm ycsb_run ', None, True)
 
   def initSuite(self):
     createOverlayNetwork(self.log)
@@ -284,7 +285,6 @@ class Benchmark():
     deploy('query_engine', self.record_count, self.systemTag, getattr(self.deployment, 'query_engine'), self.placement, self.nodeLabels, self.log)
     runCmd(['env YCSB_IMAGE_TAG=%s ' % (self.benchToolTag)
     + 'env PROTEUSHOST=%s env PROTEUSPORT=%d ' % (self.proteus_host, self.proteus_port)
-    + 'env RECORDCOUNT=%s ' % (self.record_count)
     + 'env RECORDCOUNT=%s ' % (self.record_count)
     + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (self.query_proportion, self.update_proportion)
     + 'env CACHEDQUERYPROPORTION=%.1f ' % (self.cached_query_proportion)
@@ -333,11 +333,11 @@ class NodeLabels(dict):
 if __name__ == '__main__':
   args = parseArgs()
 
+  createResultDir(args.dest)
   with open(args.config) as config_file:
     with open(args.mapping) as label_file:
       benchSuite = json.loads(config_file.read(), object_hook = lambda dict: BenchmarkSuite(dict))
       benchSuite.init(args.dest, args.config.split(".")[0], ('proteus', 'benchmarks'), ('YCSB', 'proteus'), label_file)
-      benchSuite.createResultDir()
       benchSuite.cleanupPreviousRun()
       benchSuite.createBenchmarks()
       benchSuite.initSuite()

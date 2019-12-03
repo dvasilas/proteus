@@ -180,6 +180,7 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 	go func() {
 		for op := range opChan {
 			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_UPDATEDELTA, op)); err != nil {
+				utils.ReportError(err)
 				errs <- err
 				break
 			}
@@ -188,10 +189,12 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 				log.Debug("DataStoreQPU:opConsumer waiting for ACK..")
 				ackMsg, err := stream.Recv()
 				if err == io.EOF {
+					utils.ReportError(errors.New("DataStoreQPU:opConsumer received nil"))
 					errs <- errors.New("DataStoreQPU:opConsumer received nil")
 					break
 				}
 				if err != nil {
+					utils.ReportError(err)
 					errs <- err
 					break
 				}
@@ -211,7 +214,8 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 func heartbeat(seqID int64, stream pbQPU.QPU_QueryServer, errs chan error) {
 	beat := protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_HEARTBEAT, nil)
 	if err := stream.Send(beat); err != nil {
-		log.Debug("failed to send heartbeat - Connection closed")
+		utils.ReportError(err)
+		// log.Debug("failed to send heartbeat - Connection closed")
 		errs <- err
 		return
 	}
