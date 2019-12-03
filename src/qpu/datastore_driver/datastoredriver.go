@@ -175,13 +175,12 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 	var seqID int64
 	errs := make(chan error, 1)
 
-	heartbeat(int64(0), stream, errs)
+	// heartbeat(int64(0), stream, errs)
 
 	go func() {
 		for op := range opChan {
 			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_UPDATEDELTA, op)); err != nil {
-				utils.ReportError(err)
-				errs <- err
+				utils.Warn(err)
 				break
 			}
 			seqID++
