@@ -1,6 +1,3 @@
-# usage
-# python ycsbToSheet.py path_to_measurement_files path_to_credential_file spreadsheetID sheetID rowIndex columnIndex
-
 from __future__ import print_function
 import argparse
 import subprocess as subprocess
@@ -17,10 +14,6 @@ from google.auth.transport.requests import Request
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 STATE = 0
-# 0: clean
-# 1: overlay network created
-# 2: storage_engine deployed
-# 3: query_engine deployed
 
 def getCredentials(credFile):
     credentials = None
@@ -97,23 +90,12 @@ def parseFile(path):
       elif line[0] == '[OVERALL]':
         overallMeasurements[line[1]] = line[2]
       line = fp.readline()
-  output += overallMeasurements['RunTime(ms)'] + ", "
   output += queryMeasurements['Throughput(ops/sec)'] + ", "
   output += str(float(queryMeasurements['AverageLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['MinLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['MaxLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['95thPercentileLatency(us)']) / 1000) + ", "
   output += str(float(queryMeasurements['99thPercentileLatency(us)']) / 1000)
-  return output
-
-def globalConfigToCsv(config, proteusTag, ycsbTag):
-  output = 'proteus commit used=%s \n' %(proteusTag)
-  output += 'ycsb commit used=%s \n' %(ycsbTag)
-  output += 'execution_time=%d \n' % (config['global_config']['execution_time'])
-  output += 'warmup_time=%d \n' % (config['global_config']['warmup_time'])
-  output += 'record_count=%d \n' % (config['global_config']['record_count'])
-  output += 'storage_engine=%s \n' % (config['deployment']['storage_engine'])
-  output += 'query_engine=%s \n' % (config['deployment']['query_engine'])
   return output
 
 def parseArgs():
@@ -124,12 +106,10 @@ def parseArgs():
   parser.add_argument('--mapping')
   parser.add_argument('--cred')
   parser.add_argument('--spreadid')
-  return parser.parse_args()
-
-def initBenchmarks(config, nodeLabelMapping, proteusTag, ycsbTag, log):
-  createOverlayNetwork(log)
-  deploy('storage_engine', proteusTag, config, nodeLabelMapping, log)
-  loadDataset(config, ycsbTag, log)
+  args = parser.parse_args()
+  if not os.path.isabs(args.dest):
+    args.dest = os.path.join(os.path.abspath(os.path.dirname(__file__)), args.dest)
+  return args
 
 def getLatestCommitTag(project, branch, log):
   output = runCmd(['cd %s' % (project) + ' && git pull origin %s' % (branch) + ' && git log -1 --pretty=%H'], log)
@@ -140,113 +120,16 @@ def createOverlayNetwork(log):
   global STATE
   runCmd(['docker network create -d overlay --attachable proteus_net'], log, True)
 
-def deploy(target, tag, config, nodeLabelMapping, log):
-  record_count = config['global_config']['record_count']
-  cache_size = record_count * 5 * 0.2
-  global STATE
-  compose_file = config['deployment'][target]
-  runCmd(['env PROTEUS_IMAGE_TAG=%s ' % (tag)
-    + 'env CACHE_SIZE=%d ' % (cache_size)
-    + 'docker stack deploy '
-    + '--compose-file proteus/deployment/compose-files/%s %s' % (compose_file, target)], log)
-  STATE += 1
-  checkPlacement(target, config, nodeLabelMapping, log)
-
-def loadDataset(config, tag, log):
-  dataset = config['deployment']['dataset']
-  record_count = config['global_config']['record_count']
-  runCmd(['env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s ' % (tag, record_count)
-    + 'docker stack deploy '
-    + '--compose-file proteus/deployment/compose-files/%s ycsb_load' % (dataset)
-    ], log)
-  if '_mb' in dataset:
-    waitTermination('ycsb_load_ycsb-0', log)
-  elif '_rb' in dataset:
-    waitTermination('ycsb_load_ycsb-0', log)
-    waitTermination('ycsb_load_ycsb-1', log)
-    waitTermination('ycsb_load_ycsb-2', log)
-  else:
-    print('unknown dataset compose-file name')
-    cleanup(log, 0)
-    sys.exit()
-  runCmd(['docker stack rm ycsb_load'], log)
-
-def waitTermination(service, log):
-  complete = False
-  while not complete:
-    result = runCmd(['docker service ps %s' % (service)
-    + " --format '{{.CurrentState}}'"], log, showProgress=True)
-    if result.split(' ')[0] == 'Complete':
-      complete = True
-    else:
-      time.sleep(1)
-
-
-def checkPlacement(tier, config, nodeLabelMapping, log):
-  for service in config['placement']:
-    if service.startswith(tier):
-      targetLabel = config['placement'][service]
-      targetNode = nodeLabelMapping[targetLabel]
-      output = ""
-      countRetries = 0
-      while output.split('\n')[0]  != targetNode:
-        output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
-        countRetries += 1
+def waitTermination(services, log):
+  for service in services:
+    complete = False
+    while not complete:
+      result = runCmd(['docker service ps %s' % (service)
+      + " --format '{{.CurrentState}}'"], log, showProgress=True)
+      if result.split(' ')[0] == 'Complete':
+        complete = True
+      else:
         time.sleep(1)
-        if countRetries > 10:
-          print('placement error: '
-            + 'service %s should be deployed on node %s, ' % (service, targetNode)
-            + 'but is deployed on node %s' % ( output.split('\n')[0]))
-          cleanup(log, 0)
-          sys.exit()
-
-def cleanup(log, target):
-  global STATE
-  while STATE > target:
-    if STATE == 1:
-      runCmd(['docker stack rm storage_engine'], log)
-    elif STATE == 2:
-      runCmd(['docker stack rm query_engine'], log)
-    elif STATE == 3:
-      print('state should not be %d' % (STATE))
-    STATE -= 1
-
-def runOneBenchmark(config, configBench, nodeLabelMapping, proteusTag, ycsbTag, outDir, log):
-  workload = config['deployment']['workload']
-  record_count = config['global_config']['record_count']
-  execution_time = config['global_config']['execution_time']
-  warmup_time = config['global_config']['warmup_time']
-  query_proportion = configBench['query_proportion']
-  update_proportion = configBench['update_proportion']
-  cached_query_proportion = configBench['cached_query_proportion']
-  threads = configBench['threads']
-  output_file = "%dK_%.1f_%.1f_%.1f_%d" % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
-
-  deploy('query_engine', proteusTag, config, nodeLabelMapping, log)
-
-  runCmd(['env YCSB_IMAGE_TAG=%s ' % (ycsbTag)
-    + 'env RECORDCOUNT=%s ' % (record_count)
-    + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (query_proportion, update_proportion)
-    + 'env CACHEDQUERYPROPORTION=%.1f ' % (cached_query_proportion)
-    + 'env EXECUTIONTIME=%d env WARMUPTIME=%d ' % (execution_time, warmup_time)
-    + 'env THREADS=%d env OUTPUT_FILE_NAME=%s ' % (threads, output_file)
-    + 'env OUTDIR=%s ' % (outDir)
-    + 'docker stack deploy '
-    + '--compose-file proteus/deployment/compose-files/%s ycsb_run' % (workload)
-    ], log)
-
-  if '_mb' in workload:
-    waitTermination('ycsb_run_client-0', log)
-  elif '_rb' in workload:
-    waitTermination('ycsb_run_client-0', log)
-    waitTermination('ycsb_run_client-1', log)
-    waitTermination('ycsb_run_client-2', log)
-  else:
-    print('unknown workload compose-file name')
-    cleanup(log, 0)
-    sys.exit()
-  runCmd(['docker stack rm ycsb_run'], log)
-  cleanup(log, 1)
 
 def runCmd(cmd, log, okToFail=False, showProgress=False):
   if not showProgress:
@@ -272,71 +155,197 @@ def runCmd(cmd, log, okToFail=False, showProgress=False):
       sys.exit()
   return output
 
-if __name__ == '__main__':
-  args = parseArgs()
-  if not os.path.isabs(args.dest):
-    resultDirPath = os.path.join(os.path.abspath(os.path.dirname(__file__)), args.dest)
-  else:
-    resultDirPath = args.dest
+def deploy(target, recordCount, systemTag, composeFile, placement, nodeLabels, log):
+  global STATE
+  cacheSize = recordCount * 5 * 0.2
+  runCmd(['env PROTEUS_IMAGE_TAG=%s ' % (systemTag)
+    + 'env CACHE_SIZE=%d ' % (cacheSize)
+    + 'docker stack deploy '
+    + '--compose-file proteus/deployment/compose-files/%s %s' % (composeFile, target)], log)
+  STATE += 1
+  checkPlacement(target, placement, nodeLabels, log)
 
-  returnCode = runCmd(['mkdir -p %s ' %  (resultDirPath)
-    + "&& ssh dc1_node0 'mkdir -p %s' " %  (resultDirPath)
-    + "&& ssh dc2_node0 'mkdir -p %s'" %  (resultDirPath)
-  ], None)
-  if returnCode:
-    print('could not create result output directorie')
-    sys.exit()
+def checkPlacement(target, placement, nodeLabels, log):
+  for service in placement:
+    if service.startswith(target):
+      targetLabel = getattr(placement, service)
+      targetNode = getattr(nodeLabels, targetLabel)
+      output = ""
+      countRetries = 0
+      while output.split('\n')[0]  != targetNode:
+        output = runCmd(['docker service ps --format "{{ .Node }}" %s' % (service)], log)
+        countRetries += 1
+        time.sleep(1)
+        if countRetries > 10:
+          print('placement error: '
+            + 'service %s should be deployed on node %s, ' % (service, targetNode)
+            + 'but is deployed on node %s' % ( output.split('\n')[0]))
+          cleanup(0, log)
+          sys.exit()
 
-  configFileName = args.config.split(".")[0]
-  timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-  log = open(os.path.join(args.dest, 'log_'+configFileName+"_"+timestamp), "w")
+def cleanup(target, log):
+  global STATE
+  while STATE > target:
+    if STATE == 1:
+      runCmd(['docker stack rm storage_engine'], log)
+    elif STATE == 2:
+      runCmd(['docker stack rm query_engine'], log)
+    elif STATE == 3:
+      print('state should not be %d' % (STATE))
+    STATE -= 1
 
-  runCmd('docker stack rm query_engine '
+def makeDirLocalRemote(resultDirPath, remoteNodes):
+  cmd = 'mkdir -p %s ' %  (resultDirPath)
+  for node in remoteNodes:
+    cmd += "&& ssh %s 'mkdir -p %s' " %  (node, resultDirPath)
+  return runCmd([cmd], None)
+
+def loadDataset(benchToolTag, recordCount, datasetComposeFile, log):
+  runCmd(['env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s ' % (benchToolTag, recordCount)
+    + 'docker stack deploy '
+    + '--compose-file proteus/deployment/compose-files/%s ycsb_load' % (datasetComposeFile)
+    ], log)
+  if '_mb' in datasetComposeFile:
+    waitTermination(['ycsb_load_ycsb-0'], log)
+  elif '_rb' in datasetComposeFile:
+    waitTermination(['ycsb_load_ycsb-0', 'ycsb_load_ycsb-1', 'ycsb_load_ycsb-2'], log)
+  runCmd(['docker stack rm ycsb_load'], log)
+
+class BenchmarkSuite(dict):
+  def __getattr__(self, key):
+    return self[key]
+  def __setattr__(self, key, value):
+    self[key] = value
+
+  def init(self, resultDirPath, configFileName, (systemRepo, systemBranch), (benchToolRepo, benchToolBranch), nodeLabelFile):
+    self.resultDirPath = resultDirPath
+    self.configFileName = configFileName
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    self.log = open(os.path.join(args.dest, 'log_' + self.configFileName + "_" + timestamp), "w")
+    self.systemTag = getLatestCommitTag(systemRepo, systemBranch, self.log)
+    self.benchToolTag = getLatestCommitTag(benchToolRepo, benchToolBranch, self.log)
+    self.nodeLabels = json.loads(nodeLabelFile.read(), object_hook = lambda dict: NodeLabels(dict))
+
+  def createBenchmarks(self):
+    self.benchmarks = []
+    for config in self.benchmark_configs:
+      benchmark = Benchmark(self, config)
+      self.benchmarks.append(benchmark)
+
+  def createResultDir(self):
+    if makeDirLocalRemote(self.resultDirPath, ['dc1_node0', 'dc2_node0']):
+      print('could not create result output directorie')
+      sys.exit()
+
+  def cleanupPreviousRun(self):
+    runCmd('docker stack rm query_engine '
     + '&& docker stack rm storage_engine '
     + '&& docker stack rm ycsb_load '
-    + '&& docker stack rm ycsb_run ', log, True)
+    + '&& docker stack rm ycsb_run ', self.log, True)
 
-  proteusTag = getLatestCommitTag('proteus', 'benchmarks', log)
-  ycsbTag = getLatestCommitTag('YCSB', 'proteus', log)
+  def initSuite(self):
+    createOverlayNetwork(self.log)
+    deploy('storage_engine', self.default_config.record_count, self.systemTag, getattr(self.deployment, 'storage_engine'), self.placement, self.nodeLabels, self.log)
+    loadDataset(self.benchToolTag, self.default_config.record_count, self.deployment.dataset, self.log)
 
-  with open(args.config) as config_file:
-    with open(args.mapping) as label_file:
-      benchmarkConfig = json.load(config_file)
-      nodeLabelMapping = json.load(label_file)
-      # have config object
-      # have bench object
-      initBenchmarks(benchmarkConfig, nodeLabelMapping, proteusTag, ycsbTag, log)
-      data = 'query_proportion, update_proportion, cached_query_proportion, threads, RunTime(ms), [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
-      # make list comprehension: list of bench -> list of results
-      for benchConfig in benchmarkConfig['benchmarks']:
-        record_count = benchmarkConfig['global_config']['record_count']
-        query_proportion= benchConfig['query_proportion']
-        update_proportion= benchConfig['update_proportion']
-        cached_query_proportion= benchConfig['cached_query_proportion']
-        threads = benchConfig['threads']
-        runOneBenchmark(benchmarkConfig, benchConfig, nodeLabelMapping, proteusTag, ycsbTag, args.dest, log)
-        break
+  def run(self):
+    return [ bench.run() for bench in self.benchmarks ]
 
-      returnCode = runCmd(['scp dc1_node0:%s/* %s ' %  (resultDirPath, resultDirPath)
-        + '&& scp dc2_node0:%s/* %s' %  (resultDirPath, resultDirPath)
+  def cleanup(self):
+    cleanup(0, self.log)
+
+  def benchmarkDescription(self):
+    description = 'proteus commit used=%s \n' % (self.systemTag)
+    description += 'ycsb commit used=%s \n' % (self.benchToolTag)
+    description += 'execution_time=%d \n' % (self.default_config.execution_time)
+    description += 'warmup_time=%d \n' % (self.default_config.warmup_time)
+    description += 'record_count=%d \n' % (self.default_config.record_count)
+    description += 'storage_engine=%s \n' % (self.deployment.storage_engine)
+    description += 'query_engine=%s \n' % (self.deployment.query_engine)
+    return description
+
+
+class Benchmark():
+  def __init__(self, benchmarkSuite, benchmarkConfig):
+    for param in benchmarkSuite.default_config:
+      setattr(self, param, benchmarkSuite.default_config[param])
+    for param in benchmarkConfig:
+      setattr(self, param, benchmarkConfig[param])
+    self.resultDirPath = benchmarkSuite.resultDirPath
+    self.outputFile = "%dK_%.1f_%.1f_%.1f_%d" % (self.record_count/1000, self.cached_query_proportion, self.query_proportion, self.update_proportion, self.threads)
+    self.systemTag = benchmarkSuite.systemTag
+    self.benchToolTag = benchmarkSuite.benchToolTag
+    self.deployment = benchmarkSuite.deployment
+    self.placement = benchmarkSuite.placement
+    self.nodeLabels = benchmarkSuite.nodeLabels
+    self.log = benchmarkSuite.log
+
+  def run(self):
+    deploy('query_engine', self.record_count, self.systemTag, getattr(self.deployment, 'query_engine'), self.placement, self.nodeLabels, self.log)
+    runCmd(['env YCSB_IMAGE_TAG=%s ' % (self.benchToolTag)
+    + 'env PROTEUSHOST=%s env PROTEUSPORT=%d ' % (self.proteus_host, self.proteus_port)
+    + 'env RECORDCOUNT=%s ' % (self.record_count)
+    + 'env RECORDCOUNT=%s ' % (self.record_count)
+    + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (self.query_proportion, self.update_proportion)
+    + 'env CACHEDQUERYPROPORTION=%.1f ' % (self.cached_query_proportion)
+    + 'env EXECUTIONTIME=%d env WARMUPTIME=%d ' % (self.execution_time, self.warmup_time)
+    + 'env THREADS=%d env OUTPUT_FILE_NAME=%s ' % (self.threads, self.outputFile)
+    + 'env OUTDIR=%s ' % (self.resultDirPath)
+    + 'docker stack deploy '
+    + '--compose-file proteus/deployment/compose-files/%s ycsb_run' % (self.deployment.workload)
+    ], self.log)
+    if '_mb' in self.deployment.workload:
+      waitTermination(['ycsb_run_client-0'], self.log)
+    elif '_rb' in self.deployment.workload:
+      waitTermination(['ycsb_run_client-0', 'ycsb_run_client-1', 'ycsb_run_client-2'], self.log)
+    else:
+      print('unknown workload compose-file name')
+      cleanup(0, self.log)
+      sys.exit()
+    runCmd(['docker stack rm ycsb_run'], self.log)
+    cleanup(1, self.log)
+    if '_rb' in getattr(self.deployment, 'query_engine'):
+      returnCode = runCmd(['scp dc1_node0:%s/* %s ' %  (self.resultDirPath, self.resultDirPath)
+        + '&& scp dc2_node0:%s/* %s' %  (self.resultDirPath, self.resultDirPath)
+      ], None)
+      if returnCode:
+        print('could not fetch results')
+        sys.exit()
+      returnCode = runCmd(['docker run -v %s:/ycsb ' %  (self.resultDirPath)
+        + '-e MEASUREMENT_RESULTS_DIR=/ycsb '
+        + '-e PREFIX=%s ' % (self.outputFile)
+        + 'dvasilas/ycsb:%s' % (self.benchToolTag+'_parse')
       ], None)
       if returnCode:
         print('could not fetch results')
         sys.exit()
 
-      # for benchConfig in benchmarkConfig['benchmarks']:
-      #   record_count = benchmarkConfig['global_config']['record_count']
-      #   query_proportion= benchConfig['query_proportion']
-      #   update_proportion= benchConfig['update_proportion']
-      #   cached_query_proportion= benchConfig['cached_query_proportion']
-      #   threads = benchConfig['threads']
-      #   output_file = '%dK_%.1f_%.1f_%.1f_%d.txt' % (record_count/1000, cached_query_proportion, query_proportion, update_proportion, threads)
-      #   data += '%.1f, %.1f, %.1f, %d, ' % (query_proportion, update_proportion, cached_query_proportion, threads)
-      #   data += parseFile(os.path.join(args.dest, output_file)) + '\n'
+    result = '%.1f, %.1f, %.1f, %d, ' % (self.query_proportion, self.update_proportion, self.cached_query_proportion, self.threads)
+    result += parseFile(os.path.join(self.resultDirPath, self.outputFile+'.txt')) + '\n'
+    return result
 
-      # data = data[:-1]
-      # global_config = globalConfigToCsv(benchmarkConfig, proteusTag, ycsbTag)
-      # pasteToSpreadsheet(args.cred, args.spreadid, data, global_config)
+class NodeLabels(dict):
+  def __getattr__(self, key):
+    return self[key]
+  def __setattr__(self, key, value):
+    self[key] = value
 
-  cleanup(log, 0)
-  log.close()
+if __name__ == '__main__':
+  args = parseArgs()
+
+  with open(args.config) as config_file:
+    with open(args.mapping) as label_file:
+      benchSuite = json.loads(config_file.read(), object_hook = lambda dict: BenchmarkSuite(dict))
+      benchSuite.init(args.dest, args.config.split(".")[0], ('proteus', 'benchmarks'), ('YCSB', 'proteus'), label_file)
+      benchSuite.createResultDir()
+      benchSuite.cleanupPreviousRun()
+      benchSuite.createBenchmarks()
+      benchSuite.initSuite()
+      results = benchSuite.run()
+      data = 'query_proportion, update_proportion, cached_query_proportion, threads, [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n'
+      for res in results:
+        data += res
+      data = data[:-1]
+      benchDescription = benchSuite.benchmarkDescription()
+      pasteToSpreadsheet(args.cred, args.spreadid, data, benchDescription)
+      benchSuite.cleanup()

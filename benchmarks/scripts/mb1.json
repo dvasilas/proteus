@@ -1,0 +1,33 @@
+{
+  "deployment": {
+    "storage_engine": "storage_mb.yml",
+    "query_engine": "query_mb1.yml",
+    "dataset": "load_mb.yml",
+    "workload": "run_mb.yml"
+  },
+  "placement": {
+    "storage_engine_cloudserver-0": "dc0_node1",
+    "storage_engine_dsdriver-0": "dc0_node1",
+    "query_engine_antidote": "dc0_node2",
+    "query_engine_qpuindex": "dc0_node2"
+  },
+  "default_config": {
+    "proteus_host": "qpuindex",
+    "proteus_port": 50250,
+    "execution_time": 60,
+    "warmup_time": 10,
+    "record_count": 1000,
+    "query_proportion": 1.0,
+    "update_proportion": 0.0,
+    "cached_query_proportion": 0.2,
+    "threads": 1
+  },
+  "benchmark_configs":[
+    {
+      "threads": 2
+    },
+    {
+      "threads": 4
+    }
+  ]
+}
