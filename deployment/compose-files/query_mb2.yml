@@ -35,9 +35,7 @@ services:
         bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
         && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250"
     depends_on:
-      - qpuindex-0
-      - qpuindex-1
-      - qpuindex-2
+      - qpuindex
     deploy:
       restart_policy:
         condition: none
