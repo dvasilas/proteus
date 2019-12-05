@@ -289,6 +289,7 @@ class Benchmark():
     runCmd(['env YCSB_IMAGE_TAG=%s ' % (self.benchToolTag)
     + 'env PROTEUSHOST=%s env PROTEUSPORT=%d ' % (self.proteus_host, self.proteus_port)
     + 'env RECORDCOUNT=%s ' % (self.record_count)
+    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (0, self.record_count, self.record_count*2)
     + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (self.query_proportion, self.update_proportion)
     + 'env CACHEDQUERYPROPORTION=%.1f ' % (self.cached_query_proportion)
     + 'env EXECUTIONTIME=%d env WARMUPTIME=%d ' % (self.execution_time, self.warmup_time)
