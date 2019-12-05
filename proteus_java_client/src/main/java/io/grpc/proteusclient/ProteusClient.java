@@ -73,14 +73,20 @@ public class ProteusClient {
       builder.addPredicate(predicate);
     }
 
-    builder.putAllMetadata(metadata);
+    if (metadata != null) {
+      builder.putAllMetadata(metadata);
+    }
     QueryRequest qreq = builder.build();
     RequestStream req = RequestStream.newBuilder().setRequest(qreq).build();
 
     StreamObserver<RequestStream> toServer = asyncStub.query(
       new StreamObserver<ResponseStreamRecord>() {
       @Override
-      public void onNext(ResponseStreamRecord record) { requestObserver.onNext(record); }
+      public void onNext(ResponseStreamRecord record) {
+        if (record.getType() != ResponseStreamRecord.StreamRecordType.HEARTBEAT) {
+          requestObserver.onNext(record);
+        }
+      }
       @Override
       public void onError(Throwable t) { requestObserver.onError(t); }
       @Override
