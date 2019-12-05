@@ -201,7 +201,10 @@ def makeDirLocalRemote(resultDirPath, remoteNodes):
   return runCmd([cmd], None)
 
 def loadDataset(benchToolTag, recordCount, datasetComposeFile, log):
+  if '_rb' in datasetComposeFile:
+    recordCount /= 3
   runCmd(['env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s ' % (benchToolTag, recordCount)
+    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (0, recordCount, recordCount*2)
     + 'docker stack deploy '
     + '--compose-file proteus/deployment/compose-files/%s ycsb_load' % (datasetComposeFile)
     ], log)

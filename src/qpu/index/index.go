@@ -212,7 +212,7 @@ func (q *IQPU) heartbeat(heartbeatCh chan int) {
 	}
 	heartbeatCh <- 0
 	f := q.newHeartbeat(heartbeatCh)
-	time.AfterFunc(100*time.Millisecond, f)
+	time.AfterFunc(1*time.Second, f)
 }
 
 func (q *IQPU) newHeartbeat(heartbeatCh chan int) func() {
