@@ -9,6 +9,10 @@ services:
     environment:
       - TYPE=run
       - TABLE=ycsb-buck
+      - USEBARRIER=true
+      - ENV BARRIERNODE=master
+      - BARRIERCLIENT1=client-1
+      - BARRIERCLIENT2=client-2
       - S3HOST=cloudserver-0
       - S3PORT=8000
       - S3ACCESSKEYID=accessKey1
@@ -39,6 +43,9 @@ services:
     environment:
       - TYPE=run
       - TABLE=ycsb-buck
+      - USEBARRIER=true
+      - ENV BARRIERNODE=client1
+      - BARRIERMASTER=client-0
       - S3HOST=cloudserver-1
       - S3PORT=8000
       - S3ACCESSKEYID=accessKey1
@@ -69,6 +76,9 @@ services:
     environment:
       - TYPE=run
       - TABLE=ycsb-buck
+      - USEBARRIER=true
+      - ENV BARRIERNODE=client2
+      - BARRIERMASTER=client-0
       - S3HOST=cloudserver-2
       - S3PORT=8000
       - S3ACCESSKEYID=accessKey1
