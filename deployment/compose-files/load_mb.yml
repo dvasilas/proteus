@@ -15,6 +15,7 @@ services:
       - S3SECRETKEY=verySecretKey1
       - WORKLOAD=workloada
       - RECORDCOUNT=${RECORDCOUNT}
+      - INSERTCOUNT=${RECORDCOUNT}
     deploy:
       restart_policy:
         condition: none

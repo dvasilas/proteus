@@ -16,6 +16,7 @@ services:
       - WORKLOAD=workloada
       - RECORDCOUNT=${RECORDCOUNT}
       - INSERTSTART=${INSERTSTART0}
+      - INSERTCOUNT=${INSERTCOUNT}
     deploy:
       restart_policy:
         condition: none
@@ -38,6 +39,7 @@ services:
       - WORKLOAD=workloada
       - RECORDCOUNT=${RECORDCOUNT}
       - INSERTSTART=${INSERTSTART1}
+      - INSERTCOUNT=${INSERTCOUNT}
     deploy:
       restart_policy:
         condition: none
@@ -60,6 +62,7 @@ services:
       - WORKLOAD=workloada
       - RECORDCOUNT=${RECORDCOUNT}
       - INSERTSTART=${INSERTSTART2}
+      - INSERTCOUNT=${INSERTCOUNT}
     deploy:
       restart_policy:
         condition: none

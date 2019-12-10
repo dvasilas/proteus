@@ -201,10 +201,15 @@ def makeDirLocalRemote(resultDirPath, remoteNodes):
   return runCmd([cmd], None)
 
 def loadDataset(benchToolTag, recordCount, datasetComposeFile, log):
+  insertCount = recordCount
   if '_rb' in datasetComposeFile:
-    recordCount /= 3
+    insertCount = recordCount / 3
+  insertStart0 = 0
+  insertStart1 = insertCount
+  insertStart2 = insertStart1 + insertCount
   runCmd(['env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s ' % (benchToolTag, recordCount)
-    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (0, recordCount, recordCount*2)
+    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (insertStart0, insertStart1, insertStart2)
+    + 'env INSERTCOUNT=%s ' % (insertCount)
     + 'docker stack deploy '
     + '--compose-file proteus/deployment/compose-files/%s ycsb_load' % (datasetComposeFile)
     ], log)
@@ -286,10 +291,17 @@ class Benchmark():
 
   def run(self):
     deploy('query_engine', self.record_count, self.systemTag, getattr(self.deployment, 'query_engine'), self.placement, self.nodeLabels, self.log)
+    insertCount = self.record_count
+    if '_rb' in datasetComposeFile:
+      insertCount = self.record_count / 3
+    insertStart0 = 0
+    insertStart1 = insertCount
+    insertStart2 = insertStart1 + insertCount
     runCmd(['env YCSB_IMAGE_TAG=%s ' % (self.benchToolTag)
     + 'env PROTEUSHOST=%s env PROTEUSPORT=%d ' % (self.proteus_host, self.proteus_port)
     + 'env RECORDCOUNT=%s ' % (self.record_count)
-    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (0, self.record_count, self.record_count*2)
+    + 'env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s ' % (insertStart0, insertStart1, insertStart2)
+    + 'env INSERTCOUNT=%s ' % (insertCount)
     + 'env QUERYPROPORTION=%.1f env UPDATEPROPORTION=%.1f ' % (self.query_proportion, self.update_proportion)
     + 'env CACHEDQUERYPROPORTION=%.1f ' % (self.cached_query_proportion)
     + 'env EXECUTIONTIME=%d env WARMUPTIME=%d ' % (self.execution_time, self.warmup_time)
