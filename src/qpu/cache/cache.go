@@ -134,7 +134,65 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		}
 		return nil
 	}
-	return errors.New("not supported")
+	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+		subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+		errCh := make(chan error)
+		seqID := int64(0)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
+		if err != nil {
+			return err
+		}
+		go func() {
+			for {
+				streamRec, err := streamIn.Recv()
+				if err == io.EOF {
+					close(subQueryResponseRecordCh)
+					close(errCh)
+					return
+				} else if err != nil {
+					errCh <- err
+					return
+				}
+				subQueryResponseRecordCh <- streamRec
+			}
+		}()
+		for {
+			select {
+			case err, ok := <-errCh:
+				if !ok {
+					errCh = nil
+				} else {
+					return err
+				}
+			case streamRec, ok := <-subQueryResponseRecordCh:
+				if !ok {
+					subQueryResponseRecordCh = nil
+				} else {
+					if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+					} else {
+						if err := streamOut.Send(
+							protoutils.ResponseStreamRecord(
+								seqID,
+								streamRec.GetType(),
+								streamRec.GetLogOp(),
+							)); err != nil {
+							return err
+						}
+						seqID++
+					}
+				}
+			}
+			if errCh == nil && subQueryResponseRecordCh == nil {
+				return streamOut.Send(
+					protoutils.ResponseStreamRecord(
+						seqID,
+						pbQPU.ResponseStreamRecord_END_OF_STREAM,
+						&pbUtils.LogOperation{},
+					))
+			}
+		}
+	}
+	return nil
 }
 
 // GetConfig implements the GetConfig API for the cache QPU
