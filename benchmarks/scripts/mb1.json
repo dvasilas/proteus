@@ -12,11 +12,11 @@
     "query_engine_qpuindex": "dc0_node2"
   },
   "default_config": {
-    "proteus_host": "qpuindex",
-    "proteus_port": 50250,
+    "proteus_host": "federation",
+    "proteus_port": 50450,
     "execution_time": 60,
     "warmup_time": 10,
-    "record_count": 1000,
+    "record_count": 600000,
     "query_proportion": 0.9,
     "update_proportion": 0.1,
     "cached_query_proportion": 0.2,
@@ -24,22 +24,40 @@
   },
   "benchmark_configs":[
     {
-      "threads": 1
-    }, {
-      "threads": 2
-    }, {
-      "threads": 4
-    }, {
-      "threads": 8
-    }, {
-      "threads": 16
-    }, {
-      "threads": 32
-    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
       "threads": 64
     }, {
+      "query_proportion": 0.5,
+      "update_proportion": 0.5,
+      "threads": 64
+    }, {
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
+      "threads": 64
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
       "threads": 128
     }, {
+      "query_proportion": 0.5,
+      "update_proportion": 0.5,
+      "threads": 128
+    }, {
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
+      "threads": 128
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 256
+    }, {
+      "query_proportion": 0.5,
+      "update_proportion": 0.5,
+      "threads": 256
+    }, {
+      "query_proportion": 0.1,
+      "update_proportion": 0.9,
       "threads": 256
     }
   ]

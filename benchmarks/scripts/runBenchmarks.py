@@ -393,7 +393,7 @@ class Benchmark:
             self.log,
         )
         insertCount = self.record_count
-        if "_rb" in datasetComposeFile:
+        if "_rb" in self.deployment.workload:
             insertCount = self.record_count / 3
         insertStart0 = 0
         insertStart1 = insertCount

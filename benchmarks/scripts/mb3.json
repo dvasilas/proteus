@@ -17,7 +17,7 @@
     "proteus_port": 50350,
     "execution_time": 60,
     "warmup_time": 10,
-    "record_count": 1000,
+    "record_count": 600000,
     "query_proportion": 1.0,
     "update_proportion": 0.0,
     "cached_query_proportion": 0.2,
@@ -25,7 +25,25 @@
   },
   "benchmark_configs": [
     {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
       "threads": 1
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 2
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 4
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 8
+    }, {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 16
     }
   ]
 }
