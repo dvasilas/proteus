@@ -27,6 +27,8 @@ services:
       - EXECUTIONTIME=120
       - WARMUPTIME=20
       - THREADS=${THREADS}
+      - PRELOAD=file
+      - CLIENTID=0
       - OUTPUT_FILE_NAME=${OUTPUT_FILE_NAME}_c0
     deploy:
       restart_policy:
@@ -61,6 +63,8 @@ services:
       - EXECUTIONTIME=120
       - WARMUPTIME=20
       - THREADS=${THREADS}
+      - PRELOAD=file
+      - CLIENTID=1
       - OUTPUT_FILE_NAME=${OUTPUT_FILE_NAME}_c1
     deploy:
       restart_policy:
@@ -94,6 +98,8 @@ services:
       - EXECUTIONTIME=120
       - WARMUPTIME=20
       - THREADS=${THREADS}
+      - PRELOAD=file
+      - CLIENTID=2
       - OUTPUT_FILE_NAME=${OUTPUT_FILE_NAME}_c2
     deploy:
       restart_policy:
