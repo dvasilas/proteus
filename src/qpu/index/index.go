@@ -274,23 +274,21 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			return
 		} else {
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-				go func() {
-					if err := q.updateIndex(streamRec); err != nil {
-						utils.ReportError(err)
+				if err := q.updateIndex(streamRec); err != nil {
+					utils.ReportError(err)
+					return
+				}
+				if sync {
+					log.Debug("QPUServer:index updated, sending ACK")
+					if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
+						log.Fatal("opConsumer stream.Send failed")
 						return
 					}
-					if sync {
-						log.Debug("QPUServer:index updated, sending ACK")
-						if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
-							log.Fatal("opConsumer stream.Send failed")
-							return
-						}
-					}
-					if err := q.forward(streamRec); err != nil {
-						log.Fatal("forwards err", err)
-						return
-					}
-				}()
+				}
+				if err := q.forward(streamRec); err != nil {
+					log.Fatal("forwards err", err)
+					return
+				}
 			}
 		}
 	}
