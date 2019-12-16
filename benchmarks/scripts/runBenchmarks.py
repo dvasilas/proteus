@@ -98,6 +98,7 @@ def parseFile(path):
     with open(path) as fp:
         overallMeasurements = {}
         queryMeasurements = {}
+        freshnessMeasurements = {}
         line = fp.readline()
         while line:
             line = line.strip().split(", ")
@@ -105,13 +106,20 @@ def parseFile(path):
                 queryMeasurements[line[1]] = line[2]
             elif line[0] == "[OVERALL]":
                 overallMeasurements[line[1]] = line[2]
+            elif line[0] == "[FRESHNESS_LATENCY]":
+                freshnessMeasurements[line[1]] = line[2]
             line = fp.readline()
     output += queryMeasurements["Throughput(ops/sec)"] + ", "
     output += str(float(queryMeasurements["AverageLatency(us)"]) / 1000) + ", "
     output += str(float(queryMeasurements["MinLatency(us)"]) / 1000) + ", "
     output += str(float(queryMeasurements["MaxLatency(us)"]) / 1000) + ", "
     output += str(float(queryMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
-    output += str(float(queryMeasurements["99thPercentileLatency(us)"]) / 1000)
+    output += str(float(queryMeasurements["99thPercentileLatency(us)"]) / 1000) + ", "
+    output += str(float(freshnessMeasurements["AverageLatency(us)"]) / 1000) + ", "
+    output += str(float(freshnessMeasurements["MinLatency(us)"]) / 1000) + ", "
+    output += str(float(freshnessMeasurements["MaxLatency(us)"]) / 1000) + ", "
+    output += str(float(freshnessMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
+    output += str(float(freshnessMeasurements["99thPercentileLatency(us)"]) / 1000)
     return output
 
 
@@ -458,6 +466,16 @@ class Benchmark:
             if returnCode:
                 print("could not fetch results")
                 sys.exit()
+        else:
+            returnCode = runCmd(
+                [
+                    "scp dc1_node0:%s/* %s " % (self.resultDirPath, self.resultDirPath)
+                ],
+                None,
+            )
+            if returnCode:
+                print("could not fetch results")
+                sys.exit()
 
         result = "%.1f, %.1f, %.1f, %d, " % (
             self.query_proportion,
@@ -499,7 +517,7 @@ if __name__ == "__main__":
             benchSuite.createBenchmarks()
             benchSuite.initSuite()
             results = benchSuite.run()
-            data = "query_proportion, update_proportion, cached_query_proportion, threads, [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms) \n"
+            data = "query_proportion, update_proportion, cached_query_proportion, threads, [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms), [FR]AverageLatency(ms), [FR]MinLatency(ms), [FR]MaxLatency(ms), [FR]95thPercentileLatency(ms), [FR]99thPercentileLatency(ms)\n"
             for res in results:
                 data += res
             data = data[:-1]
