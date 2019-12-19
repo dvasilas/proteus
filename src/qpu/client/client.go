@@ -33,7 +33,14 @@ func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
 	return resp, err
 }
 
-// Ping ...
+//GetDataTransfer ...
+func (c *Client) GetDataTransfer() (*pb.DataTransferResponse, error) {
+	ctx := context.TODO()
+	resp, err := c.cli.GetDataTransfer(ctx, &pb.GetDataRequest{})
+	return resp, err
+}
+
+// Forward ...
 func (c *Client) Forward() (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)

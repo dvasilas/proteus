@@ -159,6 +159,11 @@ func (q *LQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
+// GetDataTransfer ...
+func (q *LQPU) GetDataTransfer() float32 {
+	return 0
+}
+
 // Cleanup is called when the QPU receives a SIGTERM signcal
 func (q *LQPU) Cleanup() {
 	log.Info("lambda QPU cleanup")

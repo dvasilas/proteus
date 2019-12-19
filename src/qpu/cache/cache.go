@@ -3,6 +3,8 @@ package cache
 import (
 	"errors"
 	"io"
+	"os"
+	"sync"
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
@@ -16,9 +18,13 @@ import (
 
 // CQPU implements a cache QPU.
 type CQPU struct {
-	qpu    *utils.QPU
-	cache  cacheImplementation
-	config *config.Config
+	qpu                 *utils.QPU
+	cache               cacheImplementation
+	config              *config.Config
+	dataTransferCount   float32
+	dataTransferMutex   sync.Mutex
+	connectionIsLocal   bool
+	measureDataTransfer bool
 }
 
 // Describes the interface that any cache implementation needs to expose
@@ -38,12 +44,14 @@ func QPU(conf *config.Config) (*CQPU, error) {
 		},
 		cache: lrucache.New(conf),
 	}
+	q.measureDataTransfer = os.Getenv("MEASURE_DATA_TRANSFER") == "true"
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
 	}
 	if len(q.qpu.Conns) > 1 {
 		return nil, errors.New("cache QPUs support a single connection")
 	}
+	q.connectionIsLocal = q.qpu.Config.Connections[0].Local
 	return q, nil
 }
 
@@ -112,6 +120,15 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				tempCacheEntry = append(tempCacheEntry, object)
 				tempCacheEntrySize += len(streamRec.GetLogOp().GetPayload().GetState().GetAttrs()) + 1
 			}
+			if q.measureDataTransfer && !q.connectionIsLocal {
+				size, err := utils.GetMessageSize(streamRec)
+				if err != nil {
+					log.Fatal(err)
+				}
+				q.dataTransferMutex.Lock()
+				q.dataTransferCount += float32(size) / 1024.0
+				q.dataTransferMutex.Unlock()
+			}
 			if err = q.forward(request.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
 				return err
 			}
@@ -152,6 +169,15 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				} else if err != nil {
 					errCh <- err
 					return
+				}
+				if q.measureDataTransfer && !q.connectionIsLocal {
+					size, err := utils.GetMessageSize(streamRec)
+					if err != nil {
+						log.Fatal(err)
+					}
+					q.dataTransferMutex.Lock()
+					q.dataTransferCount += float32(size) / 1024.0
+					q.dataTransferMutex.Unlock()
 				}
 				subQueryResponseRecordCh <- streamRec
 			}
@@ -201,6 +227,14 @@ func (q *CQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 		q.qpu.QueryingCapabilities,
 		q.qpu.Dataset)
 	return resp, nil
+}
+
+// GetDataTransfer ...
+func (q *CQPU) GetDataTransfer() float32 {
+	q.dataTransferMutex.Lock()
+	res := q.dataTransferCount
+	q.dataTransferMutex.Unlock()
+	return res
 }
 
 // Cleanup is called when the process receives a SIGTERM signcal

@@ -144,6 +144,11 @@ func (q *DriverQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
+// GetDataTransfer ...
+func (q *DriverQPU) GetDataTransfer() float32 {
+	return 0
+}
+
 //Cleanup is called when the process receives a SIGTERM signcal
 func (q *DriverQPU) Cleanup() {
 	log.Info("data store QPU cleanup")

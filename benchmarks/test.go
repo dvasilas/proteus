@@ -35,8 +35,14 @@ func main() {
 	//for {
 	query(c, []proteusclient.AttributePredicate{
 		// proteusclient.AttributePredicate{AttrName: "votes_cool", AttrType: proteusclient.S3TAGINT, Lbound: int64(1), Ubound: int64(2)},
-		proteusclient.AttributePredicate{AttrName: "trip_distance", AttrType: proteusclient.S3TAGFLT, Lbound: 1.60, Ubound: 2.60},
+		proteusclient.AttributePredicate{AttrName: "tripdistance", AttrType: proteusclient.S3TAGFLT, Lbound: 0.00, Ubound: 10.0},
 	}, proteusclient.LATESTSNAPSHOT)
+
+	dataTransferred, err := c.GetDataTransfer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(dataTransferred)
 	// query(c, []proteusclient.AttributePredicate{proteusclient.AttributePredicate{AttrName: "test", AttrType: proteusclient.CRDTCOUNTER, Lbound: int64(0), Ubound: int64(100)}}, proteusclient.LATESTSNAPSHOT)
 
 	//query(c, []proteusclient.AttributePredicate{proteusclient.AttributePredicate{AttrName: "test", AttrType: proteusclient.S3TAGFLT, Lbound: 0.3, Ubound: 0.5}}, proteusclient.LATESTSNAPSHOT)

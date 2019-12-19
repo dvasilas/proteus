@@ -72,9 +72,13 @@ var tests = []testScenario{
 		deployment: deployment{
 			config: []*config.Config{
 				&config.Config{
-					QpuType:     pbQPU.ConfigResponse_FILTER,
-					Port:        "50250",
-					Connections: []string{"127.0.0.1:50150"},
+					QpuType: pbQPU.ConfigResponse_FILTER,
+					Port:    "50250",
+					Connections: []config.QPUConnection{config.QPUConnection{
+						Address: "127.0.0.1:50150",
+						Local:   true,
+					},
+					},
 				},
 			},
 		},
@@ -95,14 +99,22 @@ var tests = []testScenario{
 		deployment: deployment{
 			config: []*config.Config{
 				&config.Config{
-					QpuType:     pbQPU.ConfigResponse_FILTER,
-					Port:        "50250",
-					Connections: []string{"127.0.0.1:50150"},
+					QpuType: pbQPU.ConfigResponse_FILTER,
+					Port:    "50250",
+					Connections: []config.QPUConnection{config.QPUConnection{
+						Address: "127.0.0.1:50150",
+						Local:   true,
+					},
+					},
 				},
 				&config.Config{
-					QpuType:     pbQPU.ConfigResponse_CACHE,
-					Port:        "50451",
-					Connections: []string{"127.0.0.1:50250"},
+					QpuType: pbQPU.ConfigResponse_CACHE,
+					Port:    "50451",
+					Connections: []config.QPUConnection{config.QPUConnection{
+						Address: "127.0.0.1:50250",
+						Local:   true,
+					},
+					},
 				},
 			},
 		},
