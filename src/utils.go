@@ -41,8 +41,18 @@ func ConnectToQPUGraph(q *QPU) error {
 		if err != nil {
 			return err
 		}
+		retries := 0
 		connConf, err := c.GetConfig()
+		for err != nil || retries > 10 {
+			ReportError(err)
+			connConf, err = c.GetConfig()
+			if err == nil {
+				break
+			}
+			retries++
+		}
 		if err != nil {
+			ReportError(err)
 			return err
 		}
 		conns[i] = &QPU{
