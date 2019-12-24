@@ -1,0 +1,213 @@
+***************** properties *****************
+"warmuptime"="20"
+"proteus.port"="50450"
+"s3.secretKey"="verySecretKey1"
+"updateproportion"="0.1"
+"proteus.host"="federation-2"
+"client"="2"
+"scanproportion"="0"
+"threadcount"="128"
+"operationcount"="0"
+"s3.accessKeyId"="accessKey1"
+"cachedqueryproportion"="0.2"
+"preload"="file"
+"readallfields"="true"
+"s3.endPoint"="http://cloudserver-2:8000"
+"queryproportion"="0.9"
+"useBarrier"="true"
+"insertproportion"="0"
+"requestdistribution"="zipfian"
+"dotransactions"="true"
+"queryresultcount"="1"
+"insertstart"="400000"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"insertcount"="200000"
+"status"="true"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="/yellow_tripdata_2019-06.csv"
+"table"="ycsb-buck"
+"recordcount"="600000"
+"maxexecutiontime"="120"
+"sleep"="0"
+"db"="site.ycsb.db.S3Client"
+**********************************************
+sleep
+sleep
+Inizializing the S3 connection
+Connection successfully initialized
+Inizializing the Proteus connection
+Connection successfully initialized
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+[OVERALL], RunTime(ms), 120596
+[OVERALL], RunTime/Warmup (ms), 100443
+[OVERALL], Throughput(ops/sec), 111.93571926100368
+[TOTAL_GCS_PS_Scavenge], Count, 19
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 106
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.08789677932933099
+[TOTAL_GCS_PS_MarkSweep], Count, 2
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 102
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.08457991973199774
+[TOTAL_GCs], Count, 21
+[TOTAL_GC_TIME], Time(ms), 208
+[TOTAL_GC_TIME_%], Time(%), 0.17247669906132873
+[QUERY], Operations, 10366
+[QUERY], Throughput(ops/sec), 103.20281154485629
+[QUERY], AverageLatency(us), 1248093.5365618367
+[QUERY], MinLatency(us), 251776
+[QUERY], MaxLatency(us), 6836223
+[QUERY], 95thPercentileLatency(us), 2998271
+[QUERY], 99thPercentileLatency(us), 4218879
+[QUERY], Return=OK, 10366
+[CLEANUP], Operations, 128
+[CLEANUP], Throughput(ops/sec), 1.2743546090817677
+[CLEANUP], AverageLatency(us), 52.828125
+[CLEANUP], MinLatency(us), 9
+[CLEANUP], MaxLatency(us), 5383
+[CLEANUP], 95thPercentileLatency(us), 24
+[CLEANUP], 99thPercentileLatency(us), 61
+[FRESHNESS_LATENCY], Operations, 211
+[FRESHNESS_LATENCY], Throughput(ops/sec), 2.1006939259082267
+[FRESHNESS_LATENCY], AverageLatency(us), 3.539365490047393E7
+[FRESHNESS_LATENCY], MinLatency(us), 1108992
+[FRESHNESS_LATENCY], MaxLatency(us), 100204543
+[FRESHNESS_LATENCY], 95thPercentileLatency(us), 95420415
+[FRESHNESS_LATENCY], 99thPercentileLatency(us), 99090431
+[FRESHNESS_LATENCY], Return=OK, 211
+[UPDATE_WITH_ATTRIBUTES], Operations, 1146
+[UPDATE_WITH_ATTRIBUTES], Throughput(ops/sec), 11.409456109435203
+[UPDATE_WITH_ATTRIBUTES], AverageLatency(us), 7999.605584642234
+[UPDATE_WITH_ATTRIBUTES], MinLatency(us), 5744
+[UPDATE_WITH_ATTRIBUTES], MaxLatency(us), 42655
+[UPDATE_WITH_ATTRIBUTES], 95thPercentileLatency(us), 10999
+[UPDATE_WITH_ATTRIBUTES], 99thPercentileLatency(us), 18879
+[UPDATE_WITH_ATTRIBUTES], Return=OK, 1146

@@ -1,0 +1,87 @@
+***************** properties *****************
+"warmuptime"="20"
+"proteus.port"="50450"
+"s3.secretKey"="verySecretKey1"
+"updateproportion"="0.1"
+"proteus.host"="federation-0"
+"client"="0"
+"scanproportion"="0"
+"threadcount"="2"
+"operationcount"="0"
+"s3.accessKeyId"="accessKey1"
+"cachedqueryproportion"="0.2"
+"preload"="file"
+"readallfields"="true"
+"s3.endPoint"="http://cloudserver-0:8000"
+"queryproportion"="0.9"
+"useBarrier"="true"
+"insertproportion"="0"
+"requestdistribution"="zipfian"
+"dotransactions"="true"
+"queryresultcount"="1"
+"insertstart"="0"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"insertcount"="333"
+"status"="true"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="/yellow_tripdata_2019-06.csv"
+"table"="ycsb-buck"
+"recordcount"="1000"
+"maxexecutiontime"="120"
+"sleep"="125"
+"db"="site.ycsb.db.S3Client"
+**********************************************
+sleep
+sleep
+Inizializing the S3 connection
+Connection successfully initialized
+Inizializing the Proteus connection
+Connection successfully initialized
+Reusing the same client
+Reusing the same client
+Reusing the same client
+[OVERALL], RunTime(ms), 120157
+[OVERALL], RunTime/Warmup (ms), 100148
+[OVERALL], Throughput(ops/sec), 28.19644298709189
+[TOTAL_GCS_PS_Scavenge], Count, 7
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 39
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.03245753472540094
+[TOTAL_GCS_PS_MarkSweep], Count, 1
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 34
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.028296312324708507
+[TOTAL_GCs], Count, 8
+[TOTAL_GC_TIME], Time(ms), 73
+[TOTAL_GC_TIME_%], Time(%), 0.06075384705010944
+[QUERY], Operations, 2519
+[QUERY], Throughput(ops/sec), 25.15277389463594
+[QUERY], AverageLatency(us), 78343.69630805876
+[QUERY], MinLatency(us), 3608
+[QUERY], MaxLatency(us), 181247
+[QUERY], 95thPercentileLatency(us), 161407
+[QUERY], 99thPercentileLatency(us), 167935
+[QUERY], Return=OK, 2519
+[CLEANUP], Operations, 2
+[CLEANUP], Throughput(ops/sec), 0.019970443743259975
+[CLEANUP], AverageLatency(us), 2605.0
+[CLEANUP], MinLatency(us), 20
+[CLEANUP], MaxLatency(us), 5191
+[CLEANUP], 95thPercentileLatency(us), 5191
+[CLEANUP], 99thPercentileLatency(us), 5191
+[FRESHNESS_LATENCY], Operations, 334
+[FRESHNESS_LATENCY], Throughput(ops/sec), 3.335064105124416
+[FRESHNESS_LATENCY], AverageLatency(us), 32057.508982035928
+[FRESHNESS_LATENCY], MinLatency(us), 22752
+[FRESHNESS_LATENCY], MaxLatency(us), 83839
+[FRESHNESS_LATENCY], 95thPercentileLatency(us), 43551
+[FRESHNESS_LATENCY], 99thPercentileLatency(us), 54751
+[FRESHNESS_LATENCY], Return=OK, 334
+[UPDATE_WITH_ATTRIBUTES], Operations, 282
+[UPDATE_WITH_ATTRIBUTES], Throughput(ops/sec), 2.8158325677996565
+[UPDATE_WITH_ATTRIBUTES], AverageLatency(us), 9207.85815602837
+[UPDATE_WITH_ATTRIBUTES], MinLatency(us), 6888
+[UPDATE_WITH_ATTRIBUTES], MaxLatency(us), 27455
+[UPDATE_WITH_ATTRIBUTES], 95thPercentileLatency(us), 11967
+[UPDATE_WITH_ATTRIBUTES], 99thPercentileLatency(us), 14447
+[UPDATE_WITH_ATTRIBUTES], Return=OK, 282

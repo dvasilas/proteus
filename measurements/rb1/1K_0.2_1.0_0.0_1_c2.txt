@@ -1,0 +1,62 @@
+***************** properties *****************
+"warmuptime"="20"
+"proteus.port"="50450"
+"s3.secretKey"="verySecretKey1"
+"updateproportion"="0.0"
+"proteus.host"="federation-2"
+"scanproportion"="0"
+"threadcount"="1"
+"operationcount"="0"
+"s3.accessKeyId"="accessKey1"
+"cachedqueryproportion"="0.2"
+"readallfields"="true"
+"s3.endPoint"="http://cloudserver-2:8000"
+"queryproportion"="1.0"
+"useBarrier"="true"
+"insertproportion"="0"
+"barrierMaster"="foo"
+"requestdistribution"="zipfian"
+"dotransactions"="true"
+"queryresultcount"="1"
+"insertstart"="2000"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"barrierNode"="foo"
+"status"="true"
+"readproportion"="0.0"
+"barrierClient2"="foo"
+"barrierClient1"="foo"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="/yellow_tripdata_2019-06.csv"
+"table"="ycsb-buck"
+"recordcount"="1000"
+"maxexecutiontime"="120"
+"sleep"="0"
+"db"="site.ycsb.db.S3Client"
+**********************************************
+sleep
+sleep
+Inizializing the S3 connection
+Connection successfully initialized
+Inizializing the Proteus connection
+Connection successfully initialized
+[OVERALL], RunTime(ms), 120069
+[OVERALL], RunTime/Warmup (ms), 100039
+[OVERALL], Throughput(ops/sec), 5.913266538407083
+[TOTAL_GCS_PS_Scavenge], Count, 4
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 24
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.0199885066087
+[TOTAL_GCS_PS_MarkSweep], Count, 1
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 34
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.028317051028991663
+[TOTAL_GCs], Count, 5
+[TOTAL_GC_TIME], Time(ms), 58
+[TOTAL_GC_TIME_%], Time(%), 0.04830555763769166
+[QUERY], Operations, 604
+[QUERY], Throughput(ops/sec), 6.037645318325853
+[QUERY], AverageLatency(us), 165661.88079470198
+[QUERY], MinLatency(us), 161280
+[QUERY], MaxLatency(us), 199167
+[QUERY], 95thPercentileLatency(us), 171775
+[QUERY], 99thPercentileLatency(us), 188671
+[QUERY], Return=OK, 604

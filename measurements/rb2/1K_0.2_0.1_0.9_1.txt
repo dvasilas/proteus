@@ -1,0 +1,118 @@
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.1_0.9_1"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.1_0.9_1"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.1_0.9_1"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.1_0.9_1"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+File parsed: QUERY_1K_0.2_0.1_0.9_16_c0.hdr
+File parsed: QUERY_1K_0.2_0.1_0.9_16_c1.hdr
+File parsed: QUERY_1K_0.2_0.1_0.9_16_c2.hdr
+File parsed: QUERY_1K_0.2_0.1_0.9_1_c0.hdr
+File parsed: QUERY_1K_0.2_0.1_0.9_1_c1.hdr
+File parsed: QUERY_1K_0.2_0.1_0.9_1_c2.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_16_c0.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_16_c1.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_16_c2.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_1_c0.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_1_c1.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.1_0.9_1_c2.hdr
+[OVERALL], RunTime(ms), 66
+[OVERALL], RunTime/Warmup (ms), 1576433890045
+[OVERALL], Throughput(ops/sec), 0.0
+[TOTAL_GCS_PS_Scavenge], Count, 0
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 0
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.0
+[TOTAL_GCS_PS_MarkSweep], Count, 0
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 0
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.0
+[TOTAL_GCs], Count, 0
+[TOTAL_GC_TIME], Time(ms), 0
+[TOTAL_GC_TIME_%], Time(%), 0.0
+[QUERY], Operations, 13748
+[QUERY], Throughput(ops/sec), 175.21618670667414
+[QUERY], AverageLatency(us), 420964.05644457374
+[QUERY], MinLatency(us), 26080
+[QUERY], MaxLatency(us), 5066751
+[QUERY], 95thPercentileLatency(us), 1107967
+[QUERY], 99thPercentileLatency(us), 1745919
+[FRESHNESS_LATENCY], Operations, 18334
+[FRESHNESS_LATENCY], Throughput(ops/sec), 153.8459478494106
+[FRESHNESS_LATENCY], AverageLatency(us), 1.657772498963674E7
+[FRESHNESS_LATENCY], MinLatency(us), 19104
+[FRESHNESS_LATENCY], MaxLatency(us), 111280127
+[FRESHNESS_LATENCY], 95thPercentileLatency(us), 88276991
+[FRESHNESS_LATENCY], 99thPercentileLatency(us), 106299391

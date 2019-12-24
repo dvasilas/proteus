@@ -1,0 +1,112 @@
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.9_0.1_256"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.9_0.1_256"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.9_0.1_256"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+***************** properties *****************
+"parsePrefix"="1K_0.2_0.9_0.1_256"
+"updateproportion"="0.0"
+"scanproportion"="0"
+"operationcount"="0"
+"readallfields"="true"
+"queryproportion"="1.0"
+"requestdistribution"="zipfian"
+"dotransactions"="false"
+"insertproportion"="0"
+"queryresultcount"="1"
+"parse"="true"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="dataset/yellow_tripdata_2019-06.csv"
+"recordcount"="0"
+"db"="site.ycsb.BasicDB"
+**********************************************
+File parsed: QUERY_1K_0.2_0.9_0.1_256_c0.hdr
+File parsed: QUERY_1K_0.2_0.9_0.1_256_c1.hdr
+File parsed: QUERY_1K_0.2_0.9_0.1_256_c2.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.9_0.1_256_c0.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.9_0.1_256_c1.hdr
+File parsed: FRESHNESS_LATENCY_1K_0.2_0.9_0.1_256_c2.hdr
+[OVERALL], RunTime(ms), 63
+[OVERALL], RunTime/Warmup (ms), 1576495875230
+[OVERALL], Throughput(ops/sec), 0.0
+[TOTAL_GCS_PS_Scavenge], Count, 0
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 0
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.0
+[TOTAL_GCS_PS_MarkSweep], Count, 0
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 0
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.0
+[TOTAL_GCs], Count, 0
+[TOTAL_GC_TIME], Time(ms), 0
+[TOTAL_GC_TIME_%], Time(%), 0.0
+[QUERY], Operations, 46860
+[QUERY], Throughput(ops/sec), 455.57970154330854
+[QUERY], AverageLatency(us), 1675624.6166026462
+[QUERY], MinLatency(us), 6724
+[QUERY], MaxLatency(us), 10280959
+[QUERY], 95thPercentileLatency(us), 4411391
+[QUERY], 99thPercentileLatency(us), 5566463
+[FRESHNESS_LATENCY], Operations, 1125
+[FRESHNESS_LATENCY], Throughput(ops/sec), 9.30920208897119
+[FRESHNESS_LATENCY], AverageLatency(us), 7.2640231936E7
+[FRESHNESS_LATENCY], MinLatency(us), 166528
+[FRESHNESS_LATENCY], MaxLatency(us), 115605503
+[FRESHNESS_LATENCY], 95thPercentileLatency(us), 114491391
+[FRESHNESS_LATENCY], 99thPercentileLatency(us), 115408895

@@ -1,0 +1,147 @@
+***************** properties *****************
+"warmuptime"="10"
+"proteus.port"="50450"
+"s3.secretKey"="verySecretKey1"
+"updateproportion"="0.9"
+"proteus.host"="federation"
+"client"="0"
+"scanproportion"="0"
+"threadcount"="64"
+"operationcount"="0"
+"s3.accessKeyId"="accessKey1"
+"cachedqueryproportion"="0.2"
+"preload"="file"
+"readallfields"="true"
+"s3.endPoint"="http://cloudserver-0:8000"
+"queryproportion"="0.1"
+"useBarrier"="false"
+"insertproportion"="0"
+"requestdistribution"="zipfian"
+"dotransactions"="true"
+"queryresultcount"="1"
+"insertstart"="0"
+"workload"="site.ycsb.workloads.CoreWorkload"
+"attributecount"="5"
+"insertcount"="600000"
+"status"="true"
+"readproportion"="0.0"
+"hdrhistogram.fileoutput"="true"
+"attributedataset"="/yellow_tripdata_2019-06.csv"
+"table"="ycsb-buck"
+"recordcount"="600000"
+"maxexecutiontime"="60"
+"sleep"="0"
+"db"="site.ycsb.db.S3Client"
+**********************************************
+Inizializing the S3 connection
+Connection successfully initialized
+Inizializing the Proteus connection
+Connection successfully initialized
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+Reusing the same client
+[OVERALL], RunTime(ms), 60530
+[OVERALL], RunTime/Warmup (ms), 50070
+[OVERALL], Throughput(ops/sec), 547.3979844705104
+[TOTAL_GCS_PS_Scavenge], Count, 31
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 168
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.27754832314554767
+[TOTAL_GCS_PS_MarkSweep], Count, 2
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 94
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.15529489509334213
+[TOTAL_GCs], Count, 33
+[TOTAL_GC_TIME], Time(ms), 262
+[TOTAL_GC_TIME_%], Time(%), 0.4328432182388898
+[QUERY], Operations, 2796
+[QUERY], Throughput(ops/sec), 55.84182144997004
+[QUERY], AverageLatency(us), 14478.134477825464
+[QUERY], MinLatency(us), 4924
+[QUERY], MaxLatency(us), 77311
+[QUERY], 95thPercentileLatency(us), 26879
+[QUERY], 99thPercentileLatency(us), 36543
+[QUERY], Return=OK, 2796
+[CLEANUP], Operations, 64
+[CLEANUP], Throughput(ops/sec), 1.2782105052925903
+[CLEANUP], AverageLatency(us), 113.21875
+[CLEANUP], MinLatency(us), 9
+[CLEANUP], MaxLatency(us), 6455
+[CLEANUP], 95thPercentileLatency(us), 22
+[CLEANUP], 99thPercentileLatency(us), 108
+[FRESHNESS_LATENCY], Operations, 1646
+[FRESHNESS_LATENCY], Throughput(ops/sec), 32.87397643299381
+[FRESHNESS_LATENCY], AverageLatency(us), 2.2138611246658567E7
+[FRESHNESS_LATENCY], MinLatency(us), 1421312
+[FRESHNESS_LATENCY], MaxLatency(us), 54820863
+[FRESHNESS_LATENCY], 95thPercentileLatency(us), 51085311
+[FRESHNESS_LATENCY], 99thPercentileLatency(us), 54034431
+[FRESHNESS_LATENCY], Return=OK, 1646
+[UPDATE_WITH_ATTRIBUTES], Operations, 25729
+[UPDATE_WITH_ATTRIBUTES], Throughput(ops/sec), 513.8605951667665
+[UPDATE_WITH_ATTRIBUTES], AverageLatency(us), 122998.14839286408
+[UPDATE_WITH_ATTRIBUTES], MinLatency(us), 53824
+[UPDATE_WITH_ATTRIBUTES], MaxLatency(us), 1314815
+[UPDATE_WITH_ATTRIBUTES], 95thPercentileLatency(us), 178687
+[UPDATE_WITH_ATTRIBUTES], 99thPercentileLatency(us), 431359
+[UPDATE_WITH_ATTRIBUTES], Return=OK, 25729
