@@ -1,3 +1,2 @@
 #!/bin/bash
-
-ssh scality@$1 'bash -s' < install.sh
+ssh -i $1 $2@$3 'bash -s' < install.sh
