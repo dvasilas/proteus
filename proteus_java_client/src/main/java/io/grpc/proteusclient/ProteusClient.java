@@ -24,7 +24,7 @@ public class ProteusClient {
   }
 
   public void shutdown() throws InterruptedException {
-    channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    channel.shutdown().shutdownNow();
   }
 
   public void query(QueryPredicate []predicates, Map<String, String> metadata, CountDownLatch finishLatch, final StreamObserver<ResponseStreamRecord> requestObserver) {
