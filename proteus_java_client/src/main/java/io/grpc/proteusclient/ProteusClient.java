@@ -66,6 +66,9 @@ public class ProteusClient {
       builder.addPredicate(predicate);
     }
 
+    if (metadata != null) {
+      builder.putAllMetadata(metadata);
+    }
     builder.putAllMetadata(metadata);
     QueryRequest qreq = builder.build();
     RequestStream req = RequestStream.newBuilder().setRequest(qreq).build();
