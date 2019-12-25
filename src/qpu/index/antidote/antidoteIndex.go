@@ -120,7 +120,6 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 }
 
 func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
-	log.WithFields(log.Fields{"value": attrOld.GetValue(), "object": object.ObjectID}).Debug("removing old index entry")
 	valueIndex, err := i.getValueIndex(attrOld, tx)
 	if err != nil {
 		return indexStoreUpdates, true, err
@@ -164,7 +163,6 @@ func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object u
 }
 
 func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
-	log.WithFields(log.Fields{"value": attrNew.GetValue(), "object": object.ObjectID}).Debug("adding new index entry")
 	valueIndex, err := i.getValueIndex(attrNew, tx)
 	if err != nil {
 		return indexStoreUpdates, true, err
