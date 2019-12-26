@@ -120,6 +120,11 @@ func (q *NQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return conf, err
 }
 
+// GetDataTransfer ...
+func (q *NQPU) GetDataTransfer() float32 {
+	return 0
+}
+
 // Cleanup is called when the QPU receives a SIGTERM signcal
 func (q *NQPU) Cleanup() {
 	log.Info("network QPU cleanup")

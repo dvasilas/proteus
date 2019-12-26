@@ -2,6 +2,7 @@ package federation
 
 import (
 	"io"
+	"os"
 	"sync"
 
 	"github.com/dvasilas/proteus/src"
@@ -14,8 +15,11 @@ import (
 
 // FQPU implements a federation dispatcher QPU
 type FQPU struct {
-	qpu    *utils.QPU
-	config *config.Config
+	qpu                 *utils.QPU
+	config              *config.Config
+	dataTransferCount   float32
+	dataTransferMutex   sync.Mutex
+	measureDataTransfer bool
 }
 
 //---------------- API Functions -------------------
@@ -27,6 +31,7 @@ func QPU(conf *config.Config) (*FQPU, error) {
 			Config: conf,
 		},
 	}
+	q.measureDataTransfer = os.Getenv("MEASURE_DATA_TRANSFER") == "true"
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
 	}
@@ -37,7 +42,7 @@ func QPU(conf *config.Config) (*FQPU, error) {
 func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
 	log.WithFields(log.Fields{"request": request}).Debug("query request received")
-	subQueries, err := q.generateSubQueries(request.GetPredicate())
+	subQueries, isLocal, err := q.generateSubQueries(request.GetPredicate())
 	if err != nil {
 		return err
 	}
@@ -46,12 +51,12 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
 	errCh := make(chan error)
 	seqID := int64(0)
-	for _, subQ := range subQueries {
+	for i, subQ := range subQueries {
 		streamIn, _, err := subQ.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
 		if err != nil {
 			return err
 		}
-		go func() {
+		go func(local bool) {
 			for {
 				streamRec, err := streamIn.Recv()
 				if err == io.EOF {
@@ -67,9 +72,18 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 					errCh <- err
 					return
 				}
+				if q.measureDataTransfer && !local {
+					size, err := utils.GetMessageSize(streamRec)
+					if err != nil {
+						log.Fatal(err)
+					}
+					q.dataTransferMutex.Lock()
+					q.dataTransferCount += float32(size) / 1024.0
+					q.dataTransferMutex.Unlock()
+				}
 				subQueryResponseRecordCh <- streamRec
 			}
-		}()
+		}(isLocal[i])
 	}
 	for {
 		select {
@@ -117,6 +131,14 @@ func (q *FQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
+// GetDataTransfer ...
+func (q *FQPU) GetDataTransfer() float32 {
+	q.dataTransferMutex.Lock()
+	res := q.dataTransferCount
+	q.dataTransferMutex.Unlock()
+	return res
+}
+
 // Cleanup is called when the process receives a SIGTERM signcal
 func (q *FQPU) Cleanup() {
 	log.Info("federation dispatcher QPU cleanup")
@@ -126,18 +148,20 @@ func (q *FQPU) Cleanup() {
 
 //---------------- Internal Functions --------------
 
-func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*utils.QPU, error) {
+func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*utils.QPU, []bool, error) {
 	forwardTo := make([]*utils.QPU, 0)
-	for _, c := range q.qpu.Conns {
+	isLocal := make([]bool, 0)
+	for i, c := range q.qpu.Conns {
 		capabl, err := utils.CanRespondToQuery(predicate, c.QueryingCapabilities)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if capabl {
 			forwardTo = append(forwardTo, c)
+			isLocal = append(isLocal, q.qpu.Config.Connections[i].Local)
 		}
 	}
-	return forwardTo, nil
+	return forwardTo, isLocal, nil
 }
 
 func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {

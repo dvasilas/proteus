@@ -1,0 +1,12 @@
+{
+    "attributeName": "tripdistance",
+    "attributeType": "s3tagFlt",
+    "lBound": "0",
+    "uBound": "10000",
+    "consLevel": "async",
+    "indexStore": {
+      "store": "antidote",
+      "bucket": "indexqpu1",
+      "indexDataStruct": "btree"
+    }
+}

@@ -144,6 +144,11 @@ func (q *DriverQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
+// GetDataTransfer ...
+func (q *DriverQPU) GetDataTransfer() float32 {
+	return 0
+}
+
 //Cleanup is called when the process receives a SIGTERM signcal
 func (q *DriverQPU) Cleanup() {
 	log.Info("data store QPU cleanup")
@@ -175,12 +180,12 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 	var seqID int64
 	errs := make(chan error, 1)
 
-	heartbeat(int64(0), stream, errs)
+	// heartbeat(int64(0), stream, errs)
 
 	go func() {
 		for op := range opChan {
 			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_UPDATEDELTA, op)); err != nil {
-				errs <- err
+				utils.Warn(err)
 				break
 			}
 			seqID++
@@ -188,10 +193,12 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 				log.Debug("DataStoreQPU:opConsumer waiting for ACK..")
 				ackMsg, err := stream.Recv()
 				if err == io.EOF {
+					utils.ReportError(errors.New("DataStoreQPU:opConsumer received nil"))
 					errs <- errors.New("DataStoreQPU:opConsumer received nil")
 					break
 				}
 				if err != nil {
+					utils.ReportError(err)
 					errs <- err
 					break
 				}
@@ -211,7 +218,7 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 func heartbeat(seqID int64, stream pbQPU.QPU_QueryServer, errs chan error) {
 	beat := protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_HEARTBEAT, nil)
 	if err := stream.Send(beat); err != nil {
-		log.Debug("failed to send heartbeat - Connection closed")
+		utils.ReportError(err)
 		errs <- err
 		return
 	}

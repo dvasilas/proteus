@@ -24,14 +24,21 @@ public class ProteusClient {
   }
 
   public void shutdown() throws InterruptedException {
-    channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    channel.shutdown().shutdownNow();
   }
 
-  public void query(QueryPredicate []predicates, Map<String, String> metadata, CountDownLatch finishLatch, final StreamObserver<ResponseStreamRecord> requestObserver) {
-    SnapshotTimePredicate clock = SnapshotTimePredicate.newBuilder()
-      .setLbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
-      .setUbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
-      .build();
+  public void query(QueryPredicate []predicates, Map<String, String> metadata, CountDownLatch finishLatch, final StreamObserver<ResponseStreamRecord> requestObserver, Boolean notify) {
+    SnapshotTimePredicate clock;
+    if (!notify) {
+      clock = SnapshotTimePredicate.newBuilder()
+        .setLbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
+        .setUbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.LATEST).build())
+        .build();
+    } else {
+      clock = SnapshotTimePredicate.newBuilder()
+        .setLbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.INF).build())
+        .setUbound(SnapshotTime.newBuilder().setType(SnapshotTime.SnapshotTimeType.INF).build()).build();
+    }
 
     QueryRequest.Builder builder = QueryRequest.newBuilder().setClock(clock);
     for (int i=0; i<predicates.length; i++) {
@@ -66,6 +73,9 @@ public class ProteusClient {
       builder.addPredicate(predicate);
     }
 
+    if (metadata != null) {
+      builder.putAllMetadata(metadata);
+    }
     builder.putAllMetadata(metadata);
     QueryRequest qreq = builder.build();
     RequestStream req = RequestStream.newBuilder().setRequest(qreq).build();
@@ -73,7 +83,11 @@ public class ProteusClient {
     StreamObserver<RequestStream> toServer = asyncStub.query(
       new StreamObserver<ResponseStreamRecord>() {
       @Override
-      public void onNext(ResponseStreamRecord record) { requestObserver.onNext(record); }
+      public void onNext(ResponseStreamRecord record) {
+        if (record.getType() != ResponseStreamRecord.StreamRecordType.HEARTBEAT) {
+          requestObserver.onNext(record);
+        }
+      }
       @Override
       public void onError(Throwable t) { requestObserver.onError(t); }
       @Override

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dvasilas/proteus/proteus-bench/s3/yelpDataset"
+	"github.com/dvasilas/proteus/benchmarks/s3/yelpDataset"
 	"github.com/dvasilas/proteus/proteus_client"
 	"github.com/dvasilas/proteus/src"
 	pbMonitoring "github.com/dvasilas/proteus/src/protos/monitoring"

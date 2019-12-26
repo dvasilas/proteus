@@ -14,7 +14,7 @@ import (
 type Config struct {
 	QpuType         pbQPU.ConfigResponse_QPUType
 	Port            string
-	Connections     []string
+	Connections     []QPUConnection
 	DatastoreConfig struct {
 		Dataset            *pbQPU.DataSet
 		Type               Datastore
@@ -43,6 +43,12 @@ type Config struct {
 	}
 }
 
+// QPUConnection ...
+type QPUConnection struct {
+	Address string
+	Local   bool
+}
+
 //---------------- API Functions -------------------
 
 //GetConfig ...
@@ -56,7 +62,18 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 		return nil, err
 	}
 	config.Port = conf.Port
-	config.Connections = conf.Connections
+	connections := make([]QPUConnection, 0)
+	for _, conn := range conf.Connections {
+		b, err := strconv.ParseBool(conn.Local)
+		if err != nil {
+			return nil, err
+		}
+		connections = append(connections, QPUConnection{
+			Address: conn.Address,
+			Local:   b,
+		})
+	}
+	config.Connections = connections
 
 	switch config.QpuType {
 	case pbQPU.ConfigResponse_DBDRIVER:
@@ -283,7 +300,7 @@ func (c *Config) getIndexBounds(t pbUtils.Attribute_AttributeType, conf ConfJSON
 type ConfJSON struct {
 	QpuType         string
 	Port            string
-	Connections     []string
+	Connections     []QPUConnectionJSON
 	DataStoreConfig struct {
 		DataSet struct {
 			DB    string
@@ -317,4 +334,10 @@ type ConfJSON struct {
 		Function string
 		Rate     float32
 	}
+}
+
+// QPUConnectionJSON ...
+type QPUConnectionJSON struct {
+	Address string
+	Local   string
 }

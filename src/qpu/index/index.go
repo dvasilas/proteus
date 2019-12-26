@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -22,11 +23,14 @@ import (
 
 // IQPU implements an index QPU
 type IQPU struct {
-	qpu          *utils.QPU
-	index        indexStore
-	cancelFuncs  []context.CancelFunc
-	persistentQs map[int]persistentQuery
-	mutex        sync.RWMutex
+	qpu                 *utils.QPU
+	index               indexStore
+	cancelFuncs         []context.CancelFunc
+	persistentQs        map[int]persistentQuery
+	mutex               sync.RWMutex
+	dataTransferCount   float32
+	dataTransferMutex   sync.Mutex
+	measureDataTransfer bool
 }
 
 type persistentQuery struct {
@@ -54,6 +58,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 		},
 		persistentQs: make(map[int]persistentQuery),
 	}
+	q.measureDataTransfer = os.Getenv("MEASURE_DATA_TRANSFER") == "true"
 
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
@@ -102,7 +107,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 			return nil, err
 		}
 		q.cancelFuncs[i] = cancel
-		go q.opConsumer(streamIn, cancel, sync)
+		go q.opConsumer(streamIn, cancel, sync, q.qpu.Config.Connections[i].Local)
 	}
 
 	if err := q.catchUp(); err != nil {
@@ -212,7 +217,7 @@ func (q *IQPU) heartbeat(heartbeatCh chan int) {
 	}
 	heartbeatCh <- 0
 	f := q.newHeartbeat(heartbeatCh)
-	time.AfterFunc(100*time.Millisecond, f)
+	time.AfterFunc(1*time.Second, f)
 }
 
 func (q *IQPU) newHeartbeat(heartbeatCh chan int) func() {
@@ -228,6 +233,14 @@ func (q *IQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 		q.qpu.QueryingCapabilities,
 		q.qpu.Dataset)
 	return resp, nil
+}
+
+// GetDataTransfer ...
+func (q *IQPU) GetDataTransfer() float32 {
+	q.dataTransferMutex.Lock()
+	res := q.dataTransferCount
+	q.dataTransferMutex.Unlock()
+	return res
 }
 
 // Cleanup ...
@@ -262,7 +275,7 @@ func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
 // Receives an stream of update operations
 // Updates the index for each operation
 // TODO: Query a way to handle an error here
-func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFunc, sync bool) {
+func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFunc, sync bool, local bool) {
 	for {
 		streamRec, err := stream.Recv()
 		if err == io.EOF {
@@ -274,23 +287,30 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			return
 		} else {
 			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
-				go func() {
-					if err := q.updateIndex(streamRec); err != nil {
-						utils.ReportError(err)
+				if q.measureDataTransfer && !local {
+					size, err := utils.GetMessageSize(streamRec)
+					if err != nil {
+						log.Fatal(err)
+					}
+					q.dataTransferMutex.Lock()
+					q.dataTransferCount += float32(size) / 1024.0
+					q.dataTransferMutex.Unlock()
+				}
+				if err := q.updateIndex(streamRec); err != nil {
+					utils.ReportError(err)
+					return
+				}
+				if sync {
+					log.Debug("QPUServer:index updated, sending ACK")
+					if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
+						log.Fatal("opConsumer stream.Send failed")
 						return
 					}
-					if sync {
-						log.Debug("QPUServer:index updated, sending ACK")
-						if err := stream.Send(protoutils.RequestStreamAck(streamRec.GetSequenceId())); err != nil {
-							log.Fatal("opConsumer stream.Send failed")
-							return
-						}
-					}
-					if err := q.forward(streamRec); err != nil {
-						log.Fatal("forwards err", err)
-						return
-					}
-				}()
+				}
+				if err := q.forward(streamRec); err != nil {
+					log.Fatal("forwards err", err)
+					return
+				}
 			}
 		}
 	}

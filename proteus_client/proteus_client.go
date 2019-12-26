@@ -158,6 +158,14 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 	return respChan, errChan, nil
 }
 
+func (c *Client) GetDataTransfer() (float64, error) {
+	dataTransferred, err := c.client.GetDataTransfer()
+	if err != nil {
+		return -1.0, err
+	}
+	return float64(dataTransferred.GetKBytesTranferred()), nil
+}
+
 func logOpToObjectState(record *pbQPU.ResponseStreamRecord) ObjectState {
 	logOp := record.GetLogOp()
 	var attrs []*pbUtils.Attribute
