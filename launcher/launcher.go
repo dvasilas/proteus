@@ -140,8 +140,12 @@ func main() {
 		connFlags.Parse(os.Args[n:])
 
 		conns := strings.Split(connections, "/")
-		for _, c := range conns {
-			conf.Connections = append(conf.Connections, c)
+		for _, conn := range conns {
+			c := strings.Split(conn, "_")
+			conf.Connections = append(conf.Connections, config.QPUConnectionJSON{
+				Address: c[0],
+				Local:   c[1],
+			})
 		}
 	}
 

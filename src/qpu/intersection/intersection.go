@@ -111,6 +111,11 @@ func (q *IQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
 	return resp, nil
 }
 
+// GetDataTransfer ...
+func (q *IQPU) GetDataTransfer() float32 {
+	return 0
+}
+
 // Cleanup is called when the process receives a SIGTERM signcal
 func (q *IQPU) Cleanup() {
 	log.Info("intersection QPU cleanup")

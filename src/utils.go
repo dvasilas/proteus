@@ -37,7 +37,7 @@ type QPU struct {
 func ConnectToQPUGraph(q *QPU) error {
 	conns := make([]*QPU, len(q.Config.Connections))
 	for i, conn := range q.Config.Connections {
-		c, err := cli.NewClient(conn)
+		c, err := cli.NewClient(conn.Address)
 		if err != nil {
 			return err
 		}
@@ -61,7 +61,7 @@ func ConnectToQPUGraph(q *QPU) error {
 			Dataset:              connConf.GetDataset(),
 			Config: &config.Config{
 				QpuType: connConf.QpuType,
-				Port:    conn,
+				Port:    conn.Address,
 			},
 		}
 	}
@@ -151,6 +151,16 @@ func UnmarshalObject(data []byte) (ObjectState, error) {
 		Timestamp:  vectorclock,
 	}
 	return objectState, nil
+}
+
+// GetMessageSize ...
+func GetMessageSize(streamRec *pbQPU.ResponseStreamRecord) (int, error) {
+	buff, err := proto.Marshal(streamRec)
+	if err != nil {
+		return -1, err
+	}
+	bytesBuff := bytes.NewBuffer(buff)
+	return bytesBuff.Len(), nil
 }
 
 // SubQuery ...

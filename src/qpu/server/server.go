@@ -38,6 +38,7 @@ type QPUAPI interface {
 	Query(pbQPU.QPU_QueryServer, *pbQPU.RequestStream) error
 	GetConfig() (*pbQPU.ConfigResponse, error)
 	Cleanup()
+	GetDataTransfer() float32
 }
 
 //---------------- API Functions -------------------
@@ -58,6 +59,13 @@ func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
 //GetConfig constructs and returns a structure describing the configuration of a QPU
 func (s *QPUServer) GetConfig(ctx context.Context, in *pbQPU.ConfigRequest) (*pbQPU.ConfigResponse, error) {
 	return s.api.GetConfig()
+}
+
+func (s *QPUServer) GetDataTransfer(ctx context.Context, in *pbQPU.GetDataRequest) (*pbQPU.DataTransferResponse, error) {
+	datatransferredCount := s.api.GetDataTransfer()
+	return &pbQPU.DataTransferResponse{
+		KBytesTranferred: datatransferredCount,
+	}, nil
 }
 
 //---------------- Internal Functions --------------
