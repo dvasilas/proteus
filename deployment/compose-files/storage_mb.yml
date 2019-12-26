@@ -1,0 +1,33 @@
+version: '3'
+services:
+  cloudserver-0:
+    image: dvasilas/cloudserver:latest
+    networks:
+      - proteus_net
+    environment:
+    - REMOTE_MANAGEMENT_DISABLE=1
+    - S3BACKEND=mem
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node1 == true ]
+
+  dsdriver-0:
+    image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
+    networks:
+      - proteus_net
+    command: >
+        bash -c "./deployment/wait-for-it.sh --host=cloudserver-0 --port=8000 --timeout=0
+        && go run ./launcher/launcher.go --qpu=dbdriver --port=50150 --dataset=1/1/1 --db=s3 --endp=cloudserver-0:8000/cloudserver-0:50000"
+    depends_on:
+      - cloudserver-0
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node1 == true ]
+
+networks:
+  proteus_net:
+    external: true

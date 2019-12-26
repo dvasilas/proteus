@@ -1,8 +1,13 @@
+benchmarks/measurements/
+
 __pycache__/
 
 vendor/
 
 bin/
+
+credentials.json
+token.pickle
 
 # OS X
 .DS_STORE
