@@ -206,7 +206,7 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 	attrs := make([]*pbUtils.Attribute, 0)
 
 	for k := range head {
-		if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") {
+		if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") && !strings.Contains(strings.ToLower(k), "s3cmd-attrs") {
 			attrk, attrt, attrv, err := xAmzMetaToAttr(k, head[k][0])
 			if err != nil {
 				errs <- err
