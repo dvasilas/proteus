@@ -2,6 +2,7 @@ package inmemindex
 
 import (
 	"container/list"
+	"errors"
 	"sync"
 
 	"github.com/dvasilas/proteus/src/protos"
@@ -31,7 +32,7 @@ type indexImplementation interface {
 
 //---------------- API Functions -------------------
 
-//New creates a new in-memory index
+// New creates a new in-memory index
 func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*InMemIndex, error) {
 	ind := &InMemIndex{
 		attributeName: attrName,
@@ -43,7 +44,6 @@ func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*InMemIndex
 
 // Update updates the index based on a given operation
 func (i *InMemIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
-	log.WithFields(log.Fields{"attrOld": attrOld, "attrNew": attrNew}).Debug("index:update")
 	return i.index.update(attrOld, attrNew, object, ts)
 }
 
@@ -79,14 +79,27 @@ func newBTreeIndex(t pbUtils.Attribute_AttributeType) *bTreeIndex {
 }
 
 func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
-
 	i.mutex.Lock()
-	if attrOld != nil {
-		if indexEntry, found := i.getIndexEntry(attrOld); found {
-			indexEntry.removeObjFromEntry(object.ObjectID, ts)
+	if attrOld == nil {
+		if indexEntry, found := i.getIndexEntry(attrNew); found {
+			indexEntry.newVersion(object, ts)
+			i.updateIndexEntry(indexEntry)
+		} else {
+			indexEntry := i.newIndexEntry(attrNew, ts, object)
+			i.updateIndexEntry(indexEntry)
 		}
-	}
-	if attrNew != nil {
+	} else if attrOld != nil && attrNew != nil {
+		eq, err := utils.Compare(attrOld.GetValue(), attrNew.GetValue())
+		if err != nil {
+			return err
+		}
+		if eq != 0 {
+			if indexEntry, found := i.getIndexEntry(attrOld); found {
+				indexEntry.removeObjFromEntry(object.ObjectID, ts)
+			} else {
+				return errors.New("index entry for old value not found")
+			}
+		}
 		if indexEntry, found := i.getIndexEntry(attrNew); found {
 			indexEntry.newVersion(object, ts)
 			i.updateIndexEntry(indexEntry)
@@ -95,7 +108,7 @@ func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribu
 			i.updateIndexEntry(indexEntry)
 		}
 	}
-	//i.print()
+	// i.print()
 	i.mutex.Unlock()
 	return nil
 }
@@ -110,7 +123,7 @@ func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectS
 		i.updateIndexEntry(indexEntry)
 	}
 	i.mutex.Unlock()
-	//i.print()
+	// i.print()
 	return nil
 }
 
@@ -248,7 +261,7 @@ func (n treeNode) Less(than btree.Item) bool {
 	return n.Value.less(than.(treeNode).Value)
 }
 
-func (n treeNode) clodeLatestVerion() map[string]utils.ObjectState {
+func (n treeNode) cloneLatestVersion() map[string]utils.ObjectState {
 	newObjMap := make(map[string]utils.ObjectState)
 	for k, v := range n.getLatestVersion().Objects {
 		newObjMap[k] = v
@@ -257,7 +270,7 @@ func (n treeNode) clodeLatestVerion() map[string]utils.ObjectState {
 }
 
 func (n treeNode) newVersion(obj utils.ObjectState, ts pbUtils.Vectorclock) {
-	objMap := n.clodeLatestVerion()
+	objMap := n.cloneLatestVersion()
 	objMap[obj.ObjectID] = obj
 	n.createNewVersion(Posting{
 		Objects:   objMap,
@@ -285,7 +298,7 @@ func (n treeNode) getLatestVersion() Posting {
 }
 
 func (n treeNode) removeObjFromEntry(objectID string, ts pbUtils.Vectorclock) {
-	objMap := n.clodeLatestVerion()
+	objMap := n.cloneLatestVersion()
 	delete(objMap, objectID)
 	n.createNewVersion(
 		Posting{
