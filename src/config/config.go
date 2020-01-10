@@ -190,6 +190,8 @@ const (
 	INMEM IndexStore = iota
 	// ANT is the enum value for an index stored in Antidote
 	ANT IndexStore = iota
+	// MONGO is the enum value for an index stored in MongoDB
+	MONGO IndexStore = iota
 )
 
 // IndexImplementation ...
@@ -218,6 +220,8 @@ func (c *Config) getIndexStore(conf ConfJSON) error {
 		c.IndexConfig.IndexStore.Store = INMEM
 	case "antidote":
 		c.IndexConfig.IndexStore.Store = ANT
+	case "mongo":
+		c.IndexConfig.IndexStore.Store = MONGO
 	default:
 		return errors.New("unknown index store type")
 	}

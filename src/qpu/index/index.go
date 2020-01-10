@@ -18,6 +18,7 @@ import (
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index/antidote"
 	"github.com/dvasilas/proteus/src/qpu/index/inMem"
+	"github.com/dvasilas/proteus/src/qpu/index/mongo"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -75,6 +76,11 @@ func QPU(conf *config.Config) (*IQPU, error) {
 		}
 	case config.ANT:
 		index, err = antidoteindex.New(conf)
+		if err != nil {
+			return &IQPU{}, err
+		}
+	case config.MONGO:
+		index, err = mongoindex.New(conf)
 		if err != nil {
 			return &IQPU{}, err
 		}
