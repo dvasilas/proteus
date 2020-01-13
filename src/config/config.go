@@ -64,13 +64,17 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 	config.Port = conf.Port
 	connections := make([]QPUConnection, 0)
 	for _, conn := range conf.Connections {
-		b, err := strconv.ParseBool(conn.Local)
-		if err != nil {
-			return nil, err
+		var isLocal bool
+		if conn.Local == "local" {
+			isLocal = true
+		} else if conn.Local == "remote" {
+			isLocal = false
+		} else {
+			return nil, errors.New("connection should be either 'local' or 'remote'")
 		}
 		connections = append(connections, QPUConnection{
 			Address: conn.Address,
-			Local:   b,
+			Local:   isLocal,
 		})
 	}
 	config.Connections = connections
