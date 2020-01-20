@@ -135,16 +135,16 @@ func (q *NQPU) Cleanup() {
 func (q *NQPU) process(send func() error) error {
 	switch q.qpu.Config.NetworkQPUConfig.Function {
 	case "drop":
-		return drop(q.qpu.Config.NetworkQPUConfig.Rate, send)
+		return q.drop(send)
 	case "delay":
-		go delay(send)
+		go q.delay(send)
 		return nil
 	}
 	return nil
 }
 
-func drop(rate float32, send func() error) error {
-	if rate < rand.Float32() {
+func (q *NQPU) drop(send func() error) error {
+	if q.qpu.Config.NetworkQPUConfig.Rate < rand.Float32() {
 		log.WithFields(log.Fields{"action": "forward"}).Debug("network QPU: drop")
 		return send()
 	}
@@ -152,9 +152,8 @@ func drop(rate float32, send func() error) error {
 	return nil
 }
 
-func delay(send func() error) error {
-	log.WithFields(log.Fields{"action": "going to sleep for 50ms"}).Debug("network QPU: delay")
-	time.Sleep(time.Millisecond * 50)
+func (q *NQPU) delay(send func() error) error {
+	time.Sleep(time.Millisecond * time.Duration(q.qpu.Config.NetworkQPUConfig.Delay))
 	err := send()
 	if err != nil {
 		log.Debug(err)

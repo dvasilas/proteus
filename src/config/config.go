@@ -40,6 +40,7 @@ type Config struct {
 	NetworkQPUConfig struct {
 		Function string
 		Rate     float32
+		Delay    int64
 	}
 }
 
@@ -182,6 +183,7 @@ func (c *Config) getCacheConfig(conf ConfJSON) {
 func (c *Config) getNetworkQPUConfig(conf ConfJSON) {
 	c.NetworkQPUConfig.Function = conf.NetworkQPUConfig.Function
 	c.NetworkQPUConfig.Rate = conf.NetworkQPUConfig.Rate
+	c.NetworkQPUConfig.Delay = conf.NetworkQPUConfig.Delay
 }
 
 //----------- Index QPU Configuration --------------
@@ -337,6 +339,7 @@ type ConfJSON struct {
 	NetworkQPUConfig struct {
 		Function string
 		Rate     float32
+		Delay    int64
 	}
 }
 

@@ -121,6 +121,13 @@ func main() {
 		n++
 		conf.NetworkQPUConfig.Function = function
 		switch conf.NetworkQPUConfig.Function {
+		case "delay":
+			var delay int64
+			dropFlags := flag.NewFlagSet("network QPU [delay] flags", flag.ExitOnError)
+			dropFlags.Int64Var(&delay, "delay", 0, "the delay duration (ms)")
+			dropFlags.Parse(os.Args[4:5])
+			n++
+			conf.NetworkQPUConfig.Delay = delay
 		case "drop":
 			var rate float64
 			dropFlags := flag.NewFlagSet("network QPU [drop] flags", flag.ExitOnError)
