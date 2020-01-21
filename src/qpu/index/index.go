@@ -143,8 +143,24 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 			case err, ok := <-errCh:
 				if !ok {
 					errCh = nil
+					if err := streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						)); err != nil {
+						return err
+					}
 				} else if err == io.EOF {
 					errCh = nil
+					if err := streamOut.Send(
+						protoutils.ResponseStreamRecord(
+							seqID,
+							pbQPU.ResponseStreamRecord_END_OF_STREAM,
+							&pbUtils.LogOperation{},
+						)); err != nil {
+						return err
+					}
 				} else {
 					utils.ReportError(err)
 					return err
@@ -402,5 +418,8 @@ func (q *IQPU) catchUp() error {
 }
 
 func (q *IQPU) updateIndexCatchUp(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
-	return q.updateIndex(streamRec)
+	if streamRec.GetType() != pbQPU.ResponseStreamRecord_END_OF_STREAM {
+		return q.updateIndex(streamRec)
+	}
+	return nil
 }

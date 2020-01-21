@@ -170,6 +170,15 @@ func (q *DriverQPU) snapshotConsumer(stream pbQPU.QPU_QueryServer) (chan *pbUtil
 			}
 			seqID++
 		}
+		if err := stream.Send(protoutils.ResponseStreamRecord(
+			seqID,
+			pbQPU.ResponseStreamRecord_END_OF_STREAM,
+			&pbUtils.LogOperation{},
+		)); err != nil {
+			utils.Warn(err)
+			close(errChan)
+			return
+		}
 		errChan <- nil
 		close(errChan)
 	}()

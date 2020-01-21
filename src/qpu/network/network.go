@@ -73,29 +73,40 @@ func QPU(conf *config.Config) (*NQPU, error) {
 }
 
 // Query implements the Query API for the network QPU
-func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecUp *pbQPU.RequestStream) error {
+func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecord *pbQPU.RequestStream) error {
+	respRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+	canReturn := make(chan bool)
+	go func(respRecordCh chan *pbQPU.ResponseStreamRecord) {
+		for respRecord := range respRecordCh {
+			if err := q.process(func() error {
+				return streamUp.Send(respRecord)
+			}); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("process.send")
+			}
+			if respRecord.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+				canReturn <- true
+				break
+			}
+		}
+	}(respRecordCh)
 	streamDown, _, err := q.qpu.Conns[0].Client.Forward()
 	if err != nil {
 		return err
 	}
-	if err = streamDown.Send(requestRecUp); err != nil {
+	if err = streamDown.Send(requestRecord); err != nil {
 		return err
 	}
 	for {
-		requestRecDown, err := streamDown.Recv()
+		respRecord, err := streamDown.Recv()
 		if err == io.EOF {
-			return nil
+			break
 		}
 		if err != nil {
 			return err
 		}
-		if err := q.process(func() error {
-			return streamUp.Send(requestRecDown)
-		}); err != nil {
-			return err
-		}
-		if requestRecUp.GetPing() != nil {
-			requestRecUp, err = streamUp.Recv()
+		respRecordCh <- respRecord
+		if requestRecord.GetPing() != nil {
+			requestRecord, err = streamUp.Recv()
 			if err == io.EOF {
 				return err
 			}
@@ -103,12 +114,14 @@ func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecUp *pbQPU.Request
 				return err
 			}
 			if err := q.process(func() error {
-				return streamDown.Send(requestRecUp)
+				return streamDown.Send(requestRecord)
 			}); err != nil {
 				return err
 			}
 		}
 	}
+	<-canReturn
+	return nil
 }
 
 // GetConfig implements the GetConfig API for the network QPU
@@ -137,18 +150,15 @@ func (q *NQPU) process(send func() error) error {
 	case "drop":
 		return q.drop(send)
 	case "delay":
-		go q.delay(send)
-		return nil
+		return q.delay(send)
 	}
 	return nil
 }
 
 func (q *NQPU) drop(send func() error) error {
 	if q.qpu.Config.NetworkQPUConfig.Rate < rand.Float32() {
-		log.WithFields(log.Fields{"action": "forward"}).Debug("network QPU: drop")
 		return send()
 	}
-	log.WithFields(log.Fields{"action": "drop"}).Debug("network QPU: drop")
 	return nil
 }
 
@@ -156,7 +166,7 @@ func (q *NQPU) delay(send func() error) error {
 	time.Sleep(time.Millisecond * time.Duration(q.qpu.Config.NetworkQPUConfig.Delay))
 	err := send()
 	if err != nil {
-		log.Debug(err)
+		log.WithFields(log.Fields{"error": err}).Debug("delay.send")
 	}
 	return err
 }
