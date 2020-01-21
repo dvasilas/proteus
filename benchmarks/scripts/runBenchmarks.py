@@ -7,6 +7,7 @@ import os.path
 import pickle
 import json
 import time
+import requests
 from datetime import datetime
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -33,7 +34,7 @@ def getCredentials(credFile):
 
 
 def pasteToSpreadsheet(credFile, spreadsheet_id, data, metadata):
-    credentials = getCredentials("credentials_scality.json")
+    credentials = getCredentials(credFile)
     service = build("sheets", "v4", credentials=credentials)
     addSheet_request = {
         "requests": [
@@ -98,6 +99,7 @@ def parseFile(path):
     with open(path) as fp:
         overallMeasurements = {}
         queryMeasurements = {}
+        updateMeasurements = {}
         freshnessMeasurements = {}
         line = fp.readline()
         while line:
@@ -106,6 +108,8 @@ def parseFile(path):
                 queryMeasurements[line[1]] = line[2]
             elif line[0] == "[OVERALL]":
                 overallMeasurements[line[1]] = line[2]
+            elif line[0] == "[UPDATE_WITH_ATTRIBUTES]":
+                updateMeasurements[line[1]] = line[2]
             elif line[0] == "[FRESHNESS_LATENCY]":
                 freshnessMeasurements[line[1]] = line[2]
             line = fp.readline()
@@ -115,10 +119,20 @@ def parseFile(path):
     output += str(float(queryMeasurements["MaxLatency(us)"]) / 1000) + ", "
     output += str(float(queryMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
     output += str(float(queryMeasurements["99thPercentileLatency(us)"]) / 1000) + ", "
+
+    output += updateMeasurements["Throughput(ops/sec)"] + ", "
+    output += str(float(updateMeasurements["AverageLatency(us)"]) / 1000) + ", "
+    output += str(float(updateMeasurements["MinLatency(us)"]) / 1000) + ", "
+    output += str(float(updateMeasurements["MaxLatency(us)"]) / 1000) + ", "
+    output += str(float(updateMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
+    output += str(float(updateMeasurements["99thPercentileLatency(us)"]) / 1000) + ", "
+
     output += str(float(freshnessMeasurements["AverageLatency(us)"]) / 1000) + ", "
     output += str(float(freshnessMeasurements["MinLatency(us)"]) / 1000) + ", "
     output += str(float(freshnessMeasurements["MaxLatency(us)"]) / 1000) + ", "
-    output += str(float(freshnessMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
+    output += (
+        str(float(freshnessMeasurements["95thPercentileLatency(us)"]) / 1000) + ", "
+    )
     output += str(float(freshnessMeasurements["99thPercentileLatency(us)"]) / 1000)
     return output
 
@@ -137,22 +151,18 @@ def parseArgs():
     return args
 
 
-def getLatestCommitTag(project, branch, log):
-    output = runCmd(
-        [
-            "cd %s" % (project)
-            + " && git pull origin %s" % (branch)
-            + " && git log -1 --pretty=%H"
-        ],
-        log,
+def getLatestCommitTag(user, repo, branch):
+    r = requests.get(
+        "https://api.github.com/repos/%s/%s/commits/%s" % (user, repo, branch)
     )
-    output = output.split("\n")
-    return output[len(output) - 2][0:8]
+    return r.json()["sha"][0:8]
 
 
 def createOverlayNetwork(log):
     global STATE
-    runCmd(["docker network create -d overlay --attachable proteus_net"], log, True)
+    runCmd(
+        ["sudo docker network create -d overlay --attachable proteus_net"], log, True
+    )
 
 
 def waitTermination(services, log):
@@ -160,7 +170,10 @@ def waitTermination(services, log):
         complete = False
         while not complete:
             result = runCmd(
-                ["docker service ps %s" % (service) + " --format '{{.CurrentState}}'"],
+                [
+                    "sudo docker service ps %s" % (service)
+                    + " --format '{{.CurrentState}}'"
+                ],
                 log,
                 showProgress=True,
             )
@@ -192,7 +205,7 @@ def runCmd(cmd, log, okToFail=False, showProgress=False):
     returnCode = p.wait()
     if returnCode and not okToFail:
         print("error\n%s\nreturn code: %d" % (cmd, returnCode))
-        cleanup(log, 0)
+        cleanup(0, log)
         sys.exit()
     return output
 
@@ -202,11 +215,10 @@ def deploy(target, recordCount, systemTag, composeFile, placement, nodeLabels, l
     cacheSize = recordCount * 5 * 0.2
     runCmd(
         [
-            "env PROTEUS_IMAGE_TAG=%s " % (systemTag)
+            "sudo env PROTEUS_IMAGE_TAG=%s " % (systemTag)
             + "env CACHE_SIZE=%d " % (cacheSize)
             + "docker stack deploy "
-            + "--compose-file proteus/deployment/compose-files/%s %s"
-            % (composeFile, target)
+            + "--compose-file compose-files/%s %s" % (composeFile, target)
         ],
         log,
     )
@@ -223,7 +235,8 @@ def checkPlacement(target, placement, nodeLabels, log):
             countRetries = 0
             while output.split("\n")[0] != targetNode:
                 output = runCmd(
-                    ['docker service ps --format "{{ .Node }}" %s' % (service)], log
+                    ['sudo docker service ps --format "{{ .Node }}" %s' % (service)],
+                    log,
                 )
                 countRetries += 1
                 time.sleep(1)
@@ -242,9 +255,9 @@ def cleanup(target, log):
     global STATE
     while STATE > target:
         if STATE == 1:
-            runCmd(["docker stack rm storage_engine"], log)
+            runCmd(["sudo docker stack rm storage_engine"], log)
         elif STATE == 2:
-            runCmd(["docker stack rm query_engine"], log)
+            runCmd(["sudo docker stack rm query_engine"], log)
         elif STATE == 3:
             print("state should not be %d" % (STATE))
         STATE -= 1
@@ -257,32 +270,32 @@ def makeDirLocalRemote(resultDirPath, remoteNodes):
     return runCmd([cmd], None)
 
 
-def loadDataset(benchToolTag, recordCount, datasetComposeFile, log):
-    insertCount = recordCount
-    if "_rb" in datasetComposeFile:
-        insertCount = recordCount / 3
+def loadDataset(benchToolTag, recordCount, dataset, log):
+    insertCount = recordCount / dataset.client_num
     insertStart0 = 0
     insertStart1 = insertCount
     insertStart2 = insertStart1 + insertCount
     runCmd(
         [
-            "env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s " % (benchToolTag, recordCount)
+            "sudo env YCSB_IMAGE_TAG=%s env RECORDCOUNT=%s "
+            % (benchToolTag, recordCount)
             + "env INSERTSTART0=%s env INSERTSTART1=%s env INSERTSTART2=%s "
             % (insertStart0, insertStart1, insertStart2)
             + "env INSERTCOUNT=%s " % (insertCount)
             + "docker stack deploy "
-            + "--compose-file proteus/deployment/compose-files/%s ycsb_load"
-            % (datasetComposeFile)
+            + "--compose-file compose-files/%s load" % (dataset.configFile)
         ],
         log,
     )
-    if "_mb" in datasetComposeFile:
-        waitTermination(["ycsb_load_ycsb-0"], log)
-    elif "_rb" in datasetComposeFile:
-        waitTermination(
-            ["ycsb_load_ycsb-0", "ycsb_load_ycsb-1", "ycsb_load_ycsb-2"], log
-        )
-    runCmd(["docker stack rm ycsb_load"], log)
+    if dataset.client_num == 1:
+        waitTermination(["load_client0"], log)
+    elif dataset.client_num == 3:
+        waitTermination(["load_client0", "load_client1", "load_client2"], log)
+    else:
+        print("deployment.dataset.client_num can be either 1 or 3")
+        cleanup(0, log)
+        sys.exit()
+    runCmd(["sudo docker stack rm load"], log)
 
 
 def createResultDir(resultDirPath):
@@ -299,21 +312,22 @@ class BenchmarkSuite(dict):
         self[key] = value
 
     def init(
-        self,
-        resultDirPath,
-        configFileName,
-        (systemRepo, systemBranch),
-        (benchToolRepo, benchToolBranch),
-        nodeLabelFile,
+        self, resultDirPath, configFileName, nodeLabelFile,
     ):
         self.resultDirPath = resultDirPath
         self.configFileName = configFileName
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.log = open(
-            os.path.join(args.dest, "log_" + self.configFileName + "_" + timestamp), "w"
+        self.log = open(os.path.join(args.dest, "log_" + timestamp), "w+")
+        self.systemTag = getLatestCommitTag(
+            self.default_config.system_repo.user,
+            self.default_config.system_repo.repo,
+            self.default_config.system_repo.branch,
         )
-        self.systemTag = getLatestCommitTag(systemRepo, systemBranch, self.log)
-        self.benchToolTag = getLatestCommitTag(benchToolRepo, benchToolBranch, self.log)
+        self.benchToolTag = getLatestCommitTag(
+            self.default_config.benchmark_tool_repo.user,
+            self.default_config.benchmark_tool_repo.repo,
+            self.default_config.benchmark_tool_repo.branch,
+        )
         self.nodeLabels = json.loads(
             nodeLabelFile.read(), object_hook=lambda dict: NodeLabels(dict)
         )
@@ -326,10 +340,10 @@ class BenchmarkSuite(dict):
 
     def cleanupPreviousRun(self):
         runCmd(
-            "docker stack rm query_engine "
-            + "&& docker stack rm storage_engine "
-            + "&& docker stack rm ycsb_load "
-            + "&& docker stack rm ycsb_run ",
+            "sudo docker stack rm query_engine "
+            + "&& sudo docker stack rm storage_engine "
+            + "&& sudo docker stack rm load "
+            + "&& sudo docker stack rm run ",
             None,
             True,
         )
@@ -400,15 +414,13 @@ class Benchmark:
             self.nodeLabels,
             self.log,
         )
-        insertCount = self.record_count
-        if "_rb" in self.deployment.workload:
-            insertCount = self.record_count / 3
+        insertCount = self.record_count / len(self.deployment.workload.placement)
         insertStart0 = 0
         insertStart1 = insertCount
         insertStart2 = insertStart1 + insertCount
         runCmd(
             [
-                "env YCSB_IMAGE_TAG=%s " % (self.benchToolTag)
+                "sudo env YCSB_IMAGE_TAG=%s " % (self.benchToolTag)
                 + "env PROTEUSHOST=%s env PROTEUSPORT=%d "
                 % (self.proteus_host, self.proteus_port)
                 + "env RECORDCOUNT=%s " % (self.record_count)
@@ -424,52 +436,49 @@ class Benchmark:
                 % (self.threads, self.outputFile)
                 + "env OUTDIR=%s " % (self.resultDirPath)
                 + "docker stack deploy "
-                + "--compose-file proteus/deployment/compose-files/%s ycsb_run"
-                % (self.deployment.workload)
+                + "--compose-file compose-files/%s run"
+                % (self.deployment.workload.configFile)
             ],
             self.log,
         )
-        if "_mb" in self.deployment.workload:
-            waitTermination(["ycsb_run_client-0"], self.log)
-        elif "_rb" in self.deployment.workload:
+        if len(self.deployment.workload.placement) == 1:
+            waitTermination(["run_client0"], self.log)
+        elif len(self.deployment.workload.placement) == 3:
             waitTermination(
-                ["ycsb_run_client-0", "ycsb_run_client-1", "ycsb_run_client-2"],
-                self.log,
+                ["run_client0", "run_client1", "run_client2"], self.log,
             )
         else:
-            print("unknown workload compose-file name")
+            print("self.deployment.workload.client_num can be either 1 or 3")
             cleanup(0, self.log)
             sys.exit()
-        runCmd(["docker stack rm ycsb_run"], self.log)
+        runCmd(["sudo docker stack rm run"], self.log)
         cleanup(1, self.log)
-        if "_rb" in getattr(self.deployment, "query_engine"):
+        for i in self.deployment.workload.placement:
+            if i != 0:
+                returnCode = runCmd(
+                    [
+                        "scp dc%s_node0:%s/* %s "
+                        % (i, self.resultDirPath, self.resultDirPath)
+                    ],
+                    self.log,
+                )
+                if returnCode:
+                    print("could not fetch results")
+                    sys.exit()
             returnCode = runCmd(
                 [
-                    "scp dc1_node0:%s/* %s " % (self.resultDirPath, self.resultDirPath)
-                    + "&& scp dc2_node0:%s/* %s"
-                    % (self.resultDirPath, self.resultDirPath)
+                    "sudo chown -R %s:%s %s"
+                    % (os.getgid(), os.getuid(), self.resultDirPath)
                 ],
-                None,
+                self.log,
             )
-            if returnCode:
-                print("could not fetch results")
-                sys.exit()
+        if len(self.deployment.workload.placement) > 1:
             returnCode = runCmd(
                 [
-                    "docker run -v %s:/ycsb " % (self.resultDirPath)
+                    "sudo docker run -v %s:/ycsb " % (self.resultDirPath)
                     + "-e MEASUREMENT_RESULTS_DIR=/ycsb "
                     + "-e PREFIX=%s " % (self.outputFile)
                     + "dvasilas/ycsb:%s" % (self.benchToolTag + "_parse")
-                ],
-                None,
-            )
-            if returnCode:
-                print("could not fetch results")
-                sys.exit()
-        else:
-            returnCode = runCmd(
-                [
-                    "scp dc1_node0:%s/* %s " % (self.resultDirPath, self.resultDirPath)
                 ],
                 None,
             )
@@ -507,17 +516,13 @@ if __name__ == "__main__":
                 config_file.read(), object_hook=lambda dict: BenchmarkSuite(dict)
             )
             benchSuite.init(
-                args.dest,
-                args.config.split(".")[0],
-                ("proteus", "benchmarks"),
-                ("YCSB", "proteus"),
-                label_file,
+                args.dest, args.config.split(".")[0], label_file,
             )
             benchSuite.cleanupPreviousRun()
             benchSuite.createBenchmarks()
             benchSuite.initSuite()
             results = benchSuite.run()
-            data = "query_proportion, update_proportion, cached_query_proportion, threads, [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms), [FR]AverageLatency(ms), [FR]MinLatency(ms), [FR]MaxLatency(ms), [FR]95thPercentileLatency(ms), [FR]99thPercentileLatency(ms)\n"
+            data = "query_proportion, update_proportion, cached_query_proportion, threads, [Q]Throughput(ops/sec), [Q]AverageLatency(ms), [Q]MinLatency(ms), [Q]MaxLatency(ms), [Q]95thPercentileLatency(ms), [Q]99thPercentileLatency(ms), [U]Throughput(ops/sec), [U]AverageLatency(ms), [U]MinLatency(ms), [U]MaxLatency(ms), [U]95thPercentileLatency(ms), [U]99thPercentileLatency(ms), [FR]AverageLatency(ms), [FR]MinLatency(ms), [FR]MaxLatency(ms), [FR]95thPercentileLatency(ms), [FR]99thPercentileLatency(ms)\n"
             for res in results:
                 data += res
             data = data[:-1]

@@ -19,7 +19,7 @@ services:
         && ./deployment/wait-for-it.sh --host=dsdriver-1 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=dsdriver-2 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=antidote --port=8087 --timeout=0
-        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote:8087 --conns=dsdriver-0:50150/dsdriver-1:50150/dsdriver-2:50150"
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote:8087 --conns=dsdriver-0:50150_local/dsdriver-1:50150_remote/dsdriver-2:50150_remote"
     depends_on:
       - antidote
     deploy:
@@ -34,7 +34,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250_local"
     depends_on:
       - qpuindex
     deploy:
@@ -49,7 +49,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250_remote"
     depends_on:
       - qpuindex
     deploy:
@@ -64,7 +64,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex --port=50250 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex:50250_remote"
     depends_on:
       - qpuindex
     deploy:

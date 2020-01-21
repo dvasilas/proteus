@@ -1,0 +1,50 @@
+{
+  "deployment": {
+    "storage_engine": "storage_engine/1dc.yml",
+    "query_engine": "query_engine/2dc_remote-update.yml",
+    "dataset": {
+      "configFile" : "load/1dc.yml",
+      "client_num": 1
+    },
+    "workload": {
+      "configFile": "run/1dc_remote.yml",
+      "placement": [1]
+    }
+  },
+  "placement": {
+    "storage_engine_cloudserver-0": "dc0_node1",
+    "storage_engine_dsdriver-0": "dc0_node1",
+    "query_engine_antidote": "dc1_node2",
+    "query_engine_qpuindex": "dc1_node2",
+    "query_engine_federation": "dc1_node2",
+    "run_client0": "dc1_node0"
+  },
+  "default_config": {
+    "system_repo" : {
+      "user": "dvasilas",
+      "repo": "proteus",
+      "branch": "master"
+    },
+    "benchmark_tool_repo" : {
+      "user": "dvasilas",
+      "repo": "YCSB",
+      "branch": "proteus"
+    },
+    "proteus_host": "federation",
+    "proteus_port": 50450,
+    "execution_time": 60,
+    "warmup_time": 10,
+    "record_count": 1000,
+    "query_proportion": 0.9,
+    "update_proportion": 0.1,
+    "cached_query_proportion": 0.2,
+    "threads": 1
+  },
+  "benchmark_configs":[
+    {
+      "query_proportion": 0.9,
+      "update_proportion": 0.1,
+      "threads": 1
+    }
+  ]
+}

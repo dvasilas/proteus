@@ -1,0 +1,38 @@
+version: '3'
+services:
+  client0:
+    image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
+    volumes:
+      - ${OUTDIR}:/ycsb
+    networks:
+      - proteus_net
+    environment:
+      - TYPE=run
+      - TABLE=ycsb-buck
+      - S3HOST=cloudserver-0
+      - S3PORT=8000
+      - S3ACCESSKEYID=accessKey1
+      - S3SECRETKEY=verySecretKey1
+      - WORKLOAD=workloada
+      - PROTEUSHOST=${PROTEUSHOST}
+      - PROTEUSPORT=${PROTEUSPORT}
+      - RECORDCOUNT=${RECORDCOUNT}
+      - INSERTCOUNT=${RECORDCOUNT}
+      - QUERYPROPORTION=${QUERYPROPORTION}
+      - UPDATEPROPORTION=${UPDATEPROPORTION}
+      - CACHEDQUERYPROPORTION=${CACHEDQUERYPROPORTION}
+      - EXECUTIONTIME=${EXECUTIONTIME}
+      - WARMUPTIME=${WARMUPTIME}
+      - THREADS=${THREADS}
+      - PRELOAD=file
+      - CLIENTID=0
+      - OUTPUT_FILE_NAME=${OUTPUT_FILE_NAME}
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node0 == true ]
+
+networks:
+  proteus_net:
+    external: true

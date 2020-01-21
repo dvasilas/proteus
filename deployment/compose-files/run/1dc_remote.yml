@@ -1,6 +1,6 @@
 version: '3'
 services:
-  client-0:
+  client0:
     image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
     volumes:
       - ${OUTDIR}:/ycsb
@@ -31,7 +31,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc0_node0 == true ]
+        constraints: [ node.labels.dc1_node0 == true ]
 
 networks:
   proteus_net:

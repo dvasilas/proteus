@@ -17,6 +17,8 @@ services:
     image: dvasilas/proteus:${PROTEUS_IMAGE_TAG}
     networks:
       - proteus_net
+    environment:
+      - DEBUG=true
     command: >
         bash -c "./deployment/wait-for-it.sh --host=cloudserver-0 --port=8000 --timeout=0
         && go run ./launcher/launcher.go --qpu=dbdriver --port=50150 --dataset=1/1/1 --db=s3 --endp=cloudserver-0:8000/cloudserver-0:50000"

@@ -1,6 +1,6 @@
 version: '3'
 services:
-  ycsb-0:
+  client0:
     image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
     networks:
       - proteus_net

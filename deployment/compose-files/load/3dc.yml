@@ -1,6 +1,6 @@
 version: '3'
 services:
-  ycsb-0:
+  client0:
     image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
     networks:
       - proteus_net
@@ -23,7 +23,7 @@ services:
       placement:
         constraints: [ node.labels.dc0_node0 == true ]
 
-  ycsb-1:
+  client1:
     image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
     networks:
       - proteus_net
@@ -46,7 +46,7 @@ services:
       placement:
         constraints: [ node.labels.dc1_node0 == true ]
 
-  ycsb-2:
+  client2:
     image: dvasilas/ycsb:${YCSB_IMAGE_TAG}
     networks:
       - proteus_net

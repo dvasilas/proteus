@@ -37,7 +37,7 @@ services:
     command: >
         bash -c "./deployment/wait-for-it.sh --host=dsdriver-0 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=antidote-0 --port=8087 --timeout=0
-        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-0:8087 --conns=dsdriver-0:50150"
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-0:8087 --conns=dsdriver-0:50150_local"
     depends_on:
       - antidote-0
     deploy:
@@ -52,7 +52,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250_remote"
     depends_on:
       - qpuindex-0
     deploy:
@@ -67,7 +67,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-0:50250_remote"
     depends_on:
       - qpuindex-0
     deploy:
@@ -83,7 +83,7 @@ services:
     command: >
         bash -c "./deployment/wait-for-it.sh --host=dsdriver-1 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=antidote-1 --port=8087 --timeout=0
-        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-1:8087 --conns=dsdriver-1:50150"
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-1:8087 --conns=dsdriver-1:50150_local"
     depends_on:
       - antidote-1
     deploy:
@@ -98,7 +98,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250_remote"
     depends_on:
       - qpuindex-1
     deploy:
@@ -113,7 +113,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-1:50250_remote"
     depends_on:
       - qpuindex-1
     deploy:
@@ -129,7 +129,7 @@ services:
     command: >
         bash -c "./deployment/wait-for-it.sh --host=dsdriver-2 --port=50150 --timeout=0
         && ./deployment/wait-for-it.sh --host=antidote-2 --port=8087 --timeout=0
-        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-2:8087 --conns=dsdriver-2:50150"
+        && go run ./launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --endP=antidote-2:8087 --conns=dsdriver-2:50150_local"
     depends_on:
       - antidote-2
     deploy:
@@ -144,7 +144,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250_remote"
     depends_on:
       - qpuindex-2
     deploy:
@@ -159,7 +159,7 @@ services:
       - proteus_net
     command: >
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
-        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250"
+        && go run launcher/launcher.go --qpu=cache --port=50350 --Csize=${CACHE_SIZE} --conns=qpuindex-2:50250_remote"
     depends_on:
       - qpuindex-2
     deploy:
@@ -176,7 +176,7 @@ services:
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-0 --port=50250 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-1-0 --port=50350 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-2-0 --port=50350 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-0:50250/qpucache-1-0:50350/qpucache-2-0:50350"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-0:50250_local/qpucache-1-0:50350_remote/qpucache-2-0:50350_remote"
     depends_on:
       - qpuindex-0
       - qpucache-1-0
@@ -195,7 +195,7 @@ services:
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-1 --port=50250 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-0-1 --port=50350 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-2-1 --port=50350 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-1:50250/qpucache-0-1:50350/qpucache-2-1:50350"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-1:50250_remote/qpucache-0-1:50350_local/qpucache-2-1:50350_remote"
     depends_on:
       - qpuindex-1
       - qpucache-0-1
@@ -214,7 +214,7 @@ services:
         bash -c "./deployment/wait-for-it.sh --host=qpuindex-2 --port=50250 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-0-2 --port=50350 --timeout=0
         && ./deployment/wait-for-it.sh --host=qpucache-1-2 --port=50350 --timeout=0
-        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-2:50250/qpucache-0-2:50350/qpucache-1-2:50350"
+        && go run ./launcher/launcher.go --qpu=federation --port=50450 --conns=qpuindex-2:50250_remote/qpucache-0-2:50350_remote/qpucache-1-2:50350_local"
     depends_on:
       - qpuindex-2
       - qpucache-0-2
