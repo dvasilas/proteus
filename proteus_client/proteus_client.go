@@ -105,7 +105,7 @@ func (c *Client) Close() {
 }
 
 // Query ...
-func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType, Metadata map[string]string) (<-chan ResponseRecord, <-chan error, error) {
+func (c *Client) Query(bucket string, AttrPredicate []AttributePredicate, TsPredicate QueryType, Metadata map[string]string) (<-chan ResponseRecord, <-chan error, error) {
 	pred, err := inputToAttributePredicate(AttrPredicate)
 	if err != nil {
 		return nil, nil, err
@@ -123,7 +123,7 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
 		)
 	}
-	stream, _, err := c.client.Query(pred, tsPred, Metadata, false)
+	stream, _, err := c.client.Query(bucket, pred, tsPred, Metadata, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -158,6 +158,7 @@ func (c *Client) Query(AttrPredicate []AttributePredicate, TsPredicate QueryType
 	return respChan, errChan, nil
 }
 
+// GetDataTransfer ...
 func (c *Client) GetDataTransfer() (float64, error) {
 	dataTransferred, err := c.client.GetDataTransfer()
 	if err != nil {

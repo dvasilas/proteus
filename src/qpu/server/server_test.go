@@ -239,6 +239,7 @@ func doTest(t *testing.T, test testScenario) {
 
 	for _, q := range test.plan {
 		stream, _, err := client.Query(
+			"mock_bucket",
 			q.query,
 			protoutils.SnapshotTimePredicate(
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),

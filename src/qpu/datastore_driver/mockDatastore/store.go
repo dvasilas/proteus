@@ -33,7 +33,7 @@ func (ds Datastore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, 
 
 //GetSnapshot reads a snapshot of all objects stored in an Antidotedb bucket,
 // not yet implemented
-func (ds Datastore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan error {
+func (ds Datastore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
 	for _, item := range ds.data {
 		payload := protoutils.PayloadState(&item.State)
 		msg <- protoutils.LogOperation(item.ObjectID, item.Bucket, pbUtils.LogOperation_S3OBJECT, &item.Timestamp, payload)

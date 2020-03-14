@@ -20,17 +20,15 @@ type AntidoteDataStore struct {
 	logStreamEndpoint string
 	endpoint          string
 	antidoteCli       *antidote.Client
-	bucketName        string
 }
 
 //---------------- API Functions -------------------
 
 //New creates and initializes an instance of AntidoteDataStore
-func New(endp, logPropEndp, buck string) AntidoteDataStore {
+func New(endp, logPropEndp string) AntidoteDataStore {
 	s := AntidoteDataStore{
 		endpoint:          endp,
 		logStreamEndpoint: logPropEndp,
-		bucketName:        buck,
 	}
 	return s
 }
@@ -64,8 +62,8 @@ func (ds AntidoteDataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack cha
 
 //GetSnapshot reads a snapshot of all objects stored in an Antidotedb bucket,
 // not yet implemented
-func (ds AntidoteDataStore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan error {
-	return ds.readSnapshot(msg, ds.processAndForwardObject)
+func (ds AntidoteDataStore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
+	return ds.readSnapshot(bucket, msg, ds.processAndForwardObject)
 }
 
 // Op ...
@@ -101,7 +99,7 @@ func (ds AntidoteDataStore) opConsumer(stream pbAnt.Service_WatchAsyncClient, ms
 
 //readSnapshot retrieves all objects stored in the given bucket
 // and for each object calls the processObj function
-func (ds AntidoteDataStore) readSnapshot(msg chan *pbUtils.LogOperation, processObj func(string, *antidote.MapReadResult, []antidote.MapEntryKey, chan *pbUtils.LogOperation, chan error)) <-chan error {
+func (ds AntidoteDataStore) readSnapshot(bucketName string, msg chan *pbUtils.LogOperation, processObj func(string, string, *antidote.MapReadResult, []antidote.MapEntryKey, chan *pbUtils.LogOperation, chan error)) <-chan error {
 	errs := make(chan error, 1)
 	endpoint := strings.Split(ds.endpoint, ":")
 	port, err := strconv.ParseInt(endpoint[1], 10, 64)
@@ -115,9 +113,9 @@ func (ds AntidoteDataStore) readSnapshot(msg chan *pbUtils.LogOperation, process
 		return errs
 	}
 	ds.antidoteCli = c
-	bucket := antidote.Bucket{Bucket: []byte(ds.bucketName)}
+	bucket := antidote.Bucket{Bucket: []byte(bucketName)}
 	tx := ds.antidoteCli.CreateStaticTransaction()
-	pIndex, err := bucket.ReadSet(tx, antidote.Key([]byte("."+ds.bucketName)))
+	pIndex, err := bucket.ReadSet(tx, antidote.Key([]byte("."+bucketName)))
 	if err != nil {
 		errs <- err
 		return errs
@@ -132,7 +130,7 @@ func (ds AntidoteDataStore) readSnapshot(msg chan *pbUtils.LogOperation, process
 			if err != nil {
 				errs <- err
 			}
-			processObj(string(obj), objVal, entries, msg, errs)
+			processObj(string(obj), bucketName, objVal, entries, msg, errs)
 		}
 		close(msg)
 	}()
@@ -141,7 +139,7 @@ func (ds AntidoteDataStore) readSnapshot(msg chan *pbUtils.LogOperation, process
 
 //processAndForwardObject reads the content of an object (map crdt)
 // creates a *pbUtils.LogOperation and sends it to the datastoredriver to datastoredriver via a channel
-func (ds AntidoteDataStore) processAndForwardObject(key string, val *antidote.MapReadResult, entries []antidote.MapEntryKey, msg chan *pbUtils.LogOperation, errs chan error) {
+func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, val *antidote.MapReadResult, entries []antidote.MapEntryKey, msg chan *pbUtils.LogOperation, errs chan error) {
 	attrs := make([]*pbUtils.Attribute, len(entries))
 	for i, e := range entries {
 		switch e.CrdtType {
@@ -167,7 +165,7 @@ func (ds AntidoteDataStore) processAndForwardObject(key string, val *antidote.Ma
 	state := protoutils.ObjectState(attrs)
 	obj := protoutils.LogOperation(
 		string(key),
-		ds.bucketName,
+		bucket,
 		pbUtils.LogOperation_MAPCRDT,
 		protoutils.Vectorclock(map[string]uint64{"antidote": uint64(0)}),
 		protoutils.PayloadState(state),

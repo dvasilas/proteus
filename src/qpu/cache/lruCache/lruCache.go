@@ -51,7 +51,7 @@ func New(conf *config.Config) *Cache {
 }
 
 // Put stores an object in a cache entry
-func (c *Cache) Put(predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, newEntrySize int, client client.Client) error {
+func (c *Cache) Put(bucket string, predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, newEntrySize int, client client.Client) error {
 	c.mutex.Lock()
 	if c.items == nil {
 		c.ll = list.New()
@@ -62,6 +62,7 @@ func (c *Cache) Put(predicate []*pbUtils.AttributePredicate, objects []utils.Obj
 			c.evict()
 		}
 		stream, cancel, err := client.Query(
+			bucket,
 			predicate,
 			protoutils.SnapshotTimePredicate(
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),

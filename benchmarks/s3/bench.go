@@ -40,6 +40,7 @@ type dataset interface {
 }
 
 type benchmark struct {
+	bucket        string
 	workload      *yelp.Workload
 	conf          config
 	proteusClient *proteusclient.Client
@@ -244,7 +245,7 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 			} else {
 				log.Fatal("unknown value for QUERY_TYPE variable")
 			}
-			t, err = b.doQuery(query)
+			t, err = b.doQuery(b.bucket, query)
 			if err != nil {
 				return 0, 0, err
 			}
@@ -265,9 +266,9 @@ func (b *benchmark) runWorkload(dsEndpoint string, respTimeCh chan time.Duration
 	//return opCount, t.Seconds(), nil
 }
 
-func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Duration, error) {
+func (b *benchmark) doQuery(bucket string, query []proteusclient.AttributePredicate) (time.Duration, error) {
 	t0 := time.Now()
-	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.LATESTSNAPSHOT, nil)
+	respCh, errCh, err := b.proteusClient.Query(bucket, query, proteusclient.LATESTSNAPSHOT, nil)
 	if err != nil {
 		return time.Since(t0), err
 	}
@@ -324,6 +325,7 @@ func (b *benchmark) doQuery(query []proteusclient.AttributePredicate) (time.Dura
 func (b *benchmark) howFresh() error {
 	errCh := make(chan error)
 	go b.subscribe(
+		b.bucket,
 		[]proteusclient.AttributePredicate{
 			proteusclient.AttributePredicate{
 				AttrName: "votes_useful",
@@ -368,8 +370,8 @@ func (b *benchmark) howFresh() error {
 	return nil
 }
 
-func (b *benchmark) subscribe(query []proteusclient.AttributePredicate, errorCh chan error) {
-	respCh, errCh, err := b.proteusClient.Query(query, proteusclient.NOTIFY, nil)
+func (b *benchmark) subscribe(bucket string, query []proteusclient.AttributePredicate, errorCh chan error) {
+	respCh, errCh, err := b.proteusClient.Query(bucket, query, proteusclient.NOTIFY, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

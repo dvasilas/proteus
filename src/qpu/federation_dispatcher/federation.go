@@ -52,7 +52,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	errCh := make(chan error)
 	seqID := int64(0)
 	for i, subQ := range subQueries {
-		streamIn, _, err := subQ.Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
+		streamIn, _, err := subQ.Client.Query(request.GetBucket(), request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
 		if err != nil {
 			return err
 		}

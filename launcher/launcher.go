@@ -78,7 +78,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		conf.DataStoreConfig.BucketName = dsConf.BucketName
 		if dbtype == "s3" {
 			conf.DataStoreConfig.AwsAccessKeyID = dsConf.AwsAccessKeyID
 			conf.DataStoreConfig.AwsSecretAccessKey = dsConf.AwsSecretAccessKey
@@ -91,19 +90,20 @@ func main() {
 		n++
 		conf.CacheConfig.Size = size
 	case "index":
-		var configFile string
-		var endpoint string
+		var configFile, endpoint, bucket string
 		indexFlags := flag.NewFlagSet("index QPU flags", flag.ExitOnError)
+		indexFlags.StringVar(&configFile, "bucket", "noArg", "bucket to index")
 		indexFlags.StringVar(&configFile, "config", "noArg", "the index configuration file")
 		indexFlags.StringVar(&endpoint, "endP", "noArg", "the index store endpoint")
-		indexFlags.Parse(os.Args[3:5])
-		n += 2
+		indexFlags.Parse(os.Args[3:6])
+		n += 3
 
 		var indexConf IndexConfJSON
 		err := readConfigFile(configFile, &indexConf)
 		if err != nil {
 			log.Fatal(err)
 		}
+		conf.IndexConfig.Bucket = bucket
 		conf.IndexConfig.AttributeName = indexConf.AttributeName
 		conf.IndexConfig.AttributeType = indexConf.AttributeType
 		conf.IndexConfig.LBound = indexConf.LBound

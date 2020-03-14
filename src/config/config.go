@@ -19,7 +19,6 @@ type Config struct {
 		Dataset            *pbQPU.DataSet
 		Type               Datastore
 		Endpoint           string
-		Bucket             string
 		LogStreamEndpoint  string
 		ΑwsAccessKeyID     string
 		AwsSecretAccessKey string
@@ -29,6 +28,7 @@ type Config struct {
 	}
 	IndexConfig struct {
 		IndexingConfig []*pbUtils.AttributePredicate
+		Bucket         string
 		ConsLevel      string
 		IndexStore     struct {
 			Store               IndexStore
@@ -143,7 +143,6 @@ const (
 
 func (c *Config) getDatastoreConfig(conf ConfJSON) error {
 	c.DatastoreConfig.Endpoint = conf.DataStoreConfig.Endpoint
-	c.DatastoreConfig.Bucket = conf.DataStoreConfig.BucketName
 	c.DatastoreConfig.LogStreamEndpoint = conf.DataStoreConfig.LogStreamEndpoint
 	c.DatastoreConfig.ΑwsAccessKeyID = conf.DataStoreConfig.AwsAccessKeyID
 	c.DatastoreConfig.AwsSecretAccessKey = conf.DataStoreConfig.AwsSecretAccessKey
@@ -202,6 +201,7 @@ const (
 type IndexImplementation int
 
 func (c *Config) getIndexConfig(conf ConfJSON) error {
+	c.IndexConfig.Bucket = conf.IndexConfig.Bucket
 	if err := c.getIndexStore(conf); err != nil {
 		return err
 	}
@@ -315,12 +315,12 @@ type ConfJSON struct {
 		}
 		Type               string
 		Endpoint           string
-		BucketName         string
 		LogStreamEndpoint  string
 		AwsAccessKeyID     string
 		AwsSecretAccessKey string
 	}
 	IndexConfig struct {
+		Bucket        string
 		AttributeName string
 		AttributeType string
 		LBound        string

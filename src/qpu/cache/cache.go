@@ -30,7 +30,7 @@ type CQPU struct {
 // Describes the interface that any cache implementation needs to expose
 // to work with this module.
 type cacheImplementation interface {
-	Put(predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
+	Put(bucket string, predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
 	Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
 }
 
@@ -89,7 +89,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 			}
 			return nil
 		}
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), nil, false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), request.GetClock(), nil, false)
 		if err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				respond = false
 			}
 		}
-		if err := q.cache.Put(request.GetPredicate(), tempCacheEntry, tempCacheEntrySize, q.qpu.Conns[0].Client); err != nil {
+		if err := q.cache.Put(request.GetBucket(), request.GetPredicate(), tempCacheEntry, tempCacheEntrySize, q.qpu.Conns[0].Client); err != nil {
 			return err
 		}
 		return nil
@@ -155,7 +155,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
 		errCh := make(chan error)
 		seqID := int64(0)
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
 		if err != nil {
 			return err
 		}

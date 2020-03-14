@@ -1,5 +1,4 @@
 {
-  "bucketName": "ycsb-buck",
   "awsAccessKeyID": "accessKey1",
   "awsSecretAccessKey": "verySecretKey1"
 }

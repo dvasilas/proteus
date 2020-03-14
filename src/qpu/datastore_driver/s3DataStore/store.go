@@ -27,7 +27,6 @@ type S3DataStore struct {
 	awsAccessKeyID     string
 	awsSecretAccessKey string
 	endpoint           string
-	bucketName         string
 	logStreamEndpoint  string
 }
 
@@ -47,12 +46,11 @@ type listBucketResult struct {
 //---------------- API Functions -------------------
 
 //New creates and initializes an instance of S3S3DataStore
-func New(aKeyID string, aSecretKey string, endP string, bName string, logSEndP string) S3DataStore {
+func New(aKeyID string, aSecretKey string, endP string, logSEndP string) S3DataStore {
 	s := S3DataStore{
 		awsAccessKeyID:     aKeyID,
 		awsSecretAccessKey: aSecretKey,
 		endpoint:           endP,
-		bucketName:         bName,
 		logStreamEndpoint:  logSEndP,
 	}
 	return s
@@ -86,9 +84,9 @@ func (ds S3DataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool
 //GetSnapshot reads a snapshot of all objects in the specified bucket, and their metadata attributes
 // by performing a http GET request to list all objects in the bucket
 // and the a http HEAD to read the metadata attributes of each object
-func (ds S3DataStore) GetSnapshot(msg chan *pbUtils.LogOperation) <-chan error {
+func (ds S3DataStore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
 	errs := make(chan error, 1)
-	ds.readSnapshot(msg, errs, ds.processAndForwardObject)
+	ds.readSnapshot(bucket, msg, errs, ds.processAndForwardObject)
 	return errs
 }
 
@@ -143,9 +141,9 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 // all objects in the given bucket
 // for each object it sends a http HEAD request to get the object's metadata attributes
 // and calls the processObj function
-func (ds S3DataStore) readSnapshot(msg chan *pbUtils.LogOperation, errs chan error, processObj func(string, http.Header, chan *pbUtils.LogOperation, chan error)) {
+func (ds S3DataStore) readSnapshot(bucket string, msg chan *pbUtils.LogOperation, errs chan error, processObj func(string, string, http.Header, chan *pbUtils.LogOperation, chan error)) {
 	buff := bytes.NewBuffer([]byte{})
-	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, ds.bucketName)
+	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, bucket)
 
 	request, err := http.NewRequest("GET", requestURL, buff)
 	if err != nil {
@@ -174,7 +172,7 @@ func (ds S3DataStore) readSnapshot(msg chan *pbUtils.LogOperation, errs chan err
 	go func() {
 		for _, r := range res.Contents {
 			buff := bytes.NewBuffer([]byte{})
-			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, ds.bucketName, r.Key)
+			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, bucket, r.Key)
 			request, err = http.NewRequest("HEAD", requestURL, buff)
 			if err != nil {
 				errs <- err
@@ -192,7 +190,7 @@ func (ds S3DataStore) readSnapshot(msg chan *pbUtils.LogOperation, errs chan err
 				close(msg)
 				break
 			}
-			processObj(r.Key, resp.Header, msg, errs)
+			processObj(r.Key, bucket, resp.Header, msg, errs)
 		}
 		close(msg)
 	}()
@@ -201,7 +199,7 @@ func (ds S3DataStore) readSnapshot(msg chan *pbUtils.LogOperation, errs chan err
 //processAndForwardObject receives the metadata attributes of an object
 // in the form of an http header, it creates a *pbUtils.LogOperation
 // and sends it to the datastoredriver to datastoredriver via a channel
-func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg chan *pbUtils.LogOperation, errs chan error) {
+func (ds S3DataStore) processAndForwardObject(key string, bucket string, head http.Header, msg chan *pbUtils.LogOperation, errs chan error) {
 	var payload *pbUtils.Payload
 	attrs := make([]*pbUtils.Attribute, 0)
 
@@ -231,7 +229,7 @@ func (ds S3DataStore) processAndForwardObject(key string, head http.Header, msg 
 	}
 	obj := protoutils.LogOperation(
 		key,
-		ds.bucketName,
+		bucket,
 		pbUtils.LogOperation_S3OBJECT,
 		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(ts.UnixNano() / int64(time.Millisecond))}),
 		payload,

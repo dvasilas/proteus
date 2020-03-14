@@ -88,6 +88,8 @@ func QPU(conf *config.Config) (*LQPU, error) {
 	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
 	for i, conn := range q.qpu.Conns {
 		streamIn, cancel, err := conn.Client.Query(
+			//TODO: move this to configuration
+			"lambda-buck",
 			pred,
 			protoutils.SnapshotTimePredicate(
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),

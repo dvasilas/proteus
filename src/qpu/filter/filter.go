@@ -44,7 +44,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	if err != nil {
 		return nil
 	}
-	streamIn, cancel, err := q.qpu.Conns[0].Client.Query(request.GetPredicate(), request.GetClock(), nil, request.GetSync())
+	streamIn, cancel, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), request.GetClock(), nil, request.GetSync())
 	seqID := int64(0)
 	for {
 		streamRec, err := streamIn.Recv()

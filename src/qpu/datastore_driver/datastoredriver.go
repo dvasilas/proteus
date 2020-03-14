@@ -24,7 +24,7 @@ type DriverQPU struct {
 }
 
 type dataStore interface {
-	GetSnapshot(chan *pbUtils.LogOperation) <-chan error
+	GetSnapshot(string, chan *pbUtils.LogOperation) <-chan error
 	SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error)
 	Op(op *pbUtils.LogOperation)
 }
@@ -47,15 +47,13 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 			conf.DatastoreConfig.ΑwsAccessKeyID,
 			conf.DatastoreConfig.AwsSecretAccessKey,
 			conf.DatastoreConfig.Endpoint,
-			conf.DatastoreConfig.Bucket,
 			conf.DatastoreConfig.LogStreamEndpoint,
 		)
 	case config.ANTIDOTE:
 		q.ds = antDS.New(
 			conf.DatastoreConfig.Endpoint,
 			conf.DatastoreConfig.LogStreamEndpoint,
-			conf.DatastoreConfig.Bucket)
-
+		)
 	case config.MOCK:
 		q.ds = mockDS.New()
 	}
@@ -107,7 +105,7 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.Req
 	}
 	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
-		errsGetSn := q.ds.GetSnapshot(streamCh)
+		errsGetSn := q.ds.GetSnapshot(request.GetBucket(), streamCh)
 		for {
 			select {
 			case err, ok := <-errsGetSn:

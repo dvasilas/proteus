@@ -94,6 +94,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
 	for i, conn := range q.qpu.Conns {
 		streamIn, cancel, err := conn.Client.Query(
+			q.qpu.Config.IndexConfig.Bucket,
 			pred,
 			protoutils.SnapshotTimePredicate(
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
@@ -389,6 +390,7 @@ func (q *IQPU) catchUp() error {
 	for _, conn := range q.qpu.Conns {
 		pred := make([]*pbUtils.AttributePredicate, 0)
 		stream, cancel, err := conn.Client.Query(
+			q.qpu.Config.IndexConfig.Bucket,
 			pred,
 			protoutils.SnapshotTimePredicate(
 				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),

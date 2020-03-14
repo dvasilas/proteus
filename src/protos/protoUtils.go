@@ -92,10 +92,10 @@ func Attribute(key string, typ pbUtils.Attribute_AttributeType, val *pbUtils.Val
 }
 
 //RequestStreamRequest creates a protos/qpu/RequestStream{Request} object
-func RequestStreamRequest(ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.RequestStream {
+func RequestStreamRequest(bucket string, ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.RequestStream {
 	return &pbQPU.RequestStream{
 		Payload: &pbQPU.RequestStream_Request{
-			Request: QueryRequest(ts, predicate, metadata, sync),
+			Request: QueryRequest(bucket, ts, predicate, metadata, sync),
 		},
 	}
 }
@@ -123,9 +123,10 @@ func RequestStreamPing(sID int64) *pbQPU.RequestStream {
 }
 
 //QueryRequest ...
-func QueryRequest(ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.QueryRequest {
+func QueryRequest(bucket string, ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.QueryRequest {
 	return &pbQPU.QueryRequest{
 		Clock:     ts,
+		Bucket:    bucket,
 		Predicate: predicate,
 		Metadata:  metadata,
 		Sync:      sync,

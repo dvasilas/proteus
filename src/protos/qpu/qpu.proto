@@ -46,9 +46,10 @@ message QueryRequest {
   //Timestamp is part of the attributes
   //Desclared explicitly here for easier parsing
   utils.SnapshotTimePredicate clock = 1;
-  repeated utils.AttributePredicate predicate = 2;
-  map<string, string> metadata = 3;
-  bool sync = 4;
+  string bucket = 2;
+  repeated utils.AttributePredicate predicate = 3;
+  map<string, string> metadata = 4;
+  bool sync = 5;
 }
 
 message AckMsg {
