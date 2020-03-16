@@ -161,7 +161,7 @@ func deployPopulateDatastore(depl datastoreDeployment) {
 		log.Fatal(err)
 	}
 	go func() {
-		server := QPUServer{config: depl.config, api: dsqpu}
+		server := QPUServer{Config: depl.config, Server: dsqpu}
 		s := grpc.NewServer()
 		pbQPU.RegisterQPUServer(s, &server)
 		reflection.Register(s)
@@ -216,7 +216,7 @@ func createQPU(conf []*config.Config, depl *deployment) {
 func startServer(conf *config.Config, api QPUAPI, depl *deployment) <-chan int {
 	wait := make(chan int)
 	go func() {
-		server := QPUServer{config: conf, api: api}
+		server := QPUServer{Config: conf, Server: api}
 		s := grpc.NewServer()
 		pbQPU.RegisterQPUServer(s, &server)
 		reflection.Register(s)

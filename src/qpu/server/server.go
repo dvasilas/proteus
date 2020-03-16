@@ -29,8 +29,8 @@ import (
 // api:
 // config:
 type QPUServer struct {
-	api    QPUAPI
-	config *config.Config
+	Server QPUAPI
+	Config *config.Config
 }
 
 //QPUAPI specifies the API of a QPU
@@ -53,16 +53,17 @@ func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
 	if err != nil {
 		return err
 	}
-	return s.api.Query(stream, request)
+	return s.Server.Query(stream, request)
 }
 
 //GetConfig constructs and returns a structure describing the configuration of a QPU
 func (s *QPUServer) GetConfig(ctx context.Context, in *pbQPU.ConfigRequest) (*pbQPU.ConfigResponse, error) {
-	return s.api.GetConfig()
+	return s.Server.GetConfig()
 }
 
+// GetDataTransfer ...
 func (s *QPUServer) GetDataTransfer(ctx context.Context, in *pbQPU.GetDataRequest) (*pbQPU.DataTransferResponse, error) {
-	datatransferredCount := s.api.GetDataTransfer()
+	datatransferredCount := s.Server.GetDataTransfer()
 	return &pbQPU.DataTransferResponse{
 		KBytesTranferred: datatransferredCount,
 	}, nil
@@ -126,7 +127,7 @@ func Server(confArg config.ConfJSON) error {
 			return err
 		}
 	}
-	server = QPUServer{config: conf, api: api}
+	server = QPUServer{Config: conf, Server: api}
 
 	setCleanup(server)
 
@@ -147,7 +148,7 @@ func Server(confArg config.ConfJSON) error {
 
 func (s *QPUServer) cleanup() {
 	log.Info("QPU server received SIGTERM")
-	s.api.Cleanup()
+	s.Server.Cleanup()
 }
 
 //---------------- Auxiliary Functions -------------
