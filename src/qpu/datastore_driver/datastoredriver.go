@@ -66,7 +66,6 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.Req
 		return utils.Ping(streamOut, requestRec.GetPing())
 	}
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
 	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}

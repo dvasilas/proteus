@@ -120,7 +120,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 // Query implements the Query API for the index QPU
 func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request}).Debug("query request received")
+	log.WithFields(log.Fields{"request": request, "QPU": "index"}).Debug("query request received")
 	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}

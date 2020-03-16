@@ -1,0 +1,54 @@
+{
+  "config": [
+    {
+      "qpuType": "dbdriver",
+      "port": "50150",
+      "dataStoreConfig": {
+        "type": "s3",
+        "endpoint": "http://127.0.0.1:8001",
+        "LogStreamEndpoint": "localhost:50001",
+        "AwsAccessKeyID": "accessKey1",
+        "AwsSecretAccessKey": "verySecretKey1"
+      }
+    },
+    {
+      "qpuType": "filter",
+      "port": "50250",
+      "connections": [
+        {
+          "address": "127.0.0.1:50150",
+          "local": "local"
+        }
+      ]
+    },
+    {
+      "qpuType": "index",
+      "port": "50350",
+      "connections": [{
+        "address": "127.0.0.1:50150",
+        "local": "local"
+      }],
+      "indexConfig": {
+        "attributeName": "tripdistance",
+        "attributeType": "s3tagFlt",
+        "lBound": "0",
+        "uBound": "100",
+        "consLevel": "async",
+        "indexStore": {
+          "store": "in_mem"
+        }
+      }
+    },
+    {
+      "qpuType": "cache",
+      "port": "50450",
+      "connections": [{
+        "address": "127.0.0.1:50250",
+        "local": "local"
+      }],
+      "CacheConfig": {
+        "size": "100"
+      }
+    }
+  ]
+}

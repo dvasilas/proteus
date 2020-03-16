@@ -58,6 +58,7 @@ func QPU(conf *config.Config) (*CQPU, error) {
 // Query implements the Query API for the cache QPU
 func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
+	log.WithFields(log.Fields{"request": request, "QPU": "cache"}).Debug("query request received")
 	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
 	if err != nil {
 		return nil

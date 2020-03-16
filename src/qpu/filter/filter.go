@@ -39,7 +39,7 @@ func QPU(conf *config.Config) (*FQPU, error) {
 // Query implements the Query API for the filter QPU
 func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
 	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request}).Debug("query request received")
+	log.WithFields(log.Fields{"request": request, "QPU": "filter"}).Debug("query request received")
 	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
 	if err != nil {
 		return nil
