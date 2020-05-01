@@ -1,31 +1,11 @@
 language: go
 
 go:
-  - 1.10.x
+ - 1.11.x
 
 env:
-  - DEP_VERSION="0.5.3"
-
-addons:
-  apt:
-    packages:
-      - python3-pip
-
-before_install:
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-
-install:
-  - dep ensure
-
-before_script:
-  - go vet ./...
+ - GO111MODULE=on
 
 script:
-  - make test
-
-notifications:
-  email:
-    recipients:
-      - dimitrios.vasilas@scality.com
-    on_success: always
-    on_failure: always
+  - go build ./...
+  - go test -v ./...
