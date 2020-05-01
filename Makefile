@@ -25,6 +25,7 @@ proto: $(PROTOC_CMD)
 	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
 	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/qpu/qpu.proto
 	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
+	protoc --proto_path=./src/protos/datastore --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/datastore/datastore.proto
 	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
 	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
 	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/s3client --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/s3client/s3client.proto

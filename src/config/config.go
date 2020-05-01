@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/dvasilas/proteus/src/protos"
@@ -15,15 +16,8 @@ type Config struct {
 	QpuType         pbQPU.ConfigResponse_QPUType
 	Port            string
 	Connections     []QPUConnection
-	DatastoreConfig struct {
-		Dataset            *pbQPU.DataSet
-		Type               Datastore
-		Endpoint           string
-		LogStreamEndpoint  string
-		ΑwsAccessKeyID     string
-		AwsSecretAccessKey string
-	}
-	CacheConfig struct {
+	DatastoreConfig DatastoreConfig
+	CacheConfig     struct {
 		Size int
 	}
 	IndexConfig struct {
@@ -43,6 +37,41 @@ type Config struct {
 		Delay    int64
 	}
 }
+
+// DatastoreConfig ...
+type DatastoreConfig struct {
+	Schema             []DatastoreTable
+	Dataset            *pbQPU.DataSet
+	Type               Datastore
+	Endpoint           string
+	LogStreamEndpoint  string
+	ΑwsAccessKeyID     string
+	AwsSecretAccessKey string
+}
+
+// DatastoreTable ...
+type DatastoreTable struct {
+	Table      string
+	Attributes []DatastoreAttribute
+}
+
+// DatastoreAttribute ...
+type DatastoreAttribute struct {
+	Key  string
+	Type DatastoreAttributeType
+}
+
+// DatastoreAttributeType ...
+type DatastoreAttributeType int
+
+const (
+	// STR ...
+	STR DatastoreAttributeType = iota
+	// INT ...
+	INT DatastoreAttributeType = iota
+	// FLT ...
+	FLT DatastoreAttributeType = iota
+)
 
 // QPUConnection ...
 type QPUConnection struct {
@@ -85,6 +114,7 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 		if err := config.getDatastoreConfig(conf); err != nil {
 			return nil, err
 		}
+		fmt.Println("datastore config", config.DatastoreConfig)
 	case pbQPU.ConfigResponse_CACHE:
 		config.getCacheConfig(conf)
 	case pbQPU.ConfigResponse_INDEX:
@@ -137,6 +167,8 @@ const (
 	S3 Datastore = iota
 	// ANTIDOTE is the enum value for an Antidote backend data store
 	ANTIDOTE Datastore = iota
+	// MYSQL ...
+	MYSQL Datastore = iota
 	// MOCK ...
 	MOCK Datastore = iota
 )
@@ -154,6 +186,7 @@ func (c *Config) getDatastoreConfig(conf ConfJSON) error {
 				},
 			},
 		})
+	c.getDatastoreSchema(conf)
 	return c.getDatastore(conf.DataStoreConfig.Type)
 }
 
@@ -163,10 +196,38 @@ func (c *Config) getDatastore(store string) error {
 		c.DatastoreConfig.Type = S3
 	case "antidote":
 		c.DatastoreConfig.Type = ANTIDOTE
+	case "mysql":
+		c.DatastoreConfig.Type = MYSQL
 	case "mock":
 		c.DatastoreConfig.Type = MOCK
 	default:
 		return errors.New("unknown backend datastore")
+	}
+	return nil
+}
+
+func (c *Config) getDatastoreSchema(conf ConfJSON) error {
+	fmt.Println("getDatastoreSchema")
+	c.DatastoreConfig.Schema = make([]DatastoreTable, 0)
+	for _, table := range conf.DataStoreConfig.Schema {
+		fmt.Println(table.Table)
+		dsTable := DatastoreTable{Table: table.Table}
+		dsTable.Attributes = make([]DatastoreAttribute, 0)
+		for _, attribute := range table.Attributes {
+			dsAttribute := DatastoreAttribute{Key: attribute.Key}
+			switch attribute.Type {
+			case "int":
+				dsAttribute.Type = INT
+			case "string":
+				dsAttribute.Type = STR
+			case "float":
+				dsAttribute.Type = FLT
+			default:
+				return fmt.Errorf(fmt.Sprintf("invalid attribute type %s in schema", attribute.Type))
+			}
+			dsTable.Attributes = append(dsTable.Attributes, dsAttribute)
+		}
+		c.DatastoreConfig.Schema = append(c.DatastoreConfig.Schema, dsTable)
 	}
 	return nil
 }
@@ -308,6 +369,13 @@ type ConfJSON struct {
 	Port            string
 	Connections     []QPUConnectionJSON
 	DataStoreConfig struct {
+		Schema []struct {
+			Table      string
+			Attributes []struct {
+				Key  string
+				Type string
+			}
+		}
 		DataSet struct {
 			DB    string
 			DC    string

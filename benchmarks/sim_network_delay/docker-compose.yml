@@ -1,0 +1,31 @@
+version: "3.0"
+services:
+  client_local:
+    container_name: client_local
+    build: ./client
+    tty: true
+    cap_add:
+    - NET_ADMIN
+    networks:
+      - local
+  client_remote:
+    container_name: client_remote
+    build: ./client
+    tty: true
+    cap_add:
+    - NET_ADMIN
+    networks:
+      - interdc
+  server:
+    container_name: server
+    build: ./server
+    tty: true
+    cap_add:
+    - NET_ADMIN
+    networks:
+      - interdc
+      - local
+
+networks:
+  interdc:
+  local:

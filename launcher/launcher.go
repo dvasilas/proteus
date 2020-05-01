@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +20,13 @@ type DataStoreConfJSON struct {
 	BucketName         string
 	AwsAccessKeyID     string
 	AwsSecretAccessKey string
+	Schema             []struct {
+		Table      string
+		Attributes []struct {
+			Key  string
+			Type string
+		}
+	}
 }
 
 // IndexConfJSON ...
@@ -40,17 +48,23 @@ func main() {
 	initDebug()
 
 	genFlags := flag.NewFlagSet("general flags", flag.ExitOnError)
-	var qType, port string
+	var qType, port, configFile string
 	genFlags.StringVar(&qType, "qpu", "noArg", "QPU type")
 	genFlags.StringVar(&port, "port", "noArg", "port for incoming connections")
-	genFlags.Parse(os.Args[1:3])
+	genFlags.StringVar(&configFile, "config", "noArg", "confing file")
+	genFlags.Parse(os.Args[1:4])
 
-	conf := config.ConfJSON{
-		QpuType: qType,
-		Port:    port,
+	var conf config.ConfJSON
+	err := readConfigFile(configFile, &conf)
+	if err != nil {
+		log.Fatal(err)
 	}
+	fmt.Println("config read from file", conf)
 
-	n := 3
+	conf.QpuType = qType
+	conf.Port = port
+
+	n := 4
 	switch qType {
 	case "dbdriver":
 		dbFlags := flag.NewFlagSet("datastore flags", flag.ExitOnError)
@@ -58,7 +72,8 @@ func main() {
 		dbFlags.StringVar(&dataset, "dataset", "noArg", "dataset (db, dc, shard ids)")
 		dbFlags.StringVar(&dbtype, "db", "noArg", "datastore type")
 		dbFlags.StringVar(&endpoints, "endp", "noArg", "endpoints for dataset iteration and update notifications")
-		dbFlags.Parse(os.Args[3:6])
+		dbFlags.Parse(os.Args[4:7])
+		n += 3
 
 		dset := strings.Split(dataset, "/")
 		endp := strings.Split(endpoints, "/")
@@ -73,20 +88,20 @@ func main() {
 		}
 		conf.DataStoreConfig.LogStreamEndpoint = endp[1]
 
-		var dsConf DataStoreConfJSON
-		err := readConfigFile(dbtype, &dsConf)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if dbtype == "s3" {
-			conf.DataStoreConfig.AwsAccessKeyID = dsConf.AwsAccessKeyID
-			conf.DataStoreConfig.AwsSecretAccessKey = dsConf.AwsSecretAccessKey
-		}
+		// // var dsConf DataStoreConfJSON
+		// // err := readConfigFile(dbtype, &dsConf)
+		// // if err != nil {
+		// // 	log.Fatal(err)
+		// // }
+		// if dbtype == "s3" {
+		// 	conf.DataStoreConfig.AwsAccessKeyID = dsConf.AwsAccessKeyID
+		// 	conf.DataStoreConfig.AwsSecretAccessKey = dsConf.AwsSecretAccessKey
+		// }
 	case "cache":
 		var size int
 		cacheFlags := flag.NewFlagSet("cache QPU flags", flag.ExitOnError)
 		cacheFlags.IntVar(&size, "Csize", 0, "the cache's size")
-		cacheFlags.Parse(os.Args[3:4])
+		cacheFlags.Parse(os.Args[4:5])
 		n++
 		conf.CacheConfig.Size = size
 	case "index":
@@ -98,26 +113,28 @@ func main() {
 		indexFlags.Parse(os.Args[3:6])
 		n += 3
 
-		var indexConf IndexConfJSON
-		err := readConfigFile(configFile, &indexConf)
-		if err != nil {
-			log.Fatal(err)
-		}
 		conf.IndexConfig.Bucket = bucket
-		conf.IndexConfig.AttributeName = indexConf.AttributeName
-		conf.IndexConfig.AttributeType = indexConf.AttributeType
-		conf.IndexConfig.LBound = indexConf.LBound
-		conf.IndexConfig.UBound = indexConf.UBound
-		conf.IndexConfig.ConsLevel = indexConf.ConsLevel
-		conf.IndexConfig.IndexStore.Store = indexConf.IndexStore.Store
-		conf.IndexConfig.IndexStore.Endpoint = endpoint
-		conf.IndexConfig.IndexStore.Bucket = indexConf.IndexStore.Bucket
-		conf.IndexConfig.IndexStore.Implementation = indexConf.IndexStore.Implementation
+
+		// var indexConf IndexConfJSON
+		// err := readConfigFile(configFile, &indexConf)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+
+		// conf.IndexConfig.AttributeName = indexConf.AttributeName
+		// conf.IndexConfig.AttributeType = indexConf.AttributeType
+		// conf.IndexConfig.LBound = indexConf.LBound
+		// conf.IndexConfig.UBound = indexConf.UBound
+		// conf.IndexConfig.ConsLevel = indexConf.ConsLevel
+		// conf.IndexConfig.IndexStore.Store = indexConf.IndexStore.Store
+		// conf.IndexConfig.IndexStore.Endpoint = endpoint
+		// conf.IndexConfig.IndexStore.Bucket = indexConf.IndexStore.Bucket
+		// conf.IndexConfig.IndexStore.Implementation = indexConf.IndexStore.Implementation
 	case "network":
 		var function string
 		networkQPUFlags := flag.NewFlagSet("network QPU flags", flag.ExitOnError)
 		networkQPUFlags.StringVar(&function, "func", "noArg", "the type of fault to be injected")
-		networkQPUFlags.Parse(os.Args[3:4])
+		networkQPUFlags.Parse(os.Args[4:5])
 		n++
 		conf.NetworkQPUConfig.Function = function
 		switch conf.NetworkQPUConfig.Function {
@@ -125,14 +142,14 @@ func main() {
 			var delay int64
 			dropFlags := flag.NewFlagSet("network QPU [delay] flags", flag.ExitOnError)
 			dropFlags.Int64Var(&delay, "delay", 0, "the delay duration (ms)")
-			dropFlags.Parse(os.Args[4:5])
+			dropFlags.Parse(os.Args[5:6])
 			n++
 			conf.NetworkQPUConfig.Delay = delay
 		case "drop":
 			var rate float64
 			dropFlags := flag.NewFlagSet("network QPU [drop] flags", flag.ExitOnError)
 			dropFlags.Float64Var(&rate, "rate", 0.0, "the fault rate")
-			dropFlags.Parse(os.Args[4:5])
+			dropFlags.Parse(os.Args[5:6])
 			n++
 			conf.NetworkQPUConfig.Rate = float32(rate)
 		}
@@ -156,7 +173,7 @@ func main() {
 		}
 	}
 
-	err := server.Server(conf)
+	err = server.Server(conf)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,

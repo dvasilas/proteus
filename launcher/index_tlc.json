@@ -1,12 +1,15 @@
 {
+  "indexConfig":
+  {
     "attributeName": "trip_distance",
     "attributeType": "s3tagFlt",
     "lBound": "0",
     "uBound": "10000",
     "consLevel": "async",
     "indexStore": {
-      "store": "antidote",
+      "store": "in_mem",
       "bucket": "indexqpu1",
       "indexDataStruct": "btree"
     }
+  }
 }

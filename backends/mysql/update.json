@@ -1,0 +1,15 @@
+{
+  "recordID": "1",
+  "table": "buck",
+  "attributes": [
+    {
+    "key": "attrA",
+    "valueOld": "valA",
+    "valueNew": "valA"
+    },
+    {
+      "key": "attrB",
+      "valueNew": "valB"
+    }
+  ]
+}

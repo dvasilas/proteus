@@ -1,0 +1,23 @@
+version: '3'
+services:
+  datastore:
+    container_name: datastore
+    image: mysql/test
+    ports:
+      - "50000:50000"
+  dsdriverqpu:
+    container_name: dsdriverqpu
+    build: ../../../
+    environment:
+      - DEBUG=true
+    command:
+      bash -c "./deployment/wait-for-it.sh --host=datastore --port=50000 --timeout=0
+      && go run launcher/launcher.go --qpu=dbdriver --port=50150 --config=mysql --dataset=1/1/1 --db=mysql --endp=127.0.0.1:8001/datastore:50000"
+  indexqpu:
+    container_name: indexqpu
+    build: ../../../
+    environment:
+      - DEBUG=true
+    command:
+      bash -c "./deployment/wait-for-it.sh --host=dsdriverqpu --port=50150 --timeout=0
+      && go run launcher/launcher.go --qpu=index --port=50250 --config=index_tlc --bucket=buck --config=tmp --endP=127.0.0.1:8087 --conns=dsdriverqpu:50150_local"

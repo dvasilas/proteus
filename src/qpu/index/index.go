@@ -295,6 +295,7 @@ func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
 func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFunc, sync bool, local bool) {
 	for {
 		streamRec, err := stream.Recv()
+		fmt.Println(streamRec, err)
 		if err == io.EOF {
 			// TODO: see datastoredriver to fix this
 			log.Fatal("indexQPU:opConsumer received EOF, which is not expected")

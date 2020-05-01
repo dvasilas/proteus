@@ -1,0 +1,22 @@
+{
+  "dataStoreConfig":
+  {
+    "schema":
+    [
+      {
+        "table": "votes",
+        "attributes":
+          [
+            {
+              "key": "user_id",
+              "type": "int"
+            },
+            {
+              "key": "story_id",
+              "type": "int"
+            }
+          ]
+      }
+    ]
+  }
+}
