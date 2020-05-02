@@ -143,7 +143,7 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 // and calls the processObj function
 func (ds S3DataStore) readSnapshot(bucket string, msg chan *pbUtils.LogOperation, errs chan error, processObj func(string, string, http.Header, chan *pbUtils.LogOperation, chan error)) {
 	buff := bytes.NewBuffer([]byte{})
-	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, bucket)
+	requestURL := fmt.Sprintf("http://%s/%s", ds.endpoint, bucket)
 
 	request, err := http.NewRequest("GET", requestURL, buff)
 	if err != nil {
@@ -172,7 +172,7 @@ func (ds S3DataStore) readSnapshot(bucket string, msg chan *pbUtils.LogOperation
 	go func() {
 		for _, r := range res.Contents {
 			buff := bytes.NewBuffer([]byte{})
-			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, bucket, r.Key)
+			requestURL = fmt.Sprintf("http://%s/%s/%s", ds.endpoint, bucket, r.Key)
 			request, err = http.NewRequest("HEAD", requestURL, buff)
 			if err != nil {
 				errs <- err
