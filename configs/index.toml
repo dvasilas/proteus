@@ -2,7 +2,7 @@ qpuType = "index"
 port = "50250"
 
 [[connections]]
-address = "127.0.0.1:50150"
+address = "dsdriver:50150"
 local = "local"
 
 [indexConfig]

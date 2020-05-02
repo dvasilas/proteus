@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"os"
+	"text/tabwriter"
 
 	"github.com/dvasilas/proteus/src/config"
 	"github.com/dvasilas/proteus/src/qpu/server"
@@ -12,8 +15,23 @@ import (
 
 func main() {
 	var configFile string
-	flag.StringVar(&configFile, "config", "noArg", "configuration file")
+	flag.StringVar(&configFile, "c", "noArg", "configuration file")
 	debug := flag.Bool("d", false, "show debug messages")
+
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stdout, "usage:  -c config_file [-d]")
+		w := new(tabwriter.Writer)
+		w.Init(os.Stdout, 0, 10, 0, '\t', 0)
+		flag.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(w, "  -%v\t%v\n", f.Name, f.Usage)
+		})
+		w.Flush()
+	}
+
+	if len(os.Args) < 2 {
+		flag.Usage()
+		return
+	}
 	flag.Parse()
 
 	if *debug {

@@ -1,66 +1,57 @@
+APP      := proteus
+TARGET   := qpu
+BIN_DIR  := ${CURDIR}/bin
+PKGS     := $(or $(PKG),$(shell env GO111MODULE=on go list ./...))
+TESTPKGS := $(shell env GO111MODULE=on go list -f \
+			'{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' \
+			$(PKGS))
 
-all: dep build_qpu_server
+DOCKER_NET := proteus-local-dev-net1
 
-PROTOC := $(shell which protoc)
-UNAME := $(shell uname)
-DOCKERREPONAME := dvasilas/proteus
-TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
-IMG := ${DOCKERREPONAME}:${TAG}
+export GO111MODULE=on
 
-$(PROTOC_CMD):
-ifeq ($(UNAME), Darwin)
-	https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-osx-x86_64.zip
-	unzip /tmp/protoc.zip -d "$(HOME)/protoc"
-endif
-ifeq ($(UNAME), Linux)
-	curl -L https://github.com/google/protobuf/releases/download/v3.6.1/protoc-3.6.1-linux-x86_64.zip -o /tmp/protoc.zip
-	unzip /tmp/protoc.zip -d "$(HOME)/protoc"
-endif
+.PHONY: build
+## build: build the application
+build: clean
+	@echo "Building..."
+	@go build -o ${BIN_DIR}/${TARGET} cmd/${TARGET}/main.go
 
-dep:
-	dep ensure
+.PHONY: fmt
+## fmt: runs gofmt on all source files
+fmt: ; $(info $(M) running gofmt…)
+	@go fmt $(PKGS)
 
-proto: $(PROTOC_CMD)
-	go get ./vendor/github.com/golang/protobuf/protoc-gen-go
-	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
-	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/qpu/qpu.proto
-	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
-	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/s3client --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/s3client/s3client.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/monitoring --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/monitoring/monitoring.proto
-	python3 -m grpc_tools.protoc -I./src/protos/s3client --python_out=./benchmarks/s3/ --grpc_python_out=./benchmarks/s3/ ./src/protos/s3client/s3client.proto
+.PHONY: test
+## test: run tests
+test: fmt ; $(info $(M) running $(NAME:%=% )tests…)
+	@go test $(TESTPKGS)
 
-build_qpu_server:
-	go build -o bin/qpu_server -v ./src/qpu/server/server.go
+.PHONY: docker-run-s3
+## docker-run-s3: Runs a container with an s3 server (scality/cloudserver)
+docker-run-s3: docker-prepare
+	docker run -ti --rm --name cloudserver-0 --network=${DOCKER_NET} -p 127.0.0.1:8000:8000 -p 127.0.0.1:50000:50000 -e S3BACKEND=mem -e REMOTE_MANAGEMENT_DISABLE=1 dvasilas/cloudserver:latest
 
-# Cross compilation
-build_qpu_server_linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/qpu_server_linux -v ./qpu/server/server.go
+.PHONY: docker-run-qpu
+## docker-run-qpu: Runs a container with the a QPU server
+docker-run-qpu: docker-build-localdev
+	docker run --rm -ti --name ${CONT_NAME} --network=${DOCKER_NET} ${APP}/${TAG} -c ${CONFIG} -d
 
-serve_ds:
-	./bin/ds_server
+.PHONY: docker-prepare docker-build-localdev
+docker-build-localdev:
+## docker-build-localdev: Builds a proteus docker image based on the local source code
+	@docker build -f build/localdev/Dockerfile -t ${APP}/localdev .
 
-serve_scan_qpu:
-	$(PWD)/bin/qpu_server -qpu=scanQPU
+docker-prepare:
+	@docker network inspect ${DOCKER_NET} >/dev/null 2>&1 || docker network create ${DOCKER_NET}
 
-serve_index_qpu:
-	$(PWD)/bin/qpu_server -qpu=indexQPU
-
-test:
-	go test -v ./...
-
+.PHONY: clean
+## clean: cleans the binary
 clean:
-	rm ./protos/utils/utils.pb.go ./protos/datastore/datastore.pb.go ./protos/s3/s3.pb.go ./protos/qpu/qpu.pb.go
-	rm -rf ./bin
+	@echo "Cleaning"
+	@rm -f ${BIN_DIR}/${TARGET}
 
-docker_build:
-	echo ${TAG}
-	echo ${IMG}
-	docker build -t proteus:local .
-	docker tag proteus:local ${IMG}
-
-docker_push:
-	docker push ${IMG}
-
-.PHONY: build_qpu_server build_qpu_server test clean local docker_build docker_push
+.PHONY: help
+## help: Prints this help message
+help:
+	@echo "Usage: \n"
+	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
