@@ -1,0 +1,18 @@
+qpuType = "index"
+port = "50250"
+
+[[connections]]
+address = "127.0.0.1:50150"
+local = "local"
+
+[indexConfig]
+bucket = "buck"
+attributeName = "trip_distance"
+attributeType = "s3tagFlt"
+lBound = "0"
+uBound = "10000"
+consLevel = "async"
+
+[indexConfig.IndexStore]
+store = "in_mem"
+indexDataStruct = "btree"
