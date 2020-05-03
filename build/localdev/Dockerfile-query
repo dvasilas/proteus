@@ -1,0 +1,18 @@
+FROM golang
+
+ENV GO111MODULE=on
+
+WORKDIR /
+
+COPY go.mod .
+COPY go.sum .
+
+RUN go mod download
+
+WORKDIR /app/proteus/
+COPY . .
+
+
+RUN make query
+
+ENTRYPOINT ["/app/proteus/bin/query"]

@@ -39,10 +39,9 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the federation dispatcher QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
-	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request}).Debug("query request received")
-	subQueries, isLocal, err := q.generateSubQueries(request.GetPredicate())
+func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+	log.WithFields(log.Fields{"query": query}).Debug("query received")
+	subQueries, isLocal, err := q.generateSubQueries(query.GetPredicate())
 	if err != nil {
 		return err
 	}
@@ -52,7 +51,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	errCh := make(chan error)
 	seqID := int64(0)
 	for i, subQ := range subQueries {
-		streamIn, _, err := subQ.Client.Query(request.GetBucket(), request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
+		streamIn, _, err := subQ.Client.Query(query.GetBucket(), query.GetPredicate(), protoutils.SnapshotTimePredicate(query.GetClock().GetLbound(), query.GetClock().GetUbound()), metadata, false)
 		if err != nil {
 			return err
 		}

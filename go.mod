@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.20.11
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0
+	github.com/knocknote/vitess-sqlparser v0.0.0-20200129061755-eb7ce11aa4dd
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/pelletier/go-toml v1.4.0
@@ -19,6 +20,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.3.0
+	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/genproto v0.0.0-20190627203621-eb59cef1c072 // indirect

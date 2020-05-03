@@ -92,10 +92,14 @@ func Attribute(key string, typ pbUtils.Attribute_AttributeType, val *pbUtils.Val
 }
 
 //RequestStreamRequest creates a protos/qpu/RequestStream{Request} object
-func RequestStreamRequest(bucket string, ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.RequestStream {
+func RequestStreamRequest(query *pbQPU.Query, metadata map[string]string, sync bool) *pbQPU.RequestStream {
 	return &pbQPU.RequestStream{
 		Payload: &pbQPU.RequestStream_Request{
-			Request: QueryRequest(bucket, ts, predicate, metadata, sync),
+			Request: &pbQPU.QueryRequest{
+				Query:    query,
+				Metadata: metadata,
+				Sync:     sync,
+			},
 		},
 	}
 }
@@ -122,14 +126,27 @@ func RequestStreamPing(sID int64) *pbQPU.RequestStream {
 	}
 }
 
-//QueryRequest ...
-func QueryRequest(bucket string, ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate, metadata map[string]string, sync bool) *pbQPU.QueryRequest {
-	return &pbQPU.QueryRequest{
-		Clock:     ts,
-		Bucket:    bucket,
-		Predicate: predicate,
-		Metadata:  metadata,
-		Sync:      sync,
+// QueryInternal ...
+func QueryInternal(bucket string, ts *pbUtils.SnapshotTimePredicate, predicate []*pbUtils.AttributePredicate) *pbQPU.Query {
+	return &pbQPU.Query{
+		Val: &pbQPU.Query_QueryI{
+			QueryI: &pbQPU.QueryInternalQuery{
+				Clock:     ts,
+				Bucket:    bucket,
+				Predicate: predicate,
+			},
+		},
+	}
+}
+
+// QuerySQL ...
+func QuerySQL(query string) *pbQPU.Query {
+	return &pbQPU.Query{
+		Val: &pbQPU.Query_QuerySql{
+			QuerySql: &pbQPU.Query_SQLQuery{
+				QueryStr: query,
+			},
+		},
 	}
 }
 

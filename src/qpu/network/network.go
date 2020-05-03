@@ -73,13 +73,13 @@ func QPU(conf *config.Config) (*NQPU, error) {
 }
 
 // Query implements the Query API for the network QPU
-func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecord *pbQPU.RequestStream) error {
+func (q *NQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
 	respRecordCh := make(chan *pbQPU.ResponseStreamRecord)
 	canReturn := make(chan bool)
 	go func(respRecordCh chan *pbQPU.ResponseStreamRecord) {
 		for respRecord := range respRecordCh {
 			if err := q.process(func() error {
-				return streamUp.Send(respRecord)
+				return streamOut.Send(respRecord)
 			}); err != nil {
 				log.WithFields(log.Fields{"error": err}).Debug("process.send")
 			}
@@ -93,7 +93,17 @@ func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecord *pbQPU.Reques
 	if err != nil {
 		return err
 	}
-	if err = streamDown.Send(requestRecord); err != nil {
+	if err = streamDown.Send(
+		protoutils.RequestStreamRequest(
+			&pbQPU.Query{
+				Val: &pbQPU.Query_QueryI{
+					QueryI: query,
+				},
+			},
+			metadata,
+			block,
+		),
+	); err != nil {
 		return err
 	}
 	for {
@@ -105,20 +115,20 @@ func (q *NQPU) Query(streamUp pbQPU.QPU_QueryServer, requestRecord *pbQPU.Reques
 			return err
 		}
 		respRecordCh <- respRecord
-		if requestRecord.GetPing() != nil {
-			requestRecord, err = streamUp.Recv()
-			if err == io.EOF {
-				return err
-			}
-			if err != nil {
-				return err
-			}
-			if err := q.process(func() error {
-				return streamDown.Send(requestRecord)
-			}); err != nil {
-				return err
-			}
-		}
+		// if query.GetPing() != nil {
+		// 	query, err = streamOut.Recv()
+		// 	if err == io.EOF {
+		// 		return err
+		// 	}
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	if err := q.process(func() error {
+		// 		return streamDown.Send(requestRecord)
+		// 	}); err != nil {
+		// 		return err
+		// 	}
+		// }
 	}
 	<-canReturn
 	return nil

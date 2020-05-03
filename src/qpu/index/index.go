@@ -118,26 +118,25 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the index QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
-	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request, "QPU": "index"}).Debug("query request received")
-	if request.GetClock().GetUbound().GetType() < request.GetClock().GetUbound().GetType() {
+func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+	log.WithFields(log.Fields{"query": query, "QPU": "index"}).Debug("query received")
+	if query.GetClock().GetUbound().GetType() < query.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
-	if request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		request.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
-		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		request.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
+		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
+		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
-	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
 		return nil
 	}
-	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
 		lookupResCh := make(chan utils.ObjectState)
 		errCh := make(chan error)
-		go q.index.Lookup(request.GetPredicate()[0], request.GetClock(), lookupResCh, errCh)
+		go q.index.Lookup(query.GetPredicate()[0], query.GetClock(), lookupResCh, errCh)
 		seqID := int64(0)
 		for {
 			select {
@@ -201,11 +200,11 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 			}
 		}
 	}
-	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		chID := rand.Int()
 		q.mutex.Lock()
 		q.persistentQs[chID] = persistentQuery{
-			predicate: request.GetPredicate(),
+			predicate: query.GetPredicate(),
 			stream:    streamOut,
 		}
 		q.mutex.Unlock()
@@ -295,6 +294,7 @@ func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
 func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFunc, sync bool, local bool) {
 	for {
 		streamRec, err := stream.Recv()
+		fmt.Println(streamRec, err)
 		if err == io.EOF {
 			// TODO: see datastoredriver to fix this
 			log.Fatal("indexQPU:opConsumer received EOF, which is not expected")

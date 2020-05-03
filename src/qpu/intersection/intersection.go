@@ -40,10 +40,9 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the intersection QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
-	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"req": request}).Debug("Query request")
-	subQueries, err := q.generateSubQueries(request.GetPredicate())
+func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+	log.WithFields(log.Fields{"query": query, "QPU": "intersection"}).Debug("query received")
+	subQueries, err := q.generateSubQueries(query.GetPredicate())
 	if err != nil {
 		return err
 	}
@@ -57,7 +56,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 	errCh := make(chan error)
 
 	for _, subQ := range subQueries {
-		streamIn, _, err := subQ.Endpoint.Client.Query(request.GetBucket(), subQ.SubQuery, protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), nil, false)
+		streamIn, _, err := subQ.Endpoint.Client.Query(query.GetBucket(), subQ.SubQuery, protoutils.SnapshotTimePredicate(query.GetClock().GetLbound(), query.GetClock().GetUbound()), nil, false)
 		if err != nil {
 			return err
 		}

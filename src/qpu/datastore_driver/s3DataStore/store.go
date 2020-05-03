@@ -102,6 +102,7 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 	go func() {
 		for {
 			op, err := stream.Recv()
+			fmt.Println(op, err)
 			if err == io.EOF {
 				errs <- errors.New("s3Datastore:opConsumer received EOF")
 				break

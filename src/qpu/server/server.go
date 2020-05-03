@@ -20,6 +20,7 @@ import (
 	"github.com/dvasilas/proteus/src/qpu/lambda"
 	"github.com/dvasilas/proteus/src/qpu/load_balancer"
 	"github.com/dvasilas/proteus/src/qpu/network"
+	"github.com/dvasilas/proteus/src/sqlparser"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -35,7 +36,7 @@ type QPUServer struct {
 
 //QPUAPI specifies the API of a QPU
 type QPUAPI interface {
-	Query(pbQPU.QPU_QueryServer, *pbQPU.RequestStream) error
+	Query(pbQPU.QPU_QueryServer, *pbQPU.QueryInternalQuery, map[string]string, bool) error
 	GetConfig() (*pbQPU.ConfigResponse, error)
 	Cleanup()
 	GetDataTransfer() float32
@@ -46,14 +47,38 @@ type QPUAPI interface {
 //Query implements the Query method of a generic QPU
 //Calls specific implementations of the Query method
 func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
-	request, err := stream.Recv()
+	requestRec, err := stream.Recv()
 	if err == io.EOF {
 		return errors.New("Query received EOF")
 	}
 	if err != nil {
 		return err
 	}
-	return s.Server.Query(stream, request)
+
+	switch requestRec.GetPayload().(type) {
+	case *pbQPU.RequestStream_Request:
+		query := requestRec.GetRequest().GetQuery()
+		metadata := requestRec.GetRequest().GetMetadata()
+		sync := requestRec.GetRequest().GetSync()
+		switch query.GetVal().(type) {
+		case *pbQPU.Query_QueryI:
+			return s.Server.Query(stream, query.GetQueryI(), metadata, sync)
+		case *pbQPU.Query_QuerySql:
+			parsedquery, err := sqlparser.Parse(query.GetQuerySql().GetQueryStr())
+			if err != nil {
+				return err
+			}
+			return s.Server.Query(stream, parsedquery.GetQueryI(), metadata, sync)
+		default:
+			return errors.New("should not have reached here")
+		}
+	case *pbQPU.RequestStream_Ping:
+		return errors.New("not expexted RequestStream_Ping")
+	case *pbQPU.RequestStream_Ack:
+		return errors.New("not expexted RequestStream_Ack")
+	default:
+		return errors.New("should not have reached here")
+	}
 }
 
 //GetConfig constructs and returns a structure describing the configuration of a QPU

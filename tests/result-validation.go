@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -132,23 +131,24 @@ func main() {
 }
 
 func doQuery(state *storageState, queryEngine []*proteusclient.Client, db database) bool {
-	lbound, ubound, expectedResult := newQuery(state)
-	log.WithFields(log.Fields{
-		"Lower bound": lbound,
-		"Upper bound": ubound,
-	}).Info("performing query")
+	// lbound, ubound, expectedResult := newQuery(state)
+	// log.WithFields(log.Fields{
+	// 	"Lower bound": lbound,
+	// 	"Upper bound": ubound,
+	// }).Info("performing query")
 
-	responses := make([][]string, 0)
-	for _, q := range queryEngine {
-		resp, err := query(q, db.tableName, []proteusclient.AttributePredicate{
-			proteusclient.AttributePredicate{AttrName: "tripdistance", AttrType: proteusclient.S3TAGFLT, Lbound: lbound, Ubound: ubound},
-		}, proteusclient.LATESTSNAPSHOT)
-		if err != nil {
-			log.Fatal(err)
-		}
-		responses = append(responses, resp)
-	}
-	return validate(expectedResult, responses)
+	// responses := make([][]string, 0)
+	// for _, q := range queryEngine {
+	// 	resp, err := query(q, db.tableName, []proteusclient.AttributePredicate{
+	// 		proteusclient.AttributePredicate{AttrName: "tripdistance", AttrType: proteusclient.S3TAGFLT, Lbound: lbound, Ubound: ubound},
+	// 	}, proteusclient.LATESTSNAPSHOT)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	responses = append(responses, resp)
+	// }
+	// return validate(expectedResult, responses)
+	return true
 }
 
 func readConfigFile(file string, conf interface{}) error {
@@ -259,31 +259,32 @@ func newAttributeVal() float64 {
 }
 
 func query(c *proteusclient.Client, bucket string, pred []proteusclient.AttributePredicate, qType proteusclient.QueryType) ([]string, error) {
-	response := make([]string, 0)
-	respCh, errCh, err := c.Query(bucket, pred, qType, nil)
-	if err != nil {
-		return response, err
-	}
-	for {
-		select {
-		case err, ok := <-errCh:
-			if !ok {
-				errCh = nil
-			} else if err == io.EOF {
-			} else {
-				return response, err
-			}
-		case resp, ok := <-respCh:
-			if !ok {
-				respCh = nil
-			} else {
-				response = append(response, resp.ObjectID)
-			}
-		}
-		if errCh == nil && respCh == nil {
-			return response, err
-		}
-	}
+	// response := make([]string, 0)
+	// respCh, errCh, err := c.Query(bucket, pred, qType, nil)
+	// if err != nil {
+	// 	return response, err
+	// }
+	// for {
+	// 	select {
+	// 	case err, ok := <-errCh:
+	// 		if !ok {
+	// 			errCh = nil
+	// 		} else if err == io.EOF {
+	// 		} else {
+	// 			return response, err
+	// 		}
+	// 	case resp, ok := <-respCh:
+	// 		if !ok {
+	// 			respCh = nil
+	// 		} else {
+	// 			response = append(response, resp.ObjectID)
+	// 		}
+	// 	}
+	// 	if errCh == nil && respCh == nil {
+	// 		return response, err
+	// 	}
+	// }
+	return nil, nil
 }
 
 func validate(expected []string, queryEngineResponses [][]string) bool {

@@ -14,6 +14,6 @@ COPY . .
 
 COPY ./configs /etc
 
-RUN make build
+RUN make qpu
 
 ENTRYPOINT ["/app/proteus/bin/qpu"]

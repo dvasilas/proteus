@@ -37,14 +37,13 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the filter QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
-	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request, "QPU": "filter"}).Debug("query request received")
-	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+	log.WithFields(log.Fields{"query": query, "QPU": "filter"}).Debug("query received")
+	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
 		return nil
 	}
-	streamIn, cancel, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), request.GetClock(), nil, request.GetSync())
+	streamIn, cancel, err := q.qpu.Conns[0].Client.Query(query.GetBucket(), query.GetPredicate(), query.GetClock(), nil, block)
 	seqID := int64(0)
 	for {
 		streamRec, err := streamIn.Recv()
@@ -59,7 +58,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 		} else if err != nil {
 			return err
 		}
-		if err = filterAndForward(request.GetPredicate(), streamRec, streamOut, &seqID); err != nil {
+		if err = filterAndForward(query.GetPredicate(), streamRec, streamOut, &seqID); err != nil {
 			return err
 		}
 		if maxResponseCount > 0 && seqID >= maxResponseCount {

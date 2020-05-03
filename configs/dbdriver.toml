@@ -5,6 +5,8 @@ port = "50150"
 type = "s3"
 endpoint = "http://cloudserver-0:8000"
 logStreamEndpoint = "cloudserver-0:50000"
+# endpoint = "http://127.0.0.1:8000"
+# logStreamEndpoint = "127.0.0.1:50000"
 awsAccessKeyID = "accessKey1"
 awsSecretAccessKey = "verySecretKey1"
 

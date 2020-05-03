@@ -104,26 +104,9 @@ func (c *Client) Close() {
 	c.client.CloseConnection()
 }
 
-// Query ...
-func (c *Client) Query(bucket string, AttrPredicate []AttributePredicate, TsPredicate QueryType, Metadata map[string]string) (<-chan ResponseRecord, <-chan error, error) {
-	pred, err := inputToAttributePredicate(AttrPredicate)
-	if err != nil {
-		return nil, nil, err
-	}
-	var tsPred *pbUtils.SnapshotTimePredicate
-	switch TsPredicate {
-	case LATESTSNAPSHOT:
-		tsPred = protoutils.SnapshotTimePredicate(
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
-		)
-	case NOTIFY:
-		tsPred = protoutils.SnapshotTimePredicate(
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
-			protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
-		)
-	}
-	stream, _, err := c.client.Query(bucket, pred, tsPred, Metadata, false)
+// QuerySQL ...
+func (c *Client) QuerySQL(query string) (<-chan ResponseRecord, <-chan error, error) {
+	stream, _, err := c.client.QuerySQL(query, nil, false)
 	if err != nil {
 		return nil, nil, err
 	}

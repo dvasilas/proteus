@@ -135,7 +135,14 @@ func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtil
 		}
 		return true
 	}
-	lb, ub := i.entry.predicateToIndexEntries(attrPred.GetLbound(), attrPred.GetUbound())
+	newUbound := attrPred.GetUbound()
+	switch attrPred.GetLbound().GetVal().(type) {
+	case *pbUtils.Value_Flt:
+		if attrPred.GetLbound().GetFlt() == attrPred.GetUbound().GetFlt() {
+			newUbound = protoutils.ValueFlt(attrPred.GetUbound().GetFlt() + 0.01)
+		}
+	}
+	lb, ub := i.entry.predicateToIndexEntries(attrPred.GetLbound(), newUbound)
 
 	go func() {
 		i.mutex.RLock()

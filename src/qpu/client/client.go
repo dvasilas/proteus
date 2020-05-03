@@ -15,14 +15,37 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
-//Query ...
+// Query ...
 func (c *Client) Query(bucket string, predicate []*pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, metadata map[string]string, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
 		return nil, cancel, nil
 	}
-	err = stream.Send(protoutils.RequestStreamRequest(bucket, ts, predicate, metadata, sync))
+	err = stream.Send(
+		protoutils.RequestStreamRequest(
+			protoutils.QueryInternal(bucket, ts, predicate),
+			metadata,
+			sync,
+		),
+	)
+	return stream, cancel, err
+}
+
+// QuerySQL ...
+func (c *Client) QuerySQL(query string, metadata map[string]string, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.Query(ctx)
+	if err != nil {
+		return nil, cancel, nil
+	}
+	err = stream.Send(
+		protoutils.RequestStreamRequest(
+			protoutils.QuerySQL(query),
+			metadata,
+			sync,
+		),
+	)
 	return stream, cancel, err
 }
 

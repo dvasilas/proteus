@@ -56,15 +56,14 @@ func QPU(conf *config.Config) (*CQPU, error) {
 }
 
 // Query implements the Query API for the cache QPU
-func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestStream) error {
-	request := requestRec.GetRequest()
-	log.WithFields(log.Fields{"request": request, "QPU": "cache"}).Debug("query request received")
-	maxResponseCount, err := utils.MaxResponseCount(request.GetMetadata())
+func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+	log.WithFields(log.Fields{"query": query, "QPU": "cache"}).Debug("query received")
+	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
 		return nil
 	}
-	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		cachedResult, hit := q.cache.Get(request.GetPredicate())
+	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+		cachedResult, hit := q.cache.Get(query.GetPredicate())
 		if hit {
 			seqID := int64(0)
 			for _, item := range cachedResult {
@@ -90,7 +89,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 			}
 			return nil
 		}
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), request.GetClock(), nil, false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(query.GetBucket(), query.GetPredicate(), query.GetClock(), nil, false)
 		if err != nil {
 			return err
 		}
@@ -130,7 +129,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				q.dataTransferCount += float32(size) / 1024.0
 				q.dataTransferMutex.Unlock()
 			}
-			if err = q.forward(request.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
+			if err = q.forward(query.GetPredicate(), streamRec, streamOut, &seqID, respond); err != nil {
 				return err
 			}
 			if maxResponseCount > 0 && seqID >= maxResponseCount {
@@ -147,16 +146,16 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, requestRec *pbQPU.RequestS
 				respond = false
 			}
 		}
-		if err := q.cache.Put(request.GetBucket(), request.GetPredicate(), tempCacheEntry, tempCacheEntrySize, q.qpu.Conns[0].Client); err != nil {
+		if err := q.cache.Put(query.GetBucket(), query.GetPredicate(), tempCacheEntry, tempCacheEntrySize, q.qpu.Conns[0].Client); err != nil {
 			return err
 		}
 		return nil
 	}
-	if request.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || request.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
 		subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
 		errCh := make(chan error)
 		seqID := int64(0)
-		streamIn, _, err := q.qpu.Conns[0].Client.Query(request.GetBucket(), request.GetPredicate(), protoutils.SnapshotTimePredicate(request.GetClock().GetLbound(), request.GetClock().GetUbound()), request.GetMetadata(), false)
+		streamIn, _, err := q.qpu.Conns[0].Client.Query(query.GetBucket(), query.GetPredicate(), protoutils.SnapshotTimePredicate(query.GetClock().GetLbound(), query.GetClock().GetUbound()), metadata, false)
 		if err != nil {
 			return err
 		}

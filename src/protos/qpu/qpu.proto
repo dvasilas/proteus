@@ -43,13 +43,24 @@ message ResponseStreamRecord {
 }
 
 message QueryRequest {
-  //Timestamp is part of the attributes
-  //Desclared explicitly here for easier parsing
-  utils.SnapshotTimePredicate clock = 1;
-  string bucket = 2;
-  repeated utils.AttributePredicate predicate = 3;
-  map<string, string> metadata = 4;
-  bool sync = 5;
+  Query query = 1;
+  map<string, string> metadata = 2;
+  bool sync = 3;
+}
+
+message Query {
+  message internalQuery {
+    utils.SnapshotTimePredicate clock = 1;
+    string bucket = 2;
+    repeated utils.AttributePredicate predicate = 3;
+  }
+  message SQLQuery {
+    string queryStr = 1;
+  }
+  oneof val {
+    internalQuery query_i = 1;
+    SQLQuery query_sql = 2;
+  }
 }
 
 message AckMsg {

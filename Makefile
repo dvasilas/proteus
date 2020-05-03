@@ -1,5 +1,4 @@
 APP      := proteus
-TARGET   := qpu
 BIN_DIR  := ${CURDIR}/bin
 PKGS     := $(or $(PKG),$(shell env GO111MODULE=on go list ./...))
 TESTPKGS := $(shell env GO111MODULE=on go list -f \
@@ -8,13 +7,29 @@ TESTPKGS := $(shell env GO111MODULE=on go list -f \
 
 DOCKER_NET := proteus-local-dev-net1
 
+$(PROTOC_CMD):
+ifeq ($(UNAME), Darwin)
+	https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-osx-x86_64.zip
+	unzip /tmp/protoc.zip -d "$(HOME)/protoc"
+endif
+ifeq ($(UNAME), Linux)
+	curl -L https://github.com/google/protobuf/releases/download/v3.6.1/protoc-3.6.1-linux-x86_64.zip -o /tmp/protoc.zip
+	unzip /tmp/protoc.zip -d "$(HOME)/protoc"
+endif
+
 export GO111MODULE=on
 
-.PHONY: build
-## build: build the application
-build: clean
+.PHONY: qpu
+## build: build the qpu application
+qpu:
 	@echo "Building..."
-	@go build -o ${BIN_DIR}/${TARGET} cmd/${TARGET}/main.go
+	@go build -o ${BIN_DIR}/qpu cmd/qpu/main.go
+
+.PHONY: query
+## build: build the qpu application
+query:
+	@echo "Building..."
+	@go build -o ${BIN_DIR}/query cmd/query/main.go
 
 .PHONY: fmt
 ## fmt: runs gofmt on all source files
@@ -33,22 +48,44 @@ docker-run-s3: docker-prepare
 
 .PHONY: docker-run-qpu
 ## docker-run-qpu: Runs a container with the a QPU server
-docker-run-qpu: docker-build-localdev
-	docker run --rm -ti --name ${CONT_NAME} --network=${DOCKER_NET} ${APP}/${TAG} -c ${CONFIG} -d
+docker-run-qpu: docker-build-qpu-localdev
+	docker run --rm -ti --name ${CONT_NAME} --network=${DOCKER_NET} -p ${PORT}:${PORT} ${APP}/${TAG} -c ${CONFIG} -d
 
-.PHONY: docker-prepare docker-build-localdev
-docker-build-localdev:
-## docker-build-localdev: Builds a proteus docker image based on the local source code
-	@docker build -f build/localdev/Dockerfile -t ${APP}/localdev .
+.PHONY: docker-run-query
+## docker-run-query: Runs a container with the query executable
+docker-run-query: docker-build-query-localdev
+	docker run --rm -ti --name ${CONT_NAME} --network=${DOCKER_NET} ${APP}/${TAG} -e ${ENDPOINT} -q ${QUERY}
+
+.PHONY: docker-build-qpu-localdev
+docker-build-qpu-localdev: docker-prepare
+## docker-build-qpu-localdev: Builds a proteus qpu docker image based on the local source code
+	@docker build -f build/localdev/Dockerfile-qpu -t ${APP}/localdev .
+
+.PHONY: docker-build-query-localdev
+docker-build-query-localdev: docker-prepare
+## docker-build-query-localdev: Builds a proteus query docker image based on the local source code
+	docker build -f build/localdev/Dockerfile-query -t ${APP}/localdev .
 
 docker-prepare:
 	@docker network inspect ${DOCKER_NET} >/dev/null 2>&1 || docker network create ${DOCKER_NET}
+
+.PHONY: proto
+## proto: Compiles the protobuf files
+proto: $(PROTOC_CMD)
+	# go get ./vendor/github.com/golang/protobuf/protoc-gen-go
+	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
+	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
+	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
+	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
+	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/s3client --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/s3client/s3client.proto
+	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/monitoring --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/monitoring/monitoring.proto
+	# python3 -m grpc_tools.protoc -I./src/protos/s3client --python_out=./proteus-bench/s3/ --grpc_python_out=./proteus-bench/s3/ ./src/protos/s3client/s3client.proto
 
 .PHONY: clean
 ## clean: cleans the binary
 clean:
 	@echo "Cleaning"
-	@rm -f ${BIN_DIR}/${TARGET}
+	@rm -f ${BIN_DIR}/*
 
 .PHONY: help
 ## help: Prints this help message
