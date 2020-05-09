@@ -49,7 +49,7 @@ func main() {
 }
 
 func doQuery(c *proteusclient.Client, query string) {
-	respCh, errCh, err := c.QuerySQL(query)
+	respCh, errCh, err := c.Query(query)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -66,12 +66,22 @@ func doQuery(c *proteusclient.Client, query string) {
 			if !ok {
 				respCh = nil
 			} else {
-				fmt.Println(resp)
+				processResponseRecord(resp)
 			}
 		}
 		if errCh == nil && respCh == nil {
-			fmt.Println("end of results")
 			break
 		}
 	}
+}
+
+func processResponseRecord(respRecord proteusclient.ResponseRecord) {
+	fmt.Printf("%s: ( ", respRecord.ObjectID)
+	for i, attr := range respRecord.State {
+		fmt.Printf("%s: %s", attr.Name, attr.Value)
+		if i < len(respRecord.State)-1 {
+			fmt.Printf(", ")
+		}
+	}
+	fmt.Printf(" )\n")
 }

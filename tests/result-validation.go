@@ -14,6 +14,7 @@ import (
 
 	"github.com/dvasilas/proteus/deployment"
 	"github.com/dvasilas/proteus/internal/config"
+	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -258,7 +259,7 @@ func newAttributeVal() float64 {
 	return rand.Float64() * 10
 }
 
-func query(c *proteusclient.Client, bucket string, pred []proteusclient.AttributePredicate, qType proteusclient.QueryType) ([]string, error) {
+func query(c *proteusclient.Client, bucket string, pred []qpu.AttributePredicate) ([]string, error) {
 	// response := make([]string, 0)
 	// respCh, errCh, err := c.Query(bucket, pred, qType, nil)
 	// if err != nil {
