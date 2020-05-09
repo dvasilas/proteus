@@ -1,0 +1,26 @@
+FROM golang AS stage0
+RUN set -x \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends git
+
+FROM stage0 as stage1
+RUN set -x \
+  && mkdir -p $GOPATH/src/github.com/dvasilas \
+  && cd $GOPATH/src/github.com/dvasilas \
+  && git clone https://github.com/dvasilas/proteus.git
+
+FROM stage1 as stage2
+ENV GO111MODULE=on
+WORKDIR $GOPATH/src/github.com/dvasilas/proteus/
+RUN set -x \
+  && go mod download \
+  && make qpu \
+  && cp -r bin/. /app/ \
+  && cp -r configs/. /etc/
+
+FROM scratch
+WORKDIR /app/
+COPY --from=stage2 /app/ .
+COPY --from=stage2 /etc/ .
+
+ENTRYPOINT ["./qpu"]
