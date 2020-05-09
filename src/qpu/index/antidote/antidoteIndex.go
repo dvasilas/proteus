@@ -7,12 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dvasilas/proteus/src/protos"
-
 	antidote "github.com/AntidoteDB/antidote-go-client"
 	utils "github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -54,7 +53,7 @@ func New(conf *config.Config) (*AntidoteIndex, error) {
 }
 
 // UpdateCatchUp ...
-func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *AntidoteIndex) UpdateCatchUp(attr *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
 	objectEncoded, err := object.Marshal()
 	if err != nil {
@@ -126,7 +125,7 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 	return err
 }
 
-func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
+func (i *AntidoteIndex) updateOldIndexEntry(attrOld *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
 	valueIndex, err := i.getValueIndex(attrOld, tx)
 	if err != nil {
 		return indexStoreUpdates, true, err
@@ -172,7 +171,7 @@ func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object u
 	return indexStoreUpdates, false, nil
 }
 
-func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
+func (i *AntidoteIndex) updateNewIndexEntry(attrNew *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock, tx *antidote.InteractiveTransaction, indexStoreUpdates []*antidote.CRDTUpdate, objectEncoded []byte) ([]*antidote.CRDTUpdate, bool, error) {
 	valueIndex, err := i.getValueIndex(attrNew, tx)
 	if err != nil {
 		return indexStoreUpdates, true, err
@@ -235,7 +234,7 @@ func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object u
 }
 
 // Update ...
-func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *AntidoteIndex) Update(attrOld *qpu.Attribute, attrNew *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	indexStoreUpdates := make([]*antidote.CRDTUpdate, 0)
 	objectEncoded, err := object.Marshal()
 	if err != nil {
@@ -294,7 +293,7 @@ func (i *AntidoteIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attr
 }
 
 // Lookup ...
-func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
+func (i *AntidoteIndex) Lookup(attr *qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	tx := i.client.CreateStaticTransaction()
 	valueIndex, err := i.getValueIndex(attr.GetAttr(), tx)
 	if err != nil {
@@ -343,7 +342,7 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 
 //---------------- Internal Functions --------------
 
-func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx antidote.Transaction) (*antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getValueIndex(attr *qpu.Attribute, tx antidote.Transaction) (*antidote.MapReadResult, error) {
 	attributeTypeStr, err := config.AttributeTypeToString(i.config.GetAttributeType(i.config.IndexConfig.Bucket, attr.GetAttrKey()))
 	if err != nil {
 		return nil, err
@@ -352,7 +351,7 @@ func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx antidote.Trans
 	return i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 }
 
-func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult, attr *pbUtils.Attribute, tx antidote.Transaction) ([]byte, *antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult, attr *qpu.Attribute, tx antidote.Transaction) ([]byte, *antidote.MapReadResult, error) {
 	versionIndexRef, err := valueIndex.Reg(antidote.Key(utils.ValueToString(attr.GetValue())))
 	if err != nil {
 		return nil, nil, err
@@ -364,7 +363,7 @@ func (i *AntidoteIndex) getVersionIndexPoint(valueIndex *antidote.MapReadResult,
 	return versionIndexRef, versionIndex, nil
 }
 
-func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult, predicate *pbUtils.AttributePredicate, tx antidote.Transaction) ([]*antidote.MapReadResult, error) {
+func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult, predicate *qpu.AttributePredicate, tx antidote.Transaction) ([]*antidote.MapReadResult, error) {
 	res := make([]*antidote.MapReadResult, 0)
 	c, err := utils.Compare(predicate.GetLbound(), predicate.GetUbound())
 	if err != nil {
@@ -418,7 +417,7 @@ func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx antidote.Transa
 	return i.bucket.ReadSet(tx, antidote.Key(postingListRef))
 }
 
-func (i *AntidoteIndex) updateValueIndex(attr *pbUtils.Attribute) (*antidote.CRDTUpdate, []byte, error) {
+func (i *AntidoteIndex) updateValueIndex(attr *qpu.Attribute) (*antidote.CRDTUpdate, []byte, error) {
 	ref := genReference()
 	attributeTypeStr, err := config.AttributeTypeToString(i.config.GetAttributeType(i.config.IndexConfig.Bucket, attr.GetAttrKey()))
 	if err != nil {
@@ -459,8 +458,8 @@ func getLatestPostingList(versionIndex *antidote.MapReadResult) ([]byte, error) 
 	return versionIndex.Reg(latestVRef)
 }
 
-func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*pbUtils.Vectorclock, error) {
-	res := make([]*pbUtils.Vectorclock, 0)
+func decodeTimestamps(tsEncArr []antidote.MapEntryKey) ([]*qpu.Vectorclock, error) {
+	res := make([]*qpu.Vectorclock, 0)
 	for _, ts := range tsEncArr {
 		if string(ts.Key) != "prev" {
 			vc, err := utils.UnmarshalVectorClock(ts.Key)
@@ -482,7 +481,7 @@ func genReference() []byte {
 	return b
 }
 
-func lastVersion(tsList []*pbUtils.Vectorclock) *pbUtils.Vectorclock {
+func lastVersion(tsList []*qpu.Vectorclock) *qpu.Vectorclock {
 	max := tsList[0]
 	for _, ts := range tsList {
 		if greater(ts, max) {
@@ -492,7 +491,7 @@ func lastVersion(tsList []*pbUtils.Vectorclock) *pbUtils.Vectorclock {
 	return max
 }
 
-func greater(a, b *pbUtils.Vectorclock) bool {
+func greater(a, b *qpu.Vectorclock) bool {
 	var greater bool
 	bMap := b.GetVc()
 	for k, ts := range a.GetVc() {

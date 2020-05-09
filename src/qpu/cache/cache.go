@@ -8,9 +8,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/cache/lruCache"
 	"github.com/dvasilas/proteus/src/qpu/client"
 	log "github.com/sirupsen/logrus"
@@ -30,8 +30,8 @@ type CQPU struct {
 // Describes the interface that any cache implementation needs to expose
 // to work with this module.
 type cacheImplementation interface {
-	Put(bucket string, predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
-	Get(bucket string, p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool, error)
+	Put(bucket string, predicate []*qpu.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
+	Get(bucket string, p []*qpu.AttributePredicate) ([]utils.ObjectState, bool, error)
 }
 
 //---------------- API Functions -------------------
@@ -56,13 +56,13 @@ func QPU(conf *config.Config) (*CQPU, error) {
 }
 
 // Query implements the Query API for the cache QPU
-func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *CQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "cache"}).Debug("query received")
 	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
 		return nil
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_LATEST {
 		cachedResult, hit, err := q.cache.Get(query.GetBucket(), query.GetPredicate())
 		if err != nil {
 			return err
@@ -77,7 +77,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					&item.Timestamp,
 					protoutils.PayloadState(&item.State),
 				)
-				if err := streamOut.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, logOp)); err != nil {
+				if err := streamOut.Send(protoutils.ResponseStreamRecord(seqID, qpu_api.ResponseStreamRecord_STATE, logOp)); err != nil {
 					return err
 				}
 				seqID++
@@ -85,8 +85,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					return streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						))
 				}
 			}
@@ -107,8 +107,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					if err := streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						),
 					); err != nil {
 						return nil
@@ -118,7 +118,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			} else if err != nil {
 				return err
 			}
-			if streamRec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+			if streamRec.GetType() == qpu_api.ResponseStreamRecord_STATE {
 				object := responseStreamRecordToObjectState(streamRec)
 				tempCacheEntry = append(tempCacheEntry, object)
 				tempCacheEntrySize += len(streamRec.GetLogOp().GetPayload().GetState().GetAttrs()) + 1
@@ -140,8 +140,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					if err := streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						)); err != nil {
 						return err
 					}
@@ -154,8 +154,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 		}
 		return nil
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
-		subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_INF {
+		subQueryResponseRecordCh := make(chan *qpu_api.ResponseStreamRecord)
 		errCh := make(chan error)
 		seqID := int64(0)
 		streamIn, _, err := q.qpu.Conns[0].Client.Query(query.GetBucket(), query.GetPredicate(), protoutils.SnapshotTimePredicate(query.GetClock().GetLbound(), query.GetClock().GetUbound()), metadata, false)
@@ -197,7 +197,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 				if !ok {
 					subQueryResponseRecordCh = nil
 				} else {
-					if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+					if streamRec.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
 					} else {
 						if err := streamOut.Send(
 							protoutils.ResponseStreamRecord(
@@ -215,8 +215,8 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 				return streamOut.Send(
 					protoutils.ResponseStreamRecord(
 						seqID,
-						pbQPU.ResponseStreamRecord_END_OF_STREAM,
-						&pbUtils.LogOperation{},
+						qpu_api.ResponseStreamRecord_END_OF_STREAM,
+						&qpu.LogOperation{},
 					))
 			}
 		}
@@ -225,7 +225,7 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 }
 
 // GetConfig implements the GetConfig API for the cache QPU
-func (q *CQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *CQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
 		q.qpu.Dataset)
@@ -249,7 +249,7 @@ func (q *CQPU) Cleanup() {
 
 // Stores an object that is part of a query response in the cache
 // and forwards to the response stream
-func (q *CQPU) forward(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64, respond bool) error {
+func (q *CQPU) forward(predicate []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64, respond bool) error {
 	if respond {
 		err := streamOut.Send(
 			protoutils.ResponseStreamRecord(
@@ -263,7 +263,7 @@ func (q *CQPU) forward(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU
 	return nil
 }
 
-func responseStreamRecordToObjectState(streamRec *pbQPU.ResponseStreamRecord) utils.ObjectState {
+func responseStreamRecordToObjectState(streamRec *qpu_api.ResponseStreamRecord) utils.ObjectState {
 	return utils.ObjectState{
 		ObjectID:   streamRec.GetLogOp().GetObjectId(),
 		ObjectType: streamRec.GetLogOp().GetObjectType(),

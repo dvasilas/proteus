@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/dvasilas/proteus/src/config"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/cache"
 	"github.com/dvasilas/proteus/src/qpu/datastore_driver"
 	"github.com/dvasilas/proteus/src/qpu/federation_dispatcher"
@@ -36,8 +36,8 @@ type QPUServer struct {
 
 //QPUAPI specifies the API of a QPU
 type QPUAPI interface {
-	Query(pbQPU.QPU_QueryServer, *pbQPU.QueryInternalQuery, map[string]string, bool) error
-	GetConfig() (*pbQPU.ConfigResponse, error)
+	Query(qpu_api.QPU_QueryServer, *qpu_api.QueryInternalQuery, map[string]string, bool) error
+	GetConfig() (*qpu_api.ConfigResponse, error)
 	Cleanup()
 	GetDataTransfer() float32
 }
@@ -46,7 +46,7 @@ type QPUAPI interface {
 
 //Query implements the Query method of a generic QPU
 //Calls specific implementations of the Query method
-func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
+func (s *QPUServer) Query(stream qpu_api.QPU_QueryServer) error {
 	requestRec, err := stream.Recv()
 	if err == io.EOF {
 		return errors.New("Query received EOF")
@@ -56,14 +56,14 @@ func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
 	}
 
 	switch requestRec.GetPayload().(type) {
-	case *pbQPU.RequestStream_Request:
+	case *qpu_api.RequestStream_Request:
 		query := requestRec.GetRequest().GetQuery()
 		metadata := requestRec.GetRequest().GetMetadata()
 		sync := requestRec.GetRequest().GetSync()
 		switch query.GetVal().(type) {
-		case *pbQPU.Query_QueryI:
+		case *qpu_api.Query_QueryI:
 			return s.Server.Query(stream, query.GetQueryI(), metadata, sync)
-		case *pbQPU.Query_QuerySql:
+		case *qpu_api.Query_QuerySql:
 			parsedquery, err := sqlparser.Parse(query.GetQuerySql().GetQueryStr())
 			if err != nil {
 				return err
@@ -72,9 +72,9 @@ func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
 		default:
 			return errors.New("should not have reached here")
 		}
-	case *pbQPU.RequestStream_Ping:
+	case *qpu_api.RequestStream_Ping:
 		return errors.New("not expexted RequestStream_Ping")
-	case *pbQPU.RequestStream_Ack:
+	case *qpu_api.RequestStream_Ack:
 		return errors.New("not expexted RequestStream_Ack")
 	default:
 		return errors.New("should not have reached here")
@@ -82,14 +82,14 @@ func (s *QPUServer) Query(stream pbQPU.QPU_QueryServer) error {
 }
 
 //GetConfig constructs and returns a structure describing the configuration of a QPU
-func (s *QPUServer) GetConfig(ctx context.Context, in *pbQPU.ConfigRequest) (*pbQPU.ConfigResponse, error) {
+func (s *QPUServer) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
 	return s.Server.GetConfig()
 }
 
 // GetDataTransfer ...
-func (s *QPUServer) GetDataTransfer(ctx context.Context, in *pbQPU.GetDataRequest) (*pbQPU.DataTransferResponse, error) {
+func (s *QPUServer) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
 	datatransferredCount := s.Server.GetDataTransfer()
-	return &pbQPU.DataTransferResponse{
+	return &qpu_api.DataTransferResponse{
 		KBytesTranferred: datatransferredCount,
 	}, nil
 }
@@ -106,47 +106,47 @@ func Server(confArg config.ConfJSON) error {
 	var server QPUServer
 	var api QPUAPI
 	switch conf.QpuType {
-	case pbQPU.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DBDRIVER:
 		api, err = datastoredriver.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_FILTER:
+	case qpu_api.ConfigResponse_FILTER:
 		api, err = filter.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_CACHE:
+	case qpu_api.ConfigResponse_CACHE:
 		api, err = cache.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_INDEX:
+	case qpu_api.ConfigResponse_INDEX:
 		api, err = index.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_FEDERATION_DISPATCHER:
+	case qpu_api.ConfigResponse_FEDERATION_DISPATCHER:
 		api, err = federation.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_NETWORK:
+	case qpu_api.ConfigResponse_NETWORK:
 		api, err = network.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_LOAD_BALANCER:
+	case qpu_api.ConfigResponse_LOAD_BALANCER:
 		api, err = loadbalancer.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_LAMBDA:
+	case qpu_api.ConfigResponse_LAMBDA:
 		api, err = lambda.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case pbQPU.ConfigResponse_INTERSECTION:
+	case qpu_api.ConfigResponse_INTERSECTION:
 		api, err = intersection.QPU(conf)
 		if err != nil {
 			return err
@@ -157,7 +157,7 @@ func Server(confArg config.ConfJSON) error {
 	setCleanup(server)
 
 	s := grpc.NewServer()
-	pbQPU.RegisterQPUServer(s, &server)
+	qpu_api.RegisterQPUServer(s, &server)
 	reflection.Register(s)
 
 	lis, err := net.Listen("tcp", ":"+conf.Port)

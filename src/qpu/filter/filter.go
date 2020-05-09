@@ -6,9 +6,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,7 +37,7 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the filter QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *FQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "filter"}).Debug("query received")
 	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
@@ -51,8 +51,8 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			return streamOut.Send(
 				protoutils.ResponseStreamRecord(
 					seqID,
-					pbQPU.ResponseStreamRecord_END_OF_STREAM,
-					&pbUtils.LogOperation{},
+					qpu_api.ResponseStreamRecord_END_OF_STREAM,
+					&qpu.LogOperation{},
 				),
 			)
 		} else if err != nil {
@@ -66,15 +66,15 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			return streamOut.Send(
 				protoutils.ResponseStreamRecord(
 					seqID,
-					pbQPU.ResponseStreamRecord_END_OF_STREAM,
-					&pbUtils.LogOperation{},
+					qpu_api.ResponseStreamRecord_END_OF_STREAM,
+					&qpu.LogOperation{},
 				))
 		}
 	}
 }
 
 // GetConfig implements the GetConfig API for the filter QPU
-func (q *FQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *FQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -96,7 +96,7 @@ func (q *FQPU) Cleanup() {
 
 // filterAndForward checks if a given object matches a given predicate
 // if yes, it sends it to a given stream
-func filterAndForward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
+func filterAndForward(pred []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64) error {
 	match, err := Filter(pred, streamRec)
 	if err != nil {
 		return err
@@ -115,16 +115,16 @@ func filterAndForward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.Respo
 }
 
 // Filter ...
-func Filter(predicate []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord) (bool, error) {
+func Filter(predicate []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord) (bool, error) {
 	if len(predicate) == 0 {
 		return false, errors.New("empty Query AttributePredicate")
 	}
 	for _, pred := range predicate {
-		var attrs []*pbUtils.Attribute
+		var attrs []*qpu.Attribute
 		switch streamRec.GetType() {
-		case pbQPU.ResponseStreamRecord_STATE:
+		case qpu_api.ResponseStreamRecord_STATE:
 			attrs = streamRec.GetLogOp().GetPayload().GetState().GetAttrs()
-		case pbQPU.ResponseStreamRecord_UPDATEDELTA:
+		case qpu_api.ResponseStreamRecord_UPDATEDELTA:
 			attrs = streamRec.GetLogOp().GetPayload().GetDelta().GetNew().GetAttrs()
 		}
 		for _, attr := range attrs {

@@ -10,9 +10,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,14 +26,14 @@ type LQPU struct {
 
 type lambdaState interface {
 	Initialize() error
-	Update(*pbUtils.LogOperation) error
-	Read() (interface{}, pbUtils.Vectorclock, error)
-	GetTimestamp() (pbUtils.Vectorclock, error)
+	Update(*qpu.LogOperation) error
+	Read() (interface{}, qpu.Vectorclock, error)
+	GetTimestamp() (qpu.Vectorclock, error)
 }
 
 type lambdaCounter struct {
 	counter int64
-	clock   pbUtils.Vectorclock
+	clock   qpu.Vectorclock
 	mutex   sync.RWMutex
 }
 
@@ -43,7 +43,7 @@ func (l *lambdaCounter) Initialize() error {
 	return nil
 }
 
-func (l *lambdaCounter) Update(logOp *pbUtils.LogOperation) error {
+func (l *lambdaCounter) Update(logOp *qpu.LogOperation) error {
 	log.WithFields(log.Fields{
 		"operation": logOp,
 	}).Debug("lambda update")
@@ -55,7 +55,7 @@ func (l *lambdaCounter) Update(logOp *pbUtils.LogOperation) error {
 	return nil
 }
 
-func (l *lambdaCounter) Read() (interface{}, pbUtils.Vectorclock, error) {
+func (l *lambdaCounter) Read() (interface{}, qpu.Vectorclock, error) {
 	l.mutex.RLock()
 	c := l.counter
 	ts, _ := l.GetTimestamp()
@@ -63,7 +63,7 @@ func (l *lambdaCounter) Read() (interface{}, pbUtils.Vectorclock, error) {
 	return c, ts, nil
 }
 
-func (l *lambdaCounter) GetTimestamp() (pbUtils.Vectorclock, error) {
+func (l *lambdaCounter) GetTimestamp() (qpu.Vectorclock, error) {
 	return l.clock, nil
 }
 
@@ -84,7 +84,7 @@ func QPU(conf *config.Config) (*LQPU, error) {
 		return nil, err
 	}
 
-	pred := []*pbUtils.AttributePredicate{}
+	pred := []*qpu.AttributePredicate{}
 	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
 	for i, conn := range q.qpu.Conns {
 		streamIn, cancel, err := conn.Client.Query(
@@ -92,8 +92,8 @@ func QPU(conf *config.Config) (*LQPU, error) {
 			"lambda-buck",
 			pred,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
 			),
 			nil,
 			false,
@@ -110,7 +110,7 @@ func QPU(conf *config.Config) (*LQPU, error) {
 }
 
 // Query implements the Query API for the fault injection QPU
-func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *LQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "lambda"}).Debug("query received")
 	_, err := streamOut.Recv()
 	if err == io.EOF {
@@ -124,12 +124,12 @@ func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 	if err := streamOut.Send(
 		protoutils.ResponseStreamRecord(
 			0,
-			pbQPU.ResponseStreamRecord_STATE,
+			qpu_api.ResponseStreamRecord_STATE,
 			protoutils.LogOperation(
-				"lambda", "", pbUtils.LogOperation_S3OBJECT, &ts,
+				"lambda", "", qpu.LogOperation_S3OBJECT, &ts,
 				protoutils.PayloadState(
 					protoutils.ObjectState(
-						[]*pbUtils.Attribute{protoutils.Attribute("counter", protoutils.ValueInt(cnt.(int64)))},
+						[]*qpu.Attribute{protoutils.Attribute("counter", protoutils.ValueInt(cnt.(int64)))},
 					),
 				),
 			),
@@ -141,8 +141,8 @@ func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 	if err := streamOut.Send(
 		protoutils.ResponseStreamRecord(
 			1,
-			pbQPU.ResponseStreamRecord_END_OF_STREAM,
-			&pbUtils.LogOperation{},
+			qpu_api.ResponseStreamRecord_END_OF_STREAM,
+			&qpu.LogOperation{},
 		),
 	); err != nil {
 		return err
@@ -152,7 +152,7 @@ func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 }
 
 // GetConfig implements the GetConfig API for the fault injection QPU
-func (q *LQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *LQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -172,7 +172,7 @@ func (q *LQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *LQPU) opConsumer(stream pbQPU.QPU_QueryClient) {
+func (q *LQPU) opConsumer(stream qpu_api.QPU_QueryClient) {
 	for {
 		streamRec, err := stream.Recv()
 		if err == io.EOF {
@@ -183,7 +183,7 @@ func (q *LQPU) opConsumer(stream pbQPU.QPU_QueryClient) {
 			log.Fatal("opConsumer err", err)
 			return
 		} else {
-			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+			if streamRec.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
 				log.WithFields(log.Fields{
 					"operation": streamRec,
 				}).Debug("lambda QPU received operation")

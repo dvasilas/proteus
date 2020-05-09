@@ -3,20 +3,20 @@ package client
 import (
 	"context"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pb "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"google.golang.org/grpc"
 )
 
 //Client ...
 type Client struct {
-	cli  pb.QPUClient
+	cli  qpu_api.QPUClient
 	conn *grpc.ClientConn
 }
 
 // Query ...
-func (c *Client) Query(bucket string, predicate []*pbUtils.AttributePredicate, ts *pbUtils.SnapshotTimePredicate, metadata map[string]string, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+func (c *Client) Query(bucket string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, metadata map[string]string, sync bool) (qpu_api.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
@@ -33,7 +33,7 @@ func (c *Client) Query(bucket string, predicate []*pbUtils.AttributePredicate, t
 }
 
 // QuerySQL ...
-func (c *Client) QuerySQL(query string, metadata map[string]string, sync bool) (pb.QPU_QueryClient, context.CancelFunc, error) {
+func (c *Client) QuerySQL(query string, metadata map[string]string, sync bool) (qpu_api.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
@@ -50,21 +50,21 @@ func (c *Client) QuerySQL(query string, metadata map[string]string, sync bool) (
 }
 
 //GetConfig ...
-func (c *Client) GetConfig() (*pb.ConfigResponse, error) {
+func (c *Client) GetConfig() (*qpu_api.ConfigResponse, error) {
 	ctx := context.TODO()
 	resp, err := c.cli.GetConfig(ctx, protoutils.ConfigRequest())
 	return resp, err
 }
 
 //GetDataTransfer ...
-func (c *Client) GetDataTransfer() (*pb.DataTransferResponse, error) {
+func (c *Client) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
 	ctx := context.TODO()
-	resp, err := c.cli.GetDataTransfer(ctx, &pb.GetDataRequest{})
+	resp, err := c.cli.GetDataTransfer(ctx, &qpu_api.GetDataRequest{})
 	return resp, err
 }
 
 // Forward ...
-func (c *Client) Forward() (pb.QPU_QueryClient, context.CancelFunc, error) {
+func (c *Client) Forward() (qpu_api.QPU_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {
@@ -84,5 +84,5 @@ func NewClient(address string) (Client, error) {
 	if err != nil {
 		return Client{}, err
 	}
-	return Client{cli: pb.NewQPUClient(conn), conn: conn}, nil
+	return Client{cli: qpu_api.NewQPUClient(conn), conn: conn}, nil
 }

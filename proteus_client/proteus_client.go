@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/client"
 )
 
@@ -121,8 +121,8 @@ func (c *Client) QuerySQL(query string) (<-chan ResponseRecord, <-chan error, er
 				close(errChan)
 				return
 			}
-			if streamRec.GetType() == pbQPU.ResponseStreamRecord_HEARTBEAT {
-			} else if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+			if streamRec.GetType() == qpu_api.ResponseStreamRecord_HEARTBEAT {
+			} else if streamRec.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
 				close(respChan)
 				close(errChan)
 				return
@@ -150,12 +150,12 @@ func (c *Client) GetDataTransfer() (float64, error) {
 	return float64(dataTransferred.GetKBytesTranferred()), nil
 }
 
-func logOpToObjectState(record *pbQPU.ResponseStreamRecord) ObjectState {
+func logOpToObjectState(record *qpu_api.ResponseStreamRecord) ObjectState {
 	logOp := record.GetLogOp()
-	var attrs []*pbUtils.Attribute
-	if record.GetType() == pbQPU.ResponseStreamRecord_STATE {
+	var attrs []*qpu.Attribute
+	if record.GetType() == qpu_api.ResponseStreamRecord_STATE {
 		attrs = logOp.GetPayload().GetState().GetAttrs()
-	} else if record.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+	} else if record.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
 		attrs = logOp.GetPayload().GetDelta().GetNew().GetAttrs()
 	}
 	state := make([]Attribute, len(attrs))
@@ -168,8 +168,8 @@ func logOpToObjectState(record *pbQPU.ResponseStreamRecord) ObjectState {
 	return state
 }
 
-func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.AttributePredicate, error) {
-	pred := make([]*pbUtils.AttributePredicate, len(predicate))
+func inputToAttributePredicate(predicate []AttributePredicate) ([]*qpu.AttributePredicate, error) {
+	pred := make([]*qpu.AttributePredicate, len(predicate))
 	for i, p := range predicate {
 		switch p.AttrType {
 		case S3TAGSTR:
@@ -249,11 +249,11 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 	return pred, nil
 }
 
-func getObjectType(strRecord *pbQPU.ResponseStreamRecord) ObjectType {
+func getObjectType(strRecord *qpu_api.ResponseStreamRecord) ObjectType {
 	switch strRecord.GetLogOp().GetObjectType() {
-	case pbUtils.LogOperation_S3OBJECT:
+	case qpu.LogOperation_S3OBJECT:
 		return S3OBJECT
-	default: //pbUtils.LogOperation_MAPCRDT:
+	default: //qpu.LogOperation_MAPCRDT:
 		return MAPCRDT
 	}
 }

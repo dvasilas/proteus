@@ -9,9 +9,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -44,7 +44,7 @@ func QPU(conf *config.Config) (*LBQPU, error) {
 }
 
 // Query implements the Query API for the fault injection QPU
-func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *LBQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "lb"}).Debug("query received")
 	forwardTo, err := q.generateSubQueries()
 	if err != nil {
@@ -74,7 +74,7 @@ func (q *LBQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInterna
 }
 
 // GetConfig implements the GetConfig API for the fault injection QPU
-func (q *LBQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *LBQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -103,7 +103,7 @@ func (q *LBQPU) generateSubQueries() ([]*utils.QPU, error) {
 	return forwardTo, nil
 }
 
-func (q *LBQPU) forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
+func (q *LBQPU) forward(pred []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
 		"pred":   pred,

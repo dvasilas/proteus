@@ -73,12 +73,11 @@ docker-prepare:
 ## proto: Compiles the protobuf files
 proto: $(PROTOC_CMD)
 	# go get ./vendor/github.com/golang/protobuf/protoc-gen-go
-	protoc --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/utils/utils.proto
-	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/qpu --proto_path=./src/protos/s3 --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/s3/s3.proto
-	protoc --proto_path=./src/protos/utils --proto_path=./src/protos/antidote --go_out=plugins=grpc:$(GOPATH)/src ./src/protos/antidote/log_propagation.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/utils --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/qpu/qpu.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/s3client --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/s3client/s3client.proto
-	protoc --proto_path=./src/protos/qpu --proto_path=./src/protos/monitoring --go_out=plugins=grpc:$(GOPATH)/src/ ./src/protos/monitoring/monitoring.proto
+	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
+	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
+	protoc api/protobuf-spec/antidote.proto --go_out=plugins=grpc:$(GOPATH)/src/
+	protoc api/protobuf-spec/monitoring.proto --go_out=plugins=grpc:$(GOPATH)/src/
+	protoc api/protobuf-spec/s3.proto --go_out=plugins=grpc:$(GOPATH)/src/
 	# python3 -m grpc_tools.protoc -I./src/protos/s3client --python_out=./proteus-bench/s3/ --grpc_python_out=./proteus-bench/s3/ ./src/protos/s3client/s3client.proto
 
 .PHONY: clean

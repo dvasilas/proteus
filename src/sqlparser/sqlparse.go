@@ -4,15 +4,15 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 	"github.com/xwb1989/sqlparser"
 )
 
 // Parse ...
-func Parse(query string) (*pbQPU.Query, error) {
+func Parse(query string) (*qpu_api.Query, error) {
 	log.WithFields(log.Fields{"query": query}).Debug("query received")
 	stmt, err := sqlparser.Parse(query)
 	if err != nil {
@@ -27,15 +27,15 @@ func Parse(query string) (*pbQPU.Query, error) {
 	}
 }
 
-func parseSelect(stmt sqlparser.Statement) (*pbQPU.Query, error) {
+func parseSelect(stmt sqlparser.Statement) (*qpu_api.Query, error) {
 	query := parsedQuery{}
 	query.parseSelect(stmt)
 
 	return query.toQPUQuery()
 }
 
-func (q *parsedQuery) toQPUQuery() (*pbQPU.Query, error) {
-	var pred *pbUtils.AttributePredicate
+func (q *parsedQuery) toQPUQuery() (*qpu_api.Query, error) {
+	var pred *qpu.AttributePredicate
 
 	var selectOp, selectAttr, selectVal expr
 	var ok bool
@@ -61,8 +61,8 @@ func (q *parsedQuery) toQPUQuery() (*pbQPU.Query, error) {
 
 	return protoutils.QueryInternal(
 		q.table,
-		protoutils.SnapshotTimePredicate(protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil), protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil)),
-		[]*pbUtils.AttributePredicate{pred},
+		protoutils.SnapshotTimePredicate(protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil), protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil)),
+		[]*qpu.AttributePredicate{pred},
 	), nil
 }
 
@@ -293,13 +293,13 @@ type operator string
 func (expr operator) getType() exprType { return op }
 
 type value struct {
-	qpuValue *pbUtils.Value
+	qpuValue *qpu.Value
 }
 
 func (expr value) getType() exprType { return val }
 
 type attribute struct {
-	qpuAttribute *pbUtils.Attribute
+	qpuAttribute *qpu.Attribute
 }
 
 func (expr attribute) getType() exprType { return attr }

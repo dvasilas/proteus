@@ -9,7 +9,7 @@ import (
 	"runtime"
 
 	"github.com/dvasilas/proteus/src/config"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/cache"
 	"github.com/dvasilas/proteus/src/qpu/datastore_driver"
 	"github.com/dvasilas/proteus/src/qpu/filter"
@@ -54,22 +54,22 @@ func createQPU(conf *config.Config) (DeployedQPU, error) {
 	var qpu server.QPUAPI
 	var err error
 	switch conf.QpuType {
-	case pbQPU.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DBDRIVER:
 		qpu, err = datastoredriver.QPU(conf)
 		if err != nil {
 			return DeployedQPU{}, err
 		}
-	case pbQPU.ConfigResponse_FILTER:
+	case qpu_api.ConfigResponse_FILTER:
 		qpu, err = filter.QPU(conf)
 		if err != nil {
 			return DeployedQPU{}, err
 		}
-	case pbQPU.ConfigResponse_INDEX:
+	case qpu_api.ConfigResponse_INDEX:
 		qpu, err = index.QPU(conf)
 		if err != nil {
 			return DeployedQPU{}, err
 		}
-	case pbQPU.ConfigResponse_CACHE:
+	case qpu_api.ConfigResponse_CACHE:
 		qpu, err = cache.QPU(conf)
 		if err != nil {
 			return DeployedQPU{}, err
@@ -84,7 +84,7 @@ func createQPU(conf *config.Config) (DeployedQPU, error) {
 func startServer(conf *config.Config, qpu server.QPUAPI) (*grpc.Server, error) {
 	server := server.QPUServer{Config: conf, Server: qpu}
 	s := grpc.NewServer()
-	pbQPU.RegisterQPUServer(s, &server)
+	qpu_api.RegisterQPUServer(s, &server)
 	reflection.Register(s)
 	lis, err := net.Listen("tcp", ":"+conf.Port)
 	if err != nil {

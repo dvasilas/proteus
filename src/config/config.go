@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
 // Config specifies the configuration structure of a QPU
 type Config struct {
-	QpuType         pbQPU.ConfigResponse_QPUType
+	QpuType         qpu_api.ConfigResponse_QPUType
 	Port            string
 	Connections     []QPUConnection
 	Schema          Schema
 	DatastoreConfig struct {
-		Dataset            *pbQPU.DataSet
+		Dataset            *qpu_api.DataSet
 		Type               Datastore
 		Endpoint           string
 		LogStreamEndpoint  string
@@ -29,7 +29,7 @@ type Config struct {
 		Size int
 	}
 	IndexConfig struct {
-		IndexingConfig []*pbUtils.AttributePredicate
+		IndexingConfig []*qpu.AttributePredicate
 		Bucket         string
 		ConsLevel      string
 		IndexStore     struct {
@@ -102,17 +102,17 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 	}
 
 	switch config.QpuType {
-	case pbQPU.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DBDRIVER:
 		if err := config.getDatastoreConfig(conf); err != nil {
 			return nil, err
 		}
-	case pbQPU.ConfigResponse_CACHE:
+	case qpu_api.ConfigResponse_CACHE:
 		config.getCacheConfig(conf)
-	case pbQPU.ConfigResponse_INDEX:
+	case qpu_api.ConfigResponse_INDEX:
 		if err := config.getIndexConfig(conf); err != nil {
 			return nil, err
 		}
-	case pbQPU.ConfigResponse_NETWORK:
+	case qpu_api.ConfigResponse_NETWORK:
 		config.getNetworkQPUConfig(conf)
 	}
 	return config, nil
@@ -124,23 +124,23 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 func (c *Config) getQpuType(t string) error {
 	switch t {
 	case "dbdriver":
-		c.QpuType = pbQPU.ConfigResponse_DBDRIVER
+		c.QpuType = qpu_api.ConfigResponse_DBDRIVER
 	case "filter":
-		c.QpuType = pbQPU.ConfigResponse_FILTER
+		c.QpuType = qpu_api.ConfigResponse_FILTER
 	case "index":
-		c.QpuType = pbQPU.ConfigResponse_INDEX
+		c.QpuType = qpu_api.ConfigResponse_INDEX
 	case "cache":
-		c.QpuType = pbQPU.ConfigResponse_CACHE
+		c.QpuType = qpu_api.ConfigResponse_CACHE
 	case "federation":
-		c.QpuType = pbQPU.ConfigResponse_FEDERATION_DISPATCHER
+		c.QpuType = qpu_api.ConfigResponse_FEDERATION_DISPATCHER
 	case "load_balancer":
-		c.QpuType = pbQPU.ConfigResponse_LOAD_BALANCER
+		c.QpuType = qpu_api.ConfigResponse_LOAD_BALANCER
 	case "lambda":
-		c.QpuType = pbQPU.ConfigResponse_LAMBDA
+		c.QpuType = qpu_api.ConfigResponse_LAMBDA
 	case "network":
-		c.QpuType = pbQPU.ConfigResponse_NETWORK
+		c.QpuType = qpu_api.ConfigResponse_NETWORK
 	case "intersection":
-		c.QpuType = pbQPU.ConfigResponse_INTERSECTION
+		c.QpuType = qpu_api.ConfigResponse_INTERSECTION
 
 	default:
 		return errors.New("unknown QPU type")
@@ -272,7 +272,7 @@ func (c *Config) getIndexingConfig(conf ConfJSON) error {
 	return nil
 }
 
-func (c *Config) getIndexBounds(conf ConfJSON) (*pbUtils.Value, *pbUtils.Value, error) {
+func (c *Config) getIndexBounds(conf ConfJSON) (*qpu.Value, *qpu.Value, error) {
 	table := c.Schema[conf.IndexConfig.Bucket]
 	switch table[conf.IndexConfig.AttributeName] {
 	case INT:
@@ -381,7 +381,7 @@ type QPUConnectionJSON struct {
 //---------------- Auxiliary Functions -------------
 
 // StringToValue ...
-func (c *Config) StringToValue(tableName, attributeName, valueStr string) (*pbUtils.Value, error) {
+func (c *Config) StringToValue(tableName, attributeName, valueStr string) (*qpu.Value, error) {
 	switch c.Schema[tableName][attributeName] {
 	case STR:
 		return protoutils.ValueStr(valueStr), nil

@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	pb "github.com/dvasilas/proteus/src/protos/monitoring"
+	"github.com/dvasilas/proteus/src/proto/monitoring"
 	"google.golang.org/grpc"
 )
 
@@ -39,12 +39,12 @@ func init() {
 	prometheus.MustRegister(local_indexes_inMem_Histogram)
 }
 
-func runWorkload(endpoint string) (pb.Monitoring_LogResponseTimesClient, context.CancelFunc, error) {
+func runWorkload(endpoint string) (monitoring.Monitoring_LogResponseTimesClient, context.CancelFunc, error) {
 	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
 	if err != nil {
 		return nil, nil, err
 	}
-	client := pb.NewMonitoringClient(conn)
+	client := monitoring.NewMonitoringClient(conn)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := client.LogResponseTimes(ctx)
@@ -55,7 +55,7 @@ func runWorkload(endpoint string) (pb.Monitoring_LogResponseTimesClient, context
 	return stream, cancel, err
 }
 
-func startWorkload(endpoint string) (pb.Monitoring_LogResponseTimesClient, error) {
+func startWorkload(endpoint string) (monitoring.Monitoring_LogResponseTimesClient, error) {
 	stream, cancel, err := runWorkload(endpoint)
 	if err != nil {
 		cancel()
@@ -64,7 +64,7 @@ func startWorkload(endpoint string) (pb.Monitoring_LogResponseTimesClient, error
 	return stream, nil
 }
 
-func monitor(stream pb.Monitoring_LogResponseTimesClient, histogram prometheus.Histogram, endpoint string) {
+func monitor(stream monitoring.Monitoring_LogResponseTimesClient, histogram prometheus.Histogram, endpoint string) {
 	for {
 		respT, err := stream.Recv()
 		if err != nil {

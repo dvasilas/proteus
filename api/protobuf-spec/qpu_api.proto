@@ -1,12 +1,8 @@
 syntax = "proto3";
 
-package qpu;
-option java_multiple_files = true;
-option java_package = "io.grpc.proteusclient";
-option java_outer_classname = "QPUProto";
-option go_package = "github.com/dvasilas/proteus/src/protos/qpu";
+option go_package = "github.com/dvasilas/proteus/src/proto/qpu_api";
 
-import "utils.proto";
+import "api/protobuf-spec/qpu.proto";
 
 service QPU {
   rpc Query(stream RequestStream) returns (stream ResponseStreamRecord) {}
@@ -39,7 +35,7 @@ message ResponseStreamRecord {
     }
   int64 sequence_id = 1;
   StreamRecordType type = 2;
-  utils.LogOperation logOp = 3;
+  qpu.LogOperation logOp = 3;
 }
 
 message QueryRequest {
@@ -50,9 +46,9 @@ message QueryRequest {
 
 message Query {
   message internalQuery {
-    utils.SnapshotTimePredicate clock = 1;
+    qpu.SnapshotTimePredicate clock = 1;
     string bucket = 2;
-    repeated utils.AttributePredicate predicate = 3;
+    repeated qpu.AttributePredicate predicate = 3;
   }
   message SQLQuery {
     string queryStr = 1;
@@ -68,7 +64,7 @@ message AckMsg {
 }
 
 message ConfigRequest {
-  utils.SnapshotTimePredicate clock = 1;
+  qpu.SnapshotTimePredicate clock = 1;
 }
 
 message ConfigResponse {
@@ -84,7 +80,7 @@ message ConfigResponse {
     INTERSECTION = 8;
   }
   QPUType qpu_type = 1;
-  repeated utils.AttributePredicate supportedQueries = 2;
+  repeated qpu.AttributePredicate supportedQueries = 2;
   DataSet dataset = 3;
 }
 

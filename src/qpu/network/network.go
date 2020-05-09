@@ -9,8 +9,8 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,17 +73,17 @@ func QPU(conf *config.Config) (*NQPU, error) {
 }
 
 // Query implements the Query API for the network QPU
-func (q *NQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
-	respRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+func (q *NQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
+	respRecordCh := make(chan *qpu_api.ResponseStreamRecord)
 	canReturn := make(chan bool)
-	go func(respRecordCh chan *pbQPU.ResponseStreamRecord) {
+	go func(respRecordCh chan *qpu_api.ResponseStreamRecord) {
 		for respRecord := range respRecordCh {
 			if err := q.process(func() error {
 				return streamOut.Send(respRecord)
 			}); err != nil {
 				log.WithFields(log.Fields{"error": err}).Debug("process.send")
 			}
-			if respRecord.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+			if respRecord.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
 				canReturn <- true
 				break
 			}
@@ -95,8 +95,8 @@ func (q *NQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 	}
 	if err = streamDown.Send(
 		protoutils.RequestStreamRequest(
-			&pbQPU.Query{
-				Val: &pbQPU.Query_QueryI{
+			&qpu_api.Query{
+				Val: &qpu_api.Query_QueryI{
 					QueryI: query,
 				},
 			},
@@ -135,7 +135,7 @@ func (q *NQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 }
 
 // GetConfig implements the GetConfig API for the network QPU
-func (q *NQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *NQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	conf, err := q.qpu.Conns[0].Client.GetConfig()
 	if err != nil {
 		return nil, err

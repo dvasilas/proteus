@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	antidote "github.com/AntidoteDB/antidote-go-client"
-	"github.com/dvasilas/proteus/src/protos"
-	pbAnt "github.com/dvasilas/proteus/src/protos/antidote"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	pbAntidote "github.com/dvasilas/proteus/src/proto/antidote"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -34,9 +34,9 @@ func New(endp, logPropEndp string) AntidoteDataStore {
 }
 
 //SubscribeOps subscribes to updates from AntidoteDB (supports only async mode)
-// each time an update is received, it is formated as a pbUtils.LogOperation
+// each time an update is received, it is formated as a qpu.LogOperation
 // and sent to datastoredriver via a channel
-func (ds AntidoteDataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
+func (ds AntidoteDataStore) SubscribeOps(msg chan *qpu.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
 	errs := make(chan error, 1)
 
 	if sync {
@@ -49,9 +49,9 @@ func (ds AntidoteDataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack cha
 		errs <- err
 		return nil, errs
 	}
-	client := pbAnt.NewServiceClient(conn)
+	client := pbAntidote.NewServiceClient(conn)
 	ctx := context.Background()
-	stream, err := client.WatchAsync(ctx, &pbAnt.SubRequest{Timestamp: 0})
+	stream, err := client.WatchAsync(ctx, &pbAntidote.SubRequest{Timestamp: 0})
 	if err != nil {
 		errs <- err
 		return conn, errs
@@ -62,20 +62,20 @@ func (ds AntidoteDataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack cha
 
 //GetSnapshot reads a snapshot of all objects stored in an Antidotedb bucket,
 // not yet implemented
-func (ds AntidoteDataStore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
+func (ds AntidoteDataStore) GetSnapshot(bucket string, msg chan *qpu.LogOperation) <-chan error {
 	return ds.readSnapshot(bucket, msg, ds.processAndForwardObject)
 }
 
 // Op ...
-func (ds AntidoteDataStore) Op(op *pbUtils.LogOperation) {
+func (ds AntidoteDataStore) Op(op *qpu.LogOperation) {
 }
 
 //----------- Stream Consumer Functions ------------
 
 //opConsumer creates a goroutine that receives a stream of updates from AntidoteDB,
-// each time an update is received, it is parsed to a pbUtils.LogOperation object
+// each time an update is received, it is parsed to a qpu.LogOperation object
 // which is then sent to the datastoredriver via a channel
-func (ds AntidoteDataStore) opConsumer(stream pbAnt.Service_WatchAsyncClient, msg chan *pbUtils.LogOperation, errs chan error) {
+func (ds AntidoteDataStore) opConsumer(stream pbAntidote.Service_WatchAsyncClient, msg chan *qpu.LogOperation, errs chan error) {
 	go func() {
 		for {
 			op, err := stream.Recv()
@@ -99,7 +99,7 @@ func (ds AntidoteDataStore) opConsumer(stream pbAnt.Service_WatchAsyncClient, ms
 
 //readSnapshot retrieves all objects stored in the given bucket
 // and for each object calls the processObj function
-func (ds AntidoteDataStore) readSnapshot(bucketName string, msg chan *pbUtils.LogOperation, processObj func(string, string, *antidote.MapReadResult, []antidote.MapEntryKey, chan *pbUtils.LogOperation, chan error)) <-chan error {
+func (ds AntidoteDataStore) readSnapshot(bucketName string, msg chan *qpu.LogOperation, processObj func(string, string, *antidote.MapReadResult, []antidote.MapEntryKey, chan *qpu.LogOperation, chan error)) <-chan error {
 	errs := make(chan error, 1)
 	endpoint := strings.Split(ds.endpoint, ":")
 	port, err := strconv.ParseInt(endpoint[1], 10, 64)
@@ -138,9 +138,9 @@ func (ds AntidoteDataStore) readSnapshot(bucketName string, msg chan *pbUtils.Lo
 }
 
 //processAndForwardObject reads the content of an object (map crdt)
-// creates a *pbUtils.LogOperation and sends it to the datastoredriver to datastoredriver via a channel
-func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, val *antidote.MapReadResult, entries []antidote.MapEntryKey, msg chan *pbUtils.LogOperation, errs chan error) {
-	attrs := make([]*pbUtils.Attribute, len(entries))
+// creates a *qpu.LogOperation and sends it to the datastoredriver to datastoredriver via a channel
+func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, val *antidote.MapReadResult, entries []antidote.MapEntryKey, msg chan *qpu.LogOperation, errs chan error) {
+	attrs := make([]*qpu.Attribute, len(entries))
 	for i, e := range entries {
 		switch e.CrdtType {
 		case antidote.CRDTType_LWWREG:
@@ -166,7 +166,7 @@ func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, v
 	obj := protoutils.LogOperation(
 		string(key),
 		bucket,
-		pbUtils.LogOperation_MAPCRDT,
+		qpu.LogOperation_MAPCRDT,
 		protoutils.Vectorclock(map[string]uint64{"antidote": uint64(0)}),
 		protoutils.PayloadState(state),
 	)
@@ -176,25 +176,25 @@ func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, v
 	msg <- obj
 }
 
-func (ds AntidoteDataStore) formatOperation(logOp *pbAnt.LogOperation) *pbUtils.LogOperation {
-	var payload *pbUtils.Payload
+func (ds AntidoteDataStore) formatOperation(logOp *pbAntidote.LogOperation) *qpu.LogOperation {
+	var payload *qpu.Payload
 	switch logOp.GetPayload().GetVal().(type) {
-	case *pbAnt.LogOperation_Payload_Op:
+	case *pbAntidote.LogOperation_Payload_Op:
 		ops := logOp.GetPayload().GetOp().GetOp()
-		attrs := make([]*pbUtils.Attribute, len(ops))
-		updates := make([]*pbUtils.Operation_Update, len(ops))
+		attrs := make([]*qpu.Attribute, len(ops))
+		updates := make([]*qpu.Operation_Update, len(ops))
 		for i := range ops {
-			// var typ pbUtils.Attribute_AttributeType
+			// var typ qpu.Attribute_AttributeType
 			// if ops[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
-			// 	typ = pbUtils.Attribute_CRDTCOUNTER
+			// 	typ = qpu.Attribute_CRDTCOUNTER
 			// } else if ops[i].GetObject().GetType() == "antidote_crdt_register_lww" {
-			// 	typ = pbUtils.Attribute_CRDTLWWREG
+			// 	typ = qpu.Attribute_CRDTLWWREG
 			// }
 			attrs[i] = protoutils.Attribute(ops[i].GetObject().GetKey(), nil)
 			updates[i] = protoutils.Update(ops[i].GetUpdate().GetOpType(), crdtValToValue(ops[i].GetUpdate().GetValue()))
 		}
 		payload = protoutils.PayloadOp(attrs, updates)
-	case *pbAnt.LogOperation_Payload_Delta:
+	case *pbAntidote.LogOperation_Payload_Delta:
 		oldState := mapCrdtStateToObjectState(logOp.GetPayload().GetDelta().GetOld().GetState())
 		newState := mapCrdtStateToObjectState(logOp.GetPayload().GetDelta().GetNew().GetState())
 		payload = protoutils.PayloadDelta(oldState, newState)
@@ -202,7 +202,7 @@ func (ds AntidoteDataStore) formatOperation(logOp *pbAnt.LogOperation) *pbUtils.
 	op := protoutils.LogOperation(
 		logOp.GetKey(),
 		logOp.GetBucket(),
-		pbUtils.LogOperation_MAPCRDT,
+		qpu.LogOperation_MAPCRDT,
 		//TODO antidote should return vector clock
 		protoutils.Vectorclock(map[string]uint64{"antidote": uint64(logOp.GetCommitTime())}),
 		payload,
@@ -210,29 +210,29 @@ func (ds AntidoteDataStore) formatOperation(logOp *pbAnt.LogOperation) *pbUtils.
 	return op
 }
 
-func mapCrdtStateToObjectState(crdtSt []*pbAnt.CrdtMapState_MapState) *pbUtils.ObjectState {
-	attrs := make([]*pbUtils.Attribute, len(crdtSt))
+func mapCrdtStateToObjectState(crdtSt []*pbAntidote.CrdtMapState_MapState) *qpu.ObjectState {
+	attrs := make([]*qpu.Attribute, len(crdtSt))
 	for i := range crdtSt {
-		// var typ pbUtils.Attribute_AttributeType
+		// var typ qpu.Attribute_AttributeType
 		// if crdtSt[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
-		// 	typ = pbUtils.Attribute_CRDTCOUNTER
+		// 	typ = qpu.Attribute_CRDTCOUNTER
 		// } else if crdtSt[i].GetObject().GetType() == "antidote_crdt_register_lww" {
-		// 	typ = pbUtils.Attribute_CRDTLWWREG
+		// 	typ = qpu.Attribute_CRDTLWWREG
 		// }
 		attrs[i] = protoutils.Attribute(crdtSt[i].GetObject().GetKey(), crdtValToValue(crdtSt[i].GetValue()))
 	}
 	return protoutils.ObjectState(attrs)
 }
 
-func crdtValToValue(val *pbAnt.CrdtValue) *pbUtils.Value {
-	value := &pbUtils.Value{}
+func crdtValToValue(val *pbAntidote.CrdtValue) *qpu.Value {
+	value := &qpu.Value{}
 	switch val.GetVal().(type) {
-	case *pbAnt.CrdtValue_Str:
-		value.Val = &pbUtils.Value_Str{
+	case *pbAntidote.CrdtValue_Str:
+		value.Val = &qpu.Value_Str{
 			Str: val.GetStr(),
 		}
-	case *pbAnt.CrdtValue_Int:
-		value.Val = &pbUtils.Value_Int{
+	case *pbAntidote.CrdtValue_Int:
+		value.Val = &qpu.Value_Int{
 			Int: val.GetInt(),
 		}
 	}

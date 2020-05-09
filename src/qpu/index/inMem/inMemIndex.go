@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
 
 	utils "github.com/dvasilas/proteus/src"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	"github.com/google/btree"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,9 +25,9 @@ type InMemIndex struct {
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
 type indexImplementation interface {
-	update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	updateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate, chan utils.ObjectState, chan error)
+	update(*qpu.Attribute, *qpu.Attribute, utils.ObjectState, qpu.Vectorclock) error
+	updateCatchUp(*qpu.Attribute, utils.ObjectState, qpu.Vectorclock) error
+	lookup(*qpu.AttributePredicate, *qpu.SnapshotTimePredicate, chan utils.ObjectState, chan error)
 	print()
 }
 
@@ -45,17 +45,17 @@ func New(attrName string, attrType config.DatastoreAttributeType) (*InMemIndex, 
 }
 
 // Update updates the index based on a given operation
-func (i *InMemIndex) Update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *InMemIndex) Update(attrOld *qpu.Attribute, attrNew *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	return i.index.update(attrOld, attrNew, object, ts)
 }
 
 // UpdateCatchUp updates the index based on a given object state
-func (i *InMemIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *InMemIndex) UpdateCatchUp(attr *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	return i.index.updateCatchUp(attr, object, ts)
 }
 
 // Lookup performs a range lookup on the index and returns the result.
-func (i *InMemIndex) Lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
+func (i *InMemIndex) Lookup(attrPred *qpu.AttributePredicate, tsPred *qpu.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	i.index.lookup(attrPred, tsPred, lookupResCh, errCh)
 }
 
@@ -79,7 +79,7 @@ func newBTreeIndex(t config.DatastoreAttributeType) (*bTreeIndex, error) {
 	}
 }
 
-func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *bTreeIndex) update(attrOld *qpu.Attribute, attrNew *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	i.mutex.Lock()
 	if attrOld == nil {
 		if indexEntry, found := i.getIndexEntry(attrNew); found {
@@ -114,7 +114,7 @@ func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribu
 	return nil
 }
 
-func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
+func (i *bTreeIndex) updateCatchUp(attr *qpu.Attribute, object utils.ObjectState, ts qpu.Vectorclock) error {
 	i.mutex.Lock()
 	if indexEntry, found := i.getIndexEntry(attr); found {
 		indexEntry.updateFirstVersion(object)
@@ -128,7 +128,7 @@ func (i *bTreeIndex) updateCatchUp(attr *pbUtils.Attribute, object utils.ObjectS
 	return nil
 }
 
-func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtils.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
+func (i *bTreeIndex) lookup(attrPred *qpu.AttributePredicate, tsPred *qpu.SnapshotTimePredicate, lookupResCh chan utils.ObjectState, errCh chan error) {
 	it := func(node btree.Item) bool {
 		postings := node.(treeNode).getLatestVersion()
 		for _, obj := range postings.Objects {
@@ -138,7 +138,7 @@ func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtil
 	}
 	newUbound := attrPred.GetUbound()
 	switch attrPred.GetLbound().GetVal().(type) {
-	case *pbUtils.Value_Flt:
+	case *qpu.Value_Flt:
 		if attrPred.GetLbound().GetFlt() == attrPred.GetUbound().GetFlt() {
 			newUbound = protoutils.ValueFlt(attrPred.GetUbound().GetFlt() + 0.01)
 		}
@@ -154,7 +154,7 @@ func (i *bTreeIndex) lookup(attrPred *pbUtils.AttributePredicate, tsPred *pbUtil
 	}()
 }
 
-func (i *bTreeIndex) newIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) btree.Item {
+func (i *bTreeIndex) newIndexEntry(attr *qpu.Attribute, ts qpu.Vectorclock, obj utils.ObjectState) btree.Item {
 	item := i.entry.newIndexEntry(attr)
 	posting := Posting{
 		Objects:   map[string]utils.ObjectState{obj.ObjectID: obj},
@@ -164,7 +164,7 @@ func (i *bTreeIndex) newIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclo
 	return item
 }
 
-func (i *bTreeIndex) newCatchUpIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Vectorclock, obj utils.ObjectState) treeNode {
+func (i *bTreeIndex) newCatchUpIndexEntry(attr *qpu.Attribute, ts qpu.Vectorclock, obj utils.ObjectState) treeNode {
 	zeroTs := make(map[string]uint64)
 	for k := range ts.GetVc() {
 		zeroTs[k] = 0
@@ -178,7 +178,7 @@ func (i *bTreeIndex) newCatchUpIndexEntry(attr *pbUtils.Attribute, ts pbUtils.Ve
 	return entry
 }
 
-func (i *bTreeIndex) getIndexEntry(attr *pbUtils.Attribute) (treeNode, bool) {
+func (i *bTreeIndex) getIndexEntry(attr *qpu.Attribute) (treeNode, bool) {
 	indexEntry := i.entry.attrToIndexEntry(attr)
 	if i.tree.Has(indexEntry) {
 		return i.tree.Get(indexEntry).(treeNode), true
@@ -211,9 +211,9 @@ func (i *bTreeIndex) print() {
 //------------ indexEntry interface ----------------
 
 type indexEntry interface {
-	newIndexEntry(*pbUtils.Attribute) treeNode
-	attrToIndexEntry(attr *pbUtils.Attribute) btree.Item
-	predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item)
+	newIndexEntry(*qpu.Attribute) treeNode
+	attrToIndexEntry(attr *qpu.Attribute) btree.Item
+	predicateToIndexEntries(lb, ub *qpu.Value) (btree.Item, btree.Item)
 }
 
 // indexFloat implements indexEntry
@@ -231,23 +231,23 @@ func newIndexInt() indexInt {
 	return indexInt{}
 }
 
-func (i indexFloat) newIndexEntry(attr *pbUtils.Attribute) treeNode {
+func (i indexFloat) newIndexEntry(attr *qpu.Attribute) treeNode {
 	return treeNode{Value: valueFloat{Val: attr.GetValue().GetFlt()}, Postings: list.New()}
 }
-func (i indexFloat) attrToIndexEntry(attr *pbUtils.Attribute) btree.Item {
+func (i indexFloat) attrToIndexEntry(attr *qpu.Attribute) btree.Item {
 	return treeNode{Value: valueFloat{Val: attr.GetValue().GetFlt()}}
 }
-func (i indexFloat) predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item) {
+func (i indexFloat) predicateToIndexEntries(lb, ub *qpu.Value) (btree.Item, btree.Item) {
 	return treeNode{Value: valueFloat{Val: lb.GetFlt()}}, treeNode{Value: valueFloat{Val: ub.GetFlt()}}
 }
 
-func (i indexInt) newIndexEntry(attr *pbUtils.Attribute) treeNode {
+func (i indexInt) newIndexEntry(attr *qpu.Attribute) treeNode {
 	return treeNode{Value: valueInt{Val: attr.GetValue().GetInt()}, Postings: list.New()}
 }
-func (i indexInt) attrToIndexEntry(attr *pbUtils.Attribute) btree.Item {
+func (i indexInt) attrToIndexEntry(attr *qpu.Attribute) btree.Item {
 	return treeNode{Value: valueInt{Val: attr.GetValue().GetInt()}}
 }
-func (i indexInt) predicateToIndexEntries(lb, ub *pbUtils.Value) (btree.Item, btree.Item) {
+func (i indexInt) predicateToIndexEntries(lb, ub *qpu.Value) (btree.Item, btree.Item) {
 	return treeNode{Value: valueInt{Val: lb.GetInt()}}, treeNode{Value: valueInt{Val: ub.GetInt()}}
 }
 
@@ -262,7 +262,7 @@ type treeNode struct {
 // Posting ...
 type Posting struct {
 	Objects   map[string]utils.ObjectState
-	Timestamp pbUtils.Vectorclock
+	Timestamp qpu.Vectorclock
 }
 
 func (n treeNode) Less(than btree.Item) bool {
@@ -277,7 +277,7 @@ func (n treeNode) cloneLatestVersion() map[string]utils.ObjectState {
 	return newObjMap
 }
 
-func (n treeNode) newVersion(obj utils.ObjectState, ts pbUtils.Vectorclock) {
+func (n treeNode) newVersion(obj utils.ObjectState, ts qpu.Vectorclock) {
 	objMap := n.cloneLatestVersion()
 	objMap[obj.ObjectID] = obj
 	n.createNewVersion(Posting{
@@ -305,7 +305,7 @@ func (n treeNode) getLatestVersion() Posting {
 	return n.Postings.Back().Value.(Posting)
 }
 
-func (n treeNode) removeObjFromEntry(objectID string, ts pbUtils.Vectorclock) {
+func (n treeNode) removeObjFromEntry(objectID string, ts qpu.Vectorclock) {
 	objMap := n.cloneLatestVersion()
 	delete(objMap, objectID)
 	n.createNewVersion(

@@ -7,9 +7,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,7 +39,7 @@ func QPU(conf *config.Config) (*FQPU, error) {
 }
 
 // Query implements the Query API for the federation dispatcher QPU
-func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *FQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query}).Debug("query received")
 	subQueries, isLocal, err := q.generateSubQueries(query.GetPredicate())
 	if err != nil {
@@ -47,7 +47,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 	}
 	subQueryCount := len(subQueries)
 	var mutex sync.Mutex
-	subQueryResponseRecordCh := make(chan *pbQPU.ResponseStreamRecord)
+	subQueryResponseRecordCh := make(chan *qpu_api.ResponseStreamRecord)
 	errCh := make(chan error)
 	seqID := int64(0)
 	for i, subQ := range subQueries {
@@ -96,7 +96,7 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			if !ok {
 				subQueryResponseRecordCh = nil
 			} else {
-				if streamRec.GetType() == pbQPU.ResponseStreamRecord_END_OF_STREAM {
+				if streamRec.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
 				} else {
 					if err := streamOut.Send(
 						protoutils.ResponseStreamRecord(
@@ -114,15 +114,15 @@ func (q *FQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			return streamOut.Send(
 				protoutils.ResponseStreamRecord(
 					seqID,
-					pbQPU.ResponseStreamRecord_END_OF_STREAM,
-					&pbUtils.LogOperation{},
+					qpu_api.ResponseStreamRecord_END_OF_STREAM,
+					&qpu.LogOperation{},
 				))
 		}
 	}
 }
 
 // GetConfig implements the GetConfig API for the filter QPU
-func (q *FQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *FQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -147,7 +147,7 @@ func (q *FQPU) Cleanup() {
 
 //---------------- Internal Functions --------------
 
-func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*utils.QPU, []bool, error) {
+func (q *FQPU) generateSubQueries(predicate []*qpu.AttributePredicate) ([]*utils.QPU, []bool, error) {
 	forwardTo := make([]*utils.QPU, 0)
 	isLocal := make([]bool, 0)
 	for i, c := range q.qpu.Conns {
@@ -163,7 +163,7 @@ func (q *FQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]*u
 	return forwardTo, isLocal, nil
 }
 
-func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
+func forward(pred []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
 	}).Debug("Federation QPU: received input stream record")

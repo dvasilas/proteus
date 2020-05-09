@@ -12,9 +12,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/filter"
 	"github.com/dvasilas/proteus/src/qpu/index/antidote"
 	"github.com/dvasilas/proteus/src/qpu/index/inMem"
@@ -34,16 +34,16 @@ type IQPU struct {
 }
 
 type persistentQuery struct {
-	predicate []*pbUtils.AttributePredicate
-	stream    pbQPU.QPU_QueryServer
+	predicate []*qpu.AttributePredicate
+	stream    qpu_api.QPU_QueryServer
 }
 
 // indexStore describes the interface that any index implementation needs to expose
 // to work with this module.
 type indexStore interface {
-	Update(*pbUtils.Attribute, *pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	UpdateCatchUp(*pbUtils.Attribute, utils.ObjectState, pbUtils.Vectorclock) error
-	Lookup(*pbUtils.AttributePredicate, *pbUtils.SnapshotTimePredicate, chan utils.ObjectState, chan error)
+	Update(*qpu.Attribute, *qpu.Attribute, utils.ObjectState, qpu.Vectorclock) error
+	UpdateCatchUp(*qpu.Attribute, utils.ObjectState, qpu.Vectorclock) error
+	Lookup(*qpu.AttributePredicate, *qpu.SnapshotTimePredicate, chan utils.ObjectState, chan error)
 }
 
 //---------------- API Functions -------------------
@@ -91,15 +91,15 @@ func QPU(conf *config.Config) (*IQPU, error) {
 	default:
 		return nil, errors.New("unknown index consistency level")
 	}
-	pred := []*pbUtils.AttributePredicate{}
+	pred := []*qpu.AttributePredicate{}
 	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
 	for i, conn := range q.qpu.Conns {
 		streamIn, cancel, err := conn.Client.Query(
 			q.qpu.Config.IndexConfig.Bucket,
 			pred,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
 			),
 			nil,
 			sync,
@@ -119,22 +119,22 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the index QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *IQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "index"}).Debug("query received")
 	if query.GetClock().GetUbound().GetType() < query.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
-	if query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
-		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetClock().GetLbound().GetType() != qpu.SnapshotTime_INF &&
+		query.GetClock().GetUbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetClock().GetUbound().GetType() != qpu.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
 	maxResponseCount, err := utils.MaxResponseCount(metadata)
 	if err != nil {
 		return nil
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_LATEST {
 		lookupResCh := make(chan utils.ObjectState)
 		errCh := make(chan error)
 		go q.index.Lookup(query.GetPredicate()[0], query.GetClock(), lookupResCh, errCh)
@@ -147,8 +147,8 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					if err := streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						)); err != nil {
 						return err
 					}
@@ -157,8 +157,8 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					if err := streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						)); err != nil {
 						return err
 					}
@@ -179,7 +179,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 					)
 					if err := streamOut.Send(protoutils.ResponseStreamRecord(
 						seqID,
-						pbQPU.ResponseStreamRecord_STATE,
+						qpu_api.ResponseStreamRecord_STATE,
 						logOp,
 					)); err != nil {
 						fmt.Println("err from Send(): ", err)
@@ -190,8 +190,8 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 						return streamOut.Send(
 							protoutils.ResponseStreamRecord(
 								seqID,
-								pbQPU.ResponseStreamRecord_END_OF_STREAM,
-								&pbUtils.LogOperation{},
+								qpu_api.ResponseStreamRecord_END_OF_STREAM,
+								&qpu.LogOperation{},
 							))
 					}
 				}
@@ -201,7 +201,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 			}
 		}
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_INF {
 		chID := rand.Int()
 		q.mutex.Lock()
 		q.persistentQs[chID] = persistentQuery{
@@ -213,7 +213,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 		go q.heartbeat(heartbeatCh)
 		heartbeatCh <- 0
 		for i := range heartbeatCh {
-			err := streamOut.Send(protoutils.ResponseStreamRecord(int64(0), pbQPU.ResponseStreamRecord_HEARTBEAT, nil))
+			err := streamOut.Send(protoutils.ResponseStreamRecord(int64(0), qpu_api.ResponseStreamRecord_HEARTBEAT, nil))
 			if err != nil {
 				q.mutex.Lock()
 				delete(q.persistentQs, chID)
@@ -244,7 +244,7 @@ func (q *IQPU) newHeartbeat(heartbeatCh chan int) func() {
 }
 
 // GetConfig implements the GetConfig API for the index QPU
-func (q *IQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *IQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -270,7 +270,7 @@ func (q *IQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
+func (q *IQPU) forward(record *qpu_api.ResponseStreamRecord) error {
 	q.mutex.RLock()
 	for _, query := range q.persistentQs {
 		match, err := filter.Filter(query.predicate, record)
@@ -292,7 +292,7 @@ func (q *IQPU) forward(record *pbQPU.ResponseStreamRecord) error {
 // Receives an stream of update operations
 // Updates the index for each operation
 // TODO: Query a way to handle an error here
-func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFunc, sync bool, local bool) {
+func (q *IQPU) opConsumer(stream qpu_api.QPU_QueryClient, cancel context.CancelFunc, sync bool, local bool) {
 	for {
 		streamRec, err := stream.Recv()
 		fmt.Println(streamRec, err)
@@ -304,7 +304,7 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 			log.Fatal("opConsumer err", err)
 			return
 		} else {
-			if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+			if streamRec.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
 				if q.measureDataTransfer && !local {
 					size, err := utils.GetMessageSize(streamRec)
 					if err != nil {
@@ -337,20 +337,20 @@ func (q *IQPU) opConsumer(stream pbQPU.QPU_QueryClient, cancel context.CancelFun
 //---------------- Internal Functions --------------
 
 // Given an operation sent from the data store, updates the index
-func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
+func (q *IQPU) updateIndex(rec *qpu_api.ResponseStreamRecord) error {
 	state := utils.ObjectState{
 		ObjectID:   rec.GetLogOp().GetObjectId(),
 		ObjectType: rec.GetLogOp().GetObjectType(),
 		Bucket:     rec.GetLogOp().GetBucket(),
 		Timestamp:  *rec.GetLogOp().GetTimestamp(),
 	}
-	if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+	if rec.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
 		if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {
 			state.State = *rec.GetLogOp().GetPayload().GetDelta().GetNew()
 		} else if rec.GetLogOp().GetPayload().GetDelta().GetOld() != nil {
 			state.State = *rec.GetLogOp().GetPayload().GetDelta().GetOld()
 		}
-	} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+	} else if rec.GetType() == qpu_api.ResponseStreamRecord_STATE {
 		state.State = *rec.GetLogOp().GetPayload().GetState()
 	}
 	for _, attr := range state.State.GetAttrs() {
@@ -366,7 +366,7 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 			}
 		}
 		if toIndex {
-			if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+			if rec.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
 				if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {
 					for _, attrOld := range rec.GetLogOp().GetPayload().GetDelta().GetOld().GetAttrs() {
 						if attr.GetAttrKey() == attrOld.GetAttrKey() {
@@ -376,7 +376,7 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 					return q.index.Update(nil, attr, state, *rec.GetLogOp().GetTimestamp())
 				}
 				return q.index.Update(attr, nil, state, *rec.GetLogOp().GetTimestamp())
-			} else if rec.GetType() == pbQPU.ResponseStreamRecord_STATE {
+			} else if rec.GetType() == qpu_api.ResponseStreamRecord_STATE {
 				return q.index.UpdateCatchUp(attr, state, *rec.GetLogOp().GetTimestamp())
 			}
 		}
@@ -389,13 +389,13 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 func (q *IQPU) catchUp() error {
 	errChan := make(chan error)
 	for _, conn := range q.qpu.Conns {
-		pred := make([]*pbUtils.AttributePredicate, 0)
+		pred := make([]*qpu.AttributePredicate, 0)
 		stream, cancel, err := conn.Client.Query(
 			q.qpu.Config.IndexConfig.Bucket,
 			pred,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
 			),
 			nil,
 			false,
@@ -420,8 +420,8 @@ func (q *IQPU) catchUp() error {
 	return nil
 }
 
-func (q *IQPU) updateIndexCatchUp(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
-	if streamRec.GetType() != pbQPU.ResponseStreamRecord_END_OF_STREAM {
+func (q *IQPU) updateIndexCatchUp(pred []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64) error {
+	if streamRec.GetType() != qpu_api.ResponseStreamRecord_END_OF_STREAM {
 		return q.updateIndex(streamRec)
 	}
 	return nil

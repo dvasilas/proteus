@@ -1,8 +1,6 @@
 syntax = "proto3";
 
-package monitoring;
-
-option go_package = "github.com/dvasilas/proteus/src/protos/monitoring";
+option go_package = "github.com/dvasilas/proteus/src/proto/monitoring";
 
 service Monitoring {
   rpc LogResponseTimes (stream workloadRequest) returns (stream responseTime) {}

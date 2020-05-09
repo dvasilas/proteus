@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.20.11
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0
-	github.com/knocknote/vitess-sqlparser v0.0.0-20200129061755-eb7ce11aa4dd
+	github.com/knocknote/vitess-sqlparser v0.0.0-20200129061755-eb7ce11aa4dd // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/pelletier/go-toml v1.4.0

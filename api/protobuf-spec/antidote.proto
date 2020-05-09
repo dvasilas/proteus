@@ -1,7 +1,6 @@
 syntax = "proto3";
 
-package logpropagation;
-option go_package = "github.com/dvasilas/proteus/src/protos/antidote";
+option go_package = "github.com/dvasilas/proteus/src/proto/antidote";
 
 service Service {
   rpc WatchAsync(SubRequest) returns (stream LogOperation) {}

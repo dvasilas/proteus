@@ -7,7 +7,7 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	"github.com/dvasilas/proteus/src/qpu/client"
 )
 
@@ -17,14 +17,14 @@ type Cache struct {
 	usedCapacity int
 	ll           *list.List
 	items        map[string]*list.Element
-	onEvict      func(key []*pbUtils.AttributePredicate)
+	onEvict      func(key []*qpu.AttributePredicate)
 	mutex        sync.Mutex
 	config       *config.Config
 }
 
 type entry struct {
 	table     string
-	predicate []*pbUtils.AttributePredicate
+	predicate []*qpu.AttributePredicate
 	value     []utils.ObjectState
 	size      int
 	// key
@@ -33,7 +33,7 @@ type entry struct {
 	// cancel context.CancelFunc
 }
 
-func (c *Cache) onEvictFunc(predicate []*pbUtils.AttributePredicate) {
+func (c *Cache) onEvictFunc(predicate []*qpu.AttributePredicate) {
 	// key, _ := predicateToCacheKey(predicate)
 	// if item, ok := c.items[key]; ok {
 	// 	item.Value.(*entry).cancel()
@@ -53,7 +53,7 @@ func New(conf *config.Config) *Cache {
 }
 
 // Put stores an object in a cache entry
-func (c *Cache) Put(bucket string, predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, newEntrySize int, client client.Client) error {
+func (c *Cache) Put(bucket string, predicate []*qpu.AttributePredicate, objects []utils.ObjectState, newEntrySize int, client client.Client) error {
 	c.mutex.Lock()
 	if c.items == nil {
 		c.ll = list.New()
@@ -67,8 +67,8 @@ func (c *Cache) Put(bucket string, predicate []*pbUtils.AttributePredicate, obje
 		// 	bucket,
 		// 	predicate,
 		// 	protoutils.SnapshotTimePredicate(
-		// 		protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
-		// 		protoutils.SnapshotTime(pbUtils.SnapshotTime_INF, nil),
+		// 		protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
+		// 		protoutils.SnapshotTime(qpu.SnapshotTime_INF, nil),
 		// 	),
 		// 	nil,
 		// 	false,
@@ -90,7 +90,7 @@ func (c *Cache) Put(bucket string, predicate []*pbUtils.AttributePredicate, obje
 }
 
 // Get retrieves an entry from the cache
-func (c *Cache) Get(tableName string, p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool, error) {
+func (c *Cache) Get(tableName string, p []*qpu.AttributePredicate) ([]utils.ObjectState, bool, error) {
 	if c.items == nil {
 		return nil, false, nil
 	}
@@ -111,7 +111,7 @@ func (c *Cache) Get(tableName string, p []*pbUtils.AttributePredicate) ([]utils.
 }
 
 // WaitInvalidation ..
-// func (c *Cache) WaitInvalidation(p []*pbUtils.AttributePredicate, stream pbQPU.QPU_QueryClient, cancel context.CancelFunc) error {
+// func (c *Cache) WaitInvalidation(p []*qpu.AttributePredicate, stream pbQPU.QPU_QueryClient, cancel context.CancelFunc) error {
 // 	for {
 // 		streamRec, err := stream.Recv()
 // 		if err == io.EOF {
@@ -130,7 +130,7 @@ func (c *Cache) Get(tableName string, p []*pbUtils.AttributePredicate) ([]utils.
 // }
 
 // Invalidate ..
-// func (c *Cache) Invalidate(p []*pbUtils.AttributePredicate) {
+// func (c *Cache) Invalidate(p []*qpu.AttributePredicate) {
 // 	if c.items == nil {
 // 		return
 // 	}
@@ -162,7 +162,7 @@ func (c *Cache) evict() {
 }
 
 // Converts a predicate to a cache entry key
-func (c *Cache) predicateToCacheKey(tableName string, pred []*pbUtils.AttributePredicate) (string, error) {
+func (c *Cache) predicateToCacheKey(tableName string, pred []*qpu.AttributePredicate) (string, error) {
 	key := ""
 	for _, p := range pred {
 		attrTypeStr, err := config.AttributeTypeToString(c.config.GetAttributeType(tableName, p.GetAttr().GetAttrKey()))

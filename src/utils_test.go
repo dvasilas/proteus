@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,51 +50,51 @@ func TestCanRespondToQuery(t *testing.T) {
 }
 
 var capabilitiesTests = []struct {
-	predicate    []*pbUtils.AttributePredicate
-	capabilities []*pbUtils.AttributePredicate
+	predicate    []*qpu.AttributePredicate
+	capabilities []*qpu.AttributePredicate
 	expectedRes  bool
 }{
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		[]*pbUtils.AttributePredicate{},
+		[]*qpu.AttributePredicate{},
 		true,
 	},
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueStr("a"), protoutils.ValueStr("z")),
 		},
 		false,
 	},
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.5)),
 		},
 		false,
 	},
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("float", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 			protoutils.AttributePredicate(protoutils.Attribute("int", nil), protoutils.ValueInt(3), protoutils.ValueInt(6)),
 		},
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("float", nil), protoutils.ValueFlt(0.2), protoutils.ValueFlt(0.6)),
 		},
 		false,
 	},
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("float", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 			protoutils.AttributePredicate(protoutils.Attribute("int", nil), protoutils.ValueInt(3), protoutils.ValueInt(6)),
 		},
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("float", nil), protoutils.ValueFlt(0.2), protoutils.ValueFlt(0.6)),
 			protoutils.AttributePredicate(protoutils.Attribute("int", nil), protoutils.ValueInt(2), protoutils.ValueInt(7)),
 		},

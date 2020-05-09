@@ -14,9 +14,9 @@ import (
 	"runtime/debug"
 
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	cli "github.com/dvasilas/proteus/src/qpu/client"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -26,8 +26,8 @@ import (
 type QPU struct {
 	Client               cli.Client
 	Conns                []*QPU
-	Dataset              *pbQPU.DataSet
-	QueryingCapabilities []*pbUtils.AttributePredicate
+	Dataset              *qpu_api.DataSet
+	QueryingCapabilities []*qpu.AttributePredicate
 	Config               *config.Config
 }
 
@@ -76,10 +76,10 @@ func ConnectToQPUGraph(q *QPU) error {
 // ObjectState ...
 type ObjectState struct {
 	ObjectID   string
-	ObjectType pbUtils.LogOperation_ObjectType
+	ObjectType qpu.LogOperation_ObjectType
 	Bucket     string
-	State      pbUtils.ObjectState
-	Timestamp  pbUtils.Vectorclock
+	State      qpu.ObjectState
+	Timestamp  qpu.Vectorclock
 }
 
 // Marshal ...
@@ -102,32 +102,32 @@ func (o *ObjectState) Marshal() ([]byte, error) {
 	return marshalledObjetState, nil
 }
 
-func marshalObjectType(t pbUtils.LogOperation_ObjectType) []byte {
-	return []byte(pbUtils.LogOperation_ObjectType_name[int32(t)])
+func marshalObjectType(t qpu.LogOperation_ObjectType) []byte {
+	return []byte(qpu.LogOperation_ObjectType_name[int32(t)])
 }
 
-func marshalState(objectState *pbUtils.ObjectState) ([]byte, error) {
+func marshalState(objectState *qpu.ObjectState) ([]byte, error) {
 	return proto.Marshal(objectState)
 }
 
-func unmarshalObjectType(encodedType []byte) pbUtils.LogOperation_ObjectType {
-	return pbUtils.LogOperation_ObjectType(pbUtils.LogOperation_ObjectType_value[string(encodedType)])
+func unmarshalObjectType(encodedType []byte) qpu.LogOperation_ObjectType {
+	return qpu.LogOperation_ObjectType(qpu.LogOperation_ObjectType_value[string(encodedType)])
 }
 
 // MarshalVectorClock ...
-func MarshalVectorClock(vc *pbUtils.Vectorclock) ([]byte, error) {
+func MarshalVectorClock(vc *qpu.Vectorclock) ([]byte, error) {
 	return proto.Marshal(vc)
 }
 
-func unmarshalState(encodedObjectState []byte) (pbUtils.ObjectState, error) {
-	var objectState pbUtils.ObjectState
+func unmarshalState(encodedObjectState []byte) (qpu.ObjectState, error) {
+	var objectState qpu.ObjectState
 	err := proto.Unmarshal(encodedObjectState, &objectState)
 	return objectState, err
 }
 
 // UnmarshalVectorClock ...
-func UnmarshalVectorClock(encodedVC []byte) (pbUtils.Vectorclock, error) {
-	var vc pbUtils.Vectorclock
+func UnmarshalVectorClock(encodedVC []byte) (qpu.Vectorclock, error) {
+	var vc qpu.Vectorclock
 	err := proto.Unmarshal(encodedVC, &vc)
 	return vc, err
 }
@@ -154,7 +154,7 @@ func UnmarshalObject(data []byte) (ObjectState, error) {
 }
 
 // GetMessageSize ...
-func GetMessageSize(streamRec *pbQPU.ResponseStreamRecord) (int, error) {
+func GetMessageSize(streamRec *qpu_api.ResponseStreamRecord) (int, error) {
 	buff, err := proto.Marshal(streamRec)
 	if err != nil {
 		return -1, err
@@ -165,7 +165,7 @@ func GetMessageSize(streamRec *pbQPU.ResponseStreamRecord) (int, error) {
 
 // SubQuery ...
 type SubQuery struct {
-	SubQuery []*pbUtils.AttributePredicate
+	SubQuery []*qpu.AttributePredicate
 	Endpoint *QPU
 }
 
@@ -183,13 +183,13 @@ type ObjectStateJSON struct {
 }
 
 // ValueToString converts an attribute value to a string
-func ValueToString(val *pbUtils.Value) string {
+func ValueToString(val *qpu.Value) string {
 	switch val.Val.(type) {
-	case *pbUtils.Value_Int:
+	case *qpu.Value_Int:
 		return strconv.Itoa(int(val.GetInt()))
-	case *pbUtils.Value_Flt:
+	case *qpu.Value_Flt:
 		return fmt.Sprintf("%f", val.GetFlt())
-	case *pbUtils.Value_Str:
+	case *qpu.Value_Str:
 		return val.GetStr()
 	default:
 		return ""
@@ -197,7 +197,7 @@ func ValueToString(val *pbUtils.Value) string {
 }
 
 // CanRespondToQuery ...
-func CanRespondToQuery(predicate []*pbUtils.AttributePredicate, capabilities []*pbUtils.AttributePredicate) (bool, error) {
+func CanRespondToQuery(predicate []*qpu.AttributePredicate, capabilities []*qpu.AttributePredicate) (bool, error) {
 	if len(capabilities) == 0 {
 		return true, nil
 	}
@@ -227,13 +227,13 @@ func CanRespondToQuery(predicate []*pbUtils.AttributePredicate, capabilities []*
 }
 
 // Compare ...
-func Compare(a, b *pbUtils.Value) (int, error) {
+func Compare(a, b *qpu.Value) (int, error) {
 	if valueType(a) != valueType(b) {
 		return 0, errors.New("cannot compare different types of Value")
 	}
 	const TOLERANCE = 0.000001
 	switch a.GetVal().(type) {
-	case *pbUtils.Value_Flt:
+	case *qpu.Value_Flt:
 		diff := a.GetFlt() - b.GetFlt()
 		if diff := math.Abs(diff); diff < TOLERANCE {
 			return 0, nil
@@ -242,23 +242,23 @@ func Compare(a, b *pbUtils.Value) (int, error) {
 			return -1, nil
 		}
 		return 1, nil
-	case *pbUtils.Value_Int:
+	case *qpu.Value_Int:
 		return int(a.GetInt() - b.GetInt()), nil
-	case *pbUtils.Value_Str:
+	case *qpu.Value_Str:
 		return strings.Compare(a.GetStr(), b.GetStr()), nil
 	}
 	return 0, errors.New("unknown Value type")
 }
 
 // AttrMatchesPredicate checks if an object attribute matches a given predicate.
-func AttrMatchesPredicate(predicate *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
+func AttrMatchesPredicate(predicate *qpu.AttributePredicate, attr *qpu.Attribute) (bool, error) {
 	if keyMatch(predicate.GetAttr().GetAttrKey(), attr) {
 		return rangeMatch(predicate, attr)
 	}
 	return false, nil
 }
 
-func keyMatch(objectName string, attr *pbUtils.Attribute) bool {
+func keyMatch(objectName string, attr *qpu.Attribute) bool {
 	if objectName == attr.GetAttrKey() {
 		return true
 	}
@@ -266,7 +266,7 @@ func keyMatch(objectName string, attr *pbUtils.Attribute) bool {
 }
 
 // within the range [greaterOrEqual, lessThan)
-func rangeMatch(pred *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
+func rangeMatch(pred *qpu.AttributePredicate, attr *qpu.Attribute) (bool, error) {
 	lb, err := Compare(attr.GetValue(), pred.GetLbound())
 	if err != nil {
 		return false, err
@@ -282,11 +282,11 @@ func rangeMatch(pred *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool
 }
 
 // Ping ...
-func Ping(stream pbQPU.QPU_QueryServer, msg *pbQPU.PingMsg) error {
+func Ping(stream qpu_api.QPU_QueryServer, msg *qpu_api.PingMsg) error {
 	seqID := msg.GetSeqId()
 	for {
 		seqID++
-		if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_HEARTBEAT, nil)); err != nil {
+		if err := stream.Send(protoutils.ResponseStreamRecord(seqID, qpu_api.ResponseStreamRecord_HEARTBEAT, nil)); err != nil {
 			return err
 		}
 		p, err := stream.Recv()
@@ -305,7 +305,7 @@ func Ping(stream pbQPU.QPU_QueryServer, msg *pbQPU.PingMsg) error {
 //----------- Stream Consumer Functions ------------
 
 //QueryResponseConsumer receives a QueryResponseStream, iteratively reads from the stream, and processes each input element based on a given function
-func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QPU_QueryClient, streamOut pbQPU.QPU_QueryServer, process func([]*pbUtils.AttributePredicate, *pbQPU.ResponseStreamRecord, pbQPU.QPU_QueryServer, *int64) error, errChan chan error) {
+func QueryResponseConsumer(pred []*qpu.AttributePredicate, streamIn qpu_api.QPU_QueryClient, streamOut qpu_api.QPU_QueryServer, process func([]*qpu.AttributePredicate, *qpu_api.ResponseStreamRecord, qpu_api.QPU_QueryServer, *int64) error, errChan chan error) {
 	seqID := int64(0)
 	go func() {
 		for {
@@ -315,8 +315,8 @@ func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QP
 					errChan <- streamOut.Send(
 						protoutils.ResponseStreamRecord(
 							seqID,
-							pbQPU.ResponseStreamRecord_END_OF_STREAM,
-							&pbUtils.LogOperation{},
+							qpu_api.ResponseStreamRecord_END_OF_STREAM,
+							&qpu.LogOperation{},
 						),
 					)
 				}
@@ -336,7 +336,7 @@ func QueryResponseConsumer(pred []*pbUtils.AttributePredicate, streamIn pbQPU.QP
 
 //---------------- Internal Functions --------------
 
-func mergeDatasets(a, b *pbQPU.DataSet) {
+func mergeDatasets(a, b *qpu_api.DataSet) {
 	for databaseID := range b.GetDatabases() {
 		if db, ok := a.GetDatabases()[databaseID]; ok {
 			for datacenterID := range b.GetDatabases()[databaseID].GetDatacenters() {
@@ -365,13 +365,13 @@ func calcDataset(q *QPU, conns []*QPU) {
 	}
 }
 
-func valueType(v *pbUtils.Value) int {
+func valueType(v *qpu.Value) int {
 	switch v.GetVal().(type) {
-	case *pbUtils.Value_Flt:
+	case *qpu.Value_Flt:
 		return 0
-	case *pbUtils.Value_Int:
+	case *qpu.Value_Int:
 		return 1
-	case *pbUtils.Value_Str:
+	case *qpu.Value_Str:
 		return 2
 	}
 	rand.Seed(time.Now().UTC().UnixNano())

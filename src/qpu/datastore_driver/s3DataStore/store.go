@@ -15,9 +15,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/dvasilas/proteus/src/protos"
-	pbS3 "github.com/dvasilas/proteus/src/protos/s3"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/s3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -57,23 +57,23 @@ func New(aKeyID string, aSecretKey string, endP string, logSEndP string) S3DataS
 }
 
 //SubscribeOps subscribes to updates from scality/cloudserver (supports sync and async mode)
-// each time an update is received, it is formated as a pbUtils.LogOperation
+// each time an update is received, it is formated as a qpu.LogOperation
 // and sent to datastoredriver via a channel
-func (ds S3DataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
+func (ds S3DataStore) SubscribeOps(msg chan *qpu.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
 	errs := make(chan error, 1)
 	conn, err := grpc.Dial(ds.logStreamEndpoint, grpc.WithInsecure())
 	if err != nil {
 		errs <- err
 		return nil, errs
 	}
-	client := pbS3.NewNotificationServiceClient(conn)
+	client := s3.NewNotificationServiceClient(conn)
 	ctx := context.Background()
 	stream, err := client.SubscribeNotifications(ctx)
 	if err != nil {
 		errs <- err
 		return conn, errs
 	}
-	if err := stream.Send(&pbS3.RequestStream{Val: &pbS3.RequestStream_Request{Request: &pbS3.SubRequest{Sync: sync, Timestamp: time.Now().UnixNano()}}}); err != nil {
+	if err := stream.Send(&s3.RequestStream{Val: &s3.RequestStream_Request{Request: &s3.SubRequest{Sync: sync, Timestamp: time.Now().UnixNano()}}}); err != nil {
 		errs <- err
 		return conn, errs
 	}
@@ -84,21 +84,21 @@ func (ds S3DataStore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool
 //GetSnapshot reads a snapshot of all objects in the specified bucket, and their metadata attributes
 // by performing a http GET request to list all objects in the bucket
 // and the a http HEAD to read the metadata attributes of each object
-func (ds S3DataStore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
+func (ds S3DataStore) GetSnapshot(bucket string, msg chan *qpu.LogOperation) <-chan error {
 	errs := make(chan error, 1)
 	ds.readSnapshot(bucket, msg, errs, ds.processAndForwardObject)
 	return errs
 }
 
 // Op ...
-func (ds S3DataStore) Op(op *pbUtils.LogOperation) {}
+func (ds S3DataStore) Op(op *qpu.LogOperation) {}
 
 //----------- Stream Consumer Functions ------------
 
 //opConsumer creates a goroutine that receives a stream of updates from cloudserver,
-// each time an update is received, it is parsed to a pbUtils.LogOperation object
+// each time an update is received, it is parsed to a qpu.LogOperation object
 // which is then sent to the datastoredriver via a channel
-func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotificationsClient, msg chan *pbUtils.LogOperation, ack chan bool, errs chan error, sync bool) {
+func (ds S3DataStore) opConsumer(stream s3.NotificationService_SubscribeNotificationsClient, msg chan *qpu.LogOperation, ack chan bool, errs chan error, sync bool) {
 	go func() {
 		for {
 			op, err := stream.Recv()
@@ -125,7 +125,7 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 					"timestamp": op.GetTimestamp(),
 				}).Debug("S3DataStore:watchSync received ACK, sending ACK to data store")
 
-				if err := stream.Send(&pbS3.RequestStream{Val: &pbS3.RequestStream_Ack{Ack: &pbS3.AckMsg{Timestamp: op.GetTimestamp()}}}); err != nil {
+				if err := stream.Send(&s3.RequestStream{Val: &s3.RequestStream_Ack{Ack: &s3.AckMsg{Timestamp: op.GetTimestamp()}}}); err != nil {
 					errs <- err
 					return
 				}
@@ -142,7 +142,7 @@ func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotifi
 // all objects in the given bucket
 // for each object it sends a http HEAD request to get the object's metadata attributes
 // and calls the processObj function
-func (ds S3DataStore) readSnapshot(bucket string, msg chan *pbUtils.LogOperation, errs chan error, processObj func(string, string, http.Header, chan *pbUtils.LogOperation, chan error)) {
+func (ds S3DataStore) readSnapshot(bucket string, msg chan *qpu.LogOperation, errs chan error, processObj func(string, string, http.Header, chan *qpu.LogOperation, chan error)) {
 	buff := bytes.NewBuffer([]byte{})
 	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, bucket)
 	request, err := http.NewRequest("GET", requestURL, buff)
@@ -197,11 +197,11 @@ func (ds S3DataStore) readSnapshot(bucket string, msg chan *pbUtils.LogOperation
 }
 
 //processAndForwardObject receives the metadata attributes of an object
-// in the form of an http header, it creates a *pbUtils.LogOperation
+// in the form of an http header, it creates a *qpu.LogOperation
 // and sends it to the datastoredriver to datastoredriver via a channel
-func (ds S3DataStore) processAndForwardObject(key string, bucket string, head http.Header, msg chan *pbUtils.LogOperation, errs chan error) {
-	var payload *pbUtils.Payload
-	attrs := make([]*pbUtils.Attribute, 0)
+func (ds S3DataStore) processAndForwardObject(key string, bucket string, head http.Header, msg chan *qpu.LogOperation, errs chan error) {
+	var payload *qpu.Payload
+	attrs := make([]*qpu.Attribute, 0)
 
 	for k := range head {
 		if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") && !strings.Contains(strings.ToLower(k), "s3cmd-attrs") {
@@ -230,16 +230,16 @@ func (ds S3DataStore) processAndForwardObject(key string, bucket string, head ht
 	obj := protoutils.LogOperation(
 		key,
 		bucket,
-		pbUtils.LogOperation_S3OBJECT,
+		qpu.LogOperation_S3OBJECT,
 		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(ts.UnixNano() / int64(time.Millisecond))}),
 		payload,
 	)
 	msg <- obj
 }
 
-func (ds S3DataStore) formatOperation(update *pbS3.NotificationStream) (*pbUtils.LogOperation, error) {
-	var payload *pbUtils.Payload
-	var stateNew, stateOld *pbUtils.ObjectState
+func (ds S3DataStore) formatOperation(update *s3.NotificationStream) (*qpu.LogOperation, error) {
+	var payload *qpu.Payload
+	var stateNew, stateOld *qpu.ObjectState
 	var err error
 	if update.GetPayload().GetNewState() != nil {
 		stateNew, err = s3UpdateToObjectState(
@@ -263,13 +263,13 @@ func (ds S3DataStore) formatOperation(update *pbS3.NotificationStream) (*pbUtils
 	return protoutils.LogOperation(
 		update.GetPayload().GetObjectId(),
 		update.GetPayload().GetBucket(),
-		pbUtils.LogOperation_S3OBJECT,
+		qpu.LogOperation_S3OBJECT,
 		protoutils.Vectorclock(map[string]uint64{"s3server": uint64(update.GetTimestamp())}),
 		payload), nil
 }
 
-func s3UpdateToObjectState(updateAttrs map[string]string, contentLen, lastModDate int64) (*pbUtils.ObjectState, error) {
-	attrs := make([]*pbUtils.Attribute, len(updateAttrs)+2)
+func s3UpdateToObjectState(updateAttrs map[string]string, contentLen, lastModDate int64) (*qpu.ObjectState, error) {
+	attrs := make([]*qpu.Attribute, len(updateAttrs)+2)
 	i := 0
 	for attrK, attrV := range updateAttrs {
 		k, v, err := xAmzMetaToAttr(attrK, attrV)
@@ -289,8 +289,8 @@ func s3UpdateToObjectState(updateAttrs map[string]string, contentLen, lastModDat
 // xAmzMetaToAttr a key-value pair (strings) of s3 metadata attributes
 // and based on the format of the key, it infers the datatype of the attribute's value
 // and returns the key without the "x-amz-meta.." prefix,
-// and the value (*pbUtils.Value) of the attribute
-func xAmzMetaToAttr(k string, v string) (string, *pbUtils.Value, error) {
+// and the value (*qpu.Value) of the attribute
+func xAmzMetaToAttr(k string, v string) (string, *qpu.Value, error) {
 	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {

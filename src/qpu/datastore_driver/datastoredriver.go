@@ -7,9 +7,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	mockDS "github.com/dvasilas/proteus/src/qpu/datastore_driver/mockDatastore"
 	s3DS "github.com/dvasilas/proteus/src/qpu/datastore_driver/s3DataStore"
 	log "github.com/sirupsen/logrus"
@@ -23,9 +23,9 @@ type DriverQPU struct {
 }
 
 type dataStore interface {
-	GetSnapshot(string, chan *pbUtils.LogOperation) <-chan error
-	SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error)
-	Op(op *pbUtils.LogOperation)
+	GetSnapshot(string, chan *qpu.LogOperation) <-chan error
+	SubscribeOps(msg chan *qpu.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error)
+	Op(op *qpu.LogOperation)
 }
 
 //---------------- API Functions -------------------
@@ -35,7 +35,7 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 	q := &DriverQPU{
 		qpu: &utils.QPU{
 			Dataset:              conf.DatastoreConfig.Dataset,
-			QueryingCapabilities: []*pbUtils.AttributePredicate{},
+			QueryingCapabilities: []*qpu.AttributePredicate{},
 			Config:               conf,
 		},
 	}
@@ -55,18 +55,18 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 }
 
 //Query implements the Query API for the data store QPU
-func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *DriverQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	if query.GetClock().GetUbound().GetType() < query.GetClock().GetUbound().GetType() {
 		return errors.New("lower bound of timestamp attribute cannot be greater than the upper bound")
 	}
-	if query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		query.GetClock().GetLbound().GetType() != pbUtils.SnapshotTime_INF &&
-		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_LATEST &&
-		query.GetClock().GetUbound().GetType() != pbUtils.SnapshotTime_INF {
+	if query.GetClock().GetLbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetClock().GetLbound().GetType() != qpu.SnapshotTime_INF &&
+		query.GetClock().GetUbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetClock().GetUbound().GetType() != qpu.SnapshotTime_INF {
 		return errors.New("not supported")
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_INF {
-		opCh := make(chan *pbUtils.LogOperation)
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_INF || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_INF {
+		opCh := make(chan *qpu.LogOperation)
 		ack := make(chan bool)
 
 		errsConsm := q.opConsumer(streamOut, opCh, ack, block)
@@ -92,7 +92,7 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInt
 			}
 		}
 	}
-	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
+	if query.GetClock().GetLbound().GetType() == qpu.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == qpu.SnapshotTime_LATEST {
 		streamCh, errsConsm := q.snapshotConsumer(streamOut)
 		errsGetSn := q.ds.GetSnapshot(query.GetBucket(), streamCh)
 		for {
@@ -119,12 +119,12 @@ func (q *DriverQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInt
 }
 
 // Op ...
-func (q *DriverQPU) Op(op *pbUtils.LogOperation) {
+func (q *DriverQPU) Op(op *qpu.LogOperation) {
 	q.ds.Op(op)
 }
 
 //GetConfig implements the GetConfig API for the datastoredriver QPU
-func (q *DriverQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *DriverQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
 		q.qpu.Dataset)
@@ -143,14 +143,14 @@ func (q *DriverQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func (q *DriverQPU) snapshotConsumer(stream pbQPU.QPU_QueryServer) (chan *pbUtils.LogOperation, chan error) {
+func (q *DriverQPU) snapshotConsumer(stream qpu_api.QPU_QueryServer) (chan *qpu.LogOperation, chan error) {
 	var seqID int64
 	errChan := make(chan error)
-	streamChan := make(chan *pbUtils.LogOperation)
+	streamChan := make(chan *qpu.LogOperation)
 
 	go func() {
 		for streamRec := range streamChan {
-			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_STATE, streamRec)); err != nil {
+			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, qpu_api.ResponseStreamRecord_STATE, streamRec)); err != nil {
 				utils.Warn(err)
 				close(errChan)
 				return
@@ -159,8 +159,8 @@ func (q *DriverQPU) snapshotConsumer(stream pbQPU.QPU_QueryServer) (chan *pbUtil
 		}
 		if err := stream.Send(protoutils.ResponseStreamRecord(
 			seqID,
-			pbQPU.ResponseStreamRecord_END_OF_STREAM,
-			&pbUtils.LogOperation{},
+			qpu_api.ResponseStreamRecord_END_OF_STREAM,
+			&qpu.LogOperation{},
 		)); err != nil {
 			utils.Warn(err)
 			close(errChan)
@@ -172,7 +172,7 @@ func (q *DriverQPU) snapshotConsumer(stream pbQPU.QPU_QueryServer) (chan *pbUtil
 	return streamChan, errChan
 }
 
-func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtils.LogOperation, ack chan bool, sync bool) <-chan error {
+func (q *DriverQPU) opConsumer(stream qpu_api.QPU_QueryServer, opChan chan *qpu.LogOperation, ack chan bool, sync bool) <-chan error {
 	var seqID int64
 	errs := make(chan error, 1)
 
@@ -180,7 +180,7 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 
 	go func() {
 		for op := range opChan {
-			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_UPDATEDELTA, op)); err != nil {
+			if err := stream.Send(protoutils.ResponseStreamRecord(seqID, qpu_api.ResponseStreamRecord_UPDATEDELTA, op)); err != nil {
 				utils.Warn(err)
 				break
 			}
@@ -211,8 +211,8 @@ func (q *DriverQPU) opConsumer(stream pbQPU.QPU_QueryServer, opChan chan *pbUtil
 
 //---------------- Internal Functions --------------
 
-func heartbeat(seqID int64, stream pbQPU.QPU_QueryServer, errs chan error) {
-	beat := protoutils.ResponseStreamRecord(seqID, pbQPU.ResponseStreamRecord_HEARTBEAT, nil)
+func heartbeat(seqID int64, stream qpu_api.QPU_QueryServer, errs chan error) {
+	beat := protoutils.ResponseStreamRecord(seqID, qpu_api.ResponseStreamRecord_HEARTBEAT, nil)
 	if err := stream.Send(beat); err != nil {
 		utils.ReportError(err)
 		errs <- err
@@ -222,7 +222,7 @@ func heartbeat(seqID int64, stream pbQPU.QPU_QueryServer, errs chan error) {
 	time.AfterFunc(10*time.Second, f)
 }
 
-func newHeartbeat(seqID int64, stream pbQPU.QPU_QueryServer, errCh chan error) func() {
+func newHeartbeat(seqID int64, stream qpu_api.QPU_QueryServer, errCh chan error) func() {
 	return func() {
 		heartbeat(seqID, stream, errCh)
 	}

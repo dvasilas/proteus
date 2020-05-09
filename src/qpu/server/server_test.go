@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dvasilas/proteus/src/protos"
+	"github.com/dvasilas/proteus/src/proto"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dvasilas/proteus/src/config"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	"github.com/dvasilas/proteus/src/qpu/cache"
 	"github.com/dvasilas/proteus/src/qpu/client"
 	"github.com/dvasilas/proteus/src/qpu/datastore_driver"
@@ -35,30 +35,30 @@ type testScenario struct {
 }
 
 type queryPlan []struct {
-	query          []*pbUtils.AttributePredicate
+	query          []*qpu.AttributePredicate
 	assertResponse string
 }
 
 type datastoreDeployment struct {
 	config          *config.Config
 	datastoredriver *datastoredriver.DriverQPU
-	ops             []*pbUtils.LogOperation
+	ops             []*qpu.LogOperation
 }
 
 var singleDatastore = datastoreDeployment{
 	config: &config.Config{
-		QpuType: pbQPU.ConfigResponse_DBDRIVER,
+		QpuType: qpu_api.ConfigResponse_DBDRIVER,
 		Port:    "50150",
 	},
-	ops: []*pbUtils.LogOperation{
+	ops: []*qpu.LogOperation{
 		protoutils.LogOperation(
 			"object1",
 			"mock_bucket",
-			pbUtils.LogOperation_S3OBJECT,
+			qpu.LogOperation_S3OBJECT,
 			protoutils.Vectorclock(map[string]uint64{"50150": uint64(time.Now().Nanosecond())}),
 			protoutils.PayloadDelta(nil,
 				protoutils.ObjectState(
-					[]*pbUtils.Attribute{
+					[]*qpu.Attribute{
 						protoutils.Attribute("attr", protoutils.ValueInt(42)),
 					},
 				),
@@ -72,7 +72,7 @@ var tests = []testScenario{
 		deployment: deployment{
 			config: []*config.Config{
 				&config.Config{
-					QpuType: pbQPU.ConfigResponse_FILTER,
+					QpuType: qpu_api.ConfigResponse_FILTER,
 					Port:    "50250",
 					Connections: []config.QPUConnection{config.QPUConnection{
 						Address: "127.0.0.1:50150",
@@ -85,7 +85,7 @@ var tests = []testScenario{
 		endpoint: "127.0.0.1:50250",
 		plan: queryPlan{
 			{
-				query: []*pbUtils.AttributePredicate{
+				query: []*qpu.AttributePredicate{
 					protoutils.AttributePredicate(protoutils.Attribute("attr", nil),
 						protoutils.ValueInt(40),
 						protoutils.ValueInt(50),
@@ -99,7 +99,7 @@ var tests = []testScenario{
 		deployment: deployment{
 			config: []*config.Config{
 				&config.Config{
-					QpuType: pbQPU.ConfigResponse_FILTER,
+					QpuType: qpu_api.ConfigResponse_FILTER,
 					Port:    "50250",
 					Connections: []config.QPUConnection{config.QPUConnection{
 						Address: "127.0.0.1:50150",
@@ -108,7 +108,7 @@ var tests = []testScenario{
 					},
 				},
 				&config.Config{
-					QpuType: pbQPU.ConfigResponse_CACHE,
+					QpuType: qpu_api.ConfigResponse_CACHE,
 					Port:    "50451",
 					Connections: []config.QPUConnection{config.QPUConnection{
 						Address: "127.0.0.1:50250",
@@ -121,7 +121,7 @@ var tests = []testScenario{
 		endpoint: "127.0.0.1:50451",
 		plan: queryPlan{
 			{
-				query: []*pbUtils.AttributePredicate{
+				query: []*qpu.AttributePredicate{
 					protoutils.AttributePredicate(protoutils.Attribute("attr", nil),
 						protoutils.ValueInt(40),
 						protoutils.ValueInt(50),
@@ -163,7 +163,7 @@ func deployPopulateDatastore(depl datastoreDeployment) {
 	go func() {
 		server := QPUServer{Config: depl.config, Server: dsqpu}
 		s := grpc.NewServer()
-		pbQPU.RegisterQPUServer(s, &server)
+		qpu_api.RegisterQPUServer(s, &server)
 		reflection.Register(s)
 		lis, err := net.Listen("tcp", ":"+depl.config.Port)
 		if err != nil {
@@ -188,7 +188,7 @@ func createQPU(conf []*config.Config, depl *deployment) {
 	var qpu QPUAPI
 	var err error
 	switch conf[0].QpuType {
-	case pbQPU.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DBDRIVER:
 		conf[0].DatastoreConfig.Type = config.MOCK
 		dsqpu, err := datastoredriver.QPU(conf[0])
 		if err != nil {
@@ -196,12 +196,12 @@ func createQPU(conf []*config.Config, depl *deployment) {
 		}
 		depl.datastoredriver = dsqpu
 		qpu = dsqpu
-	case pbQPU.ConfigResponse_FILTER:
+	case qpu_api.ConfigResponse_FILTER:
 		qpu, err = filter.QPU(conf[0])
 		if err != nil {
 			log.Fatal(err)
 		}
-	case pbQPU.ConfigResponse_CACHE:
+	case qpu_api.ConfigResponse_CACHE:
 		conf[0].CacheConfig.Size = 10
 		qpu, err = cache.QPU(conf[0])
 		if err != nil {
@@ -218,7 +218,7 @@ func startServer(conf *config.Config, api QPUAPI, depl *deployment) <-chan int {
 	go func() {
 		server := QPUServer{Config: conf, Server: api}
 		s := grpc.NewServer()
-		pbQPU.RegisterQPUServer(s, &server)
+		qpu_api.RegisterQPUServer(s, &server)
 		reflection.Register(s)
 		lis, err := net.Listen("tcp", ":"+conf.Port)
 		if err != nil {
@@ -242,8 +242,8 @@ func doTest(t *testing.T, test testScenario) {
 			"mock_bucket",
 			q.query,
 			protoutils.SnapshotTimePredicate(
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
-				protoutils.SnapshotTime(pbUtils.SnapshotTime_LATEST, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
+				protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
 			),
 			nil,
 			false,

@@ -5,9 +5,9 @@ import (
 
 	"github.com/dvasilas/proteus/src"
 	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,7 +20,7 @@ type IQPU struct {
 type response struct {
 	streamID       string
 	objectKey      string
-	responseRecord *pbQPU.ResponseStreamRecord
+	responseRecord *qpu_api.ResponseStreamRecord
 }
 
 //---------------- API Functions -------------------
@@ -40,7 +40,7 @@ func QPU(conf *config.Config) (*IQPU, error) {
 }
 
 // Query implements the Query API for the intersection QPU
-func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternalQuery, metadata map[string]string, block bool) error {
+func (q *IQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "intersection"}).Debug("query received")
 	subQueries, err := q.generateSubQueries(query.GetPredicate())
 	if err != nil {
@@ -102,7 +102,7 @@ func (q *IQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 }
 
 // GetConfig implements the GetConfig API for the filter QPU
-func (q *IQPU) GetConfig() (*pbQPU.ConfigResponse, error) {
+func (q *IQPU) GetConfig() (*qpu_api.ConfigResponse, error) {
 	resp := protoutils.ConfigRespοnse(
 		q.qpu.Config.QpuType,
 		q.qpu.QueryingCapabilities,
@@ -122,7 +122,7 @@ func (q *IQPU) Cleanup() {
 
 //----------- Stream Consumer Functions ------------
 
-func queryResponseConsumer(streamID string, streamIn pbQPU.QPU_QueryClient, responseCh chan response, errChan chan error) {
+func queryResponseConsumer(streamID string, streamIn qpu_api.QPU_QueryClient, responseCh chan response, errChan chan error) {
 	for {
 		streamRec, err := streamIn.Recv()
 		if err == io.EOF {
@@ -142,17 +142,17 @@ func queryResponseConsumer(streamID string, streamIn pbQPU.QPU_QueryClient, resp
 
 //---------------- Internal Functions --------------
 
-func (q *IQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]utils.SubQuery, error) {
+func (q *IQPU) generateSubQueries(predicate []*qpu.AttributePredicate) ([]utils.SubQuery, error) {
 	subQs := make([]utils.SubQuery, 0)
 	endpoints := make(map[string]*utils.QPU)
-	capabilities := make(map[string][]*pbUtils.AttributePredicate)
+	capabilities := make(map[string][]*qpu.AttributePredicate)
 	for _, c := range q.qpu.Conns {
 		endpoints[c.Config.Port] = c
-		capabilities[c.Config.Port] = make([]*pbUtils.AttributePredicate, 0)
+		capabilities[c.Config.Port] = make([]*qpu.AttributePredicate, 0)
 	}
 	for _, p := range predicate {
 		for _, c := range q.qpu.Conns {
-			capabl, err := utils.CanRespondToQuery([]*pbUtils.AttributePredicate{p}, c.QueryingCapabilities)
+			capabl, err := utils.CanRespondToQuery([]*qpu.AttributePredicate{p}, c.QueryingCapabilities)
 			if err != nil {
 				return nil, err
 			}
@@ -172,7 +172,7 @@ func (q *IQPU) generateSubQueries(predicate []*pbUtils.AttributePredicate) ([]ut
 	return subQs, nil
 }
 
-func forward(pred []*pbUtils.AttributePredicate, streamRec *pbQPU.ResponseStreamRecord, streamOut pbQPU.QPU_QueryServer, seqID *int64) error {
+func forward(pred []*qpu.AttributePredicate, streamRec *qpu_api.ResponseStreamRecord, streamOut qpu_api.QPU_QueryServer, seqID *int64) error {
 	log.WithFields(log.Fields{
 		"record": streamRec,
 	}).Debug("Intersection QPU: received input stream record")

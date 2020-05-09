@@ -2,14 +2,14 @@ package store
 
 import (
 	"github.com/dvasilas/proteus/src"
-	"github.com/dvasilas/proteus/src/protos"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
 	"google.golang.org/grpc"
 )
 
 //Datastore ...
 type Datastore struct {
-	opChan chan *pbUtils.LogOperation
+	opChan chan *qpu.LogOperation
 	data   map[string]utils.ObjectState
 }
 
@@ -23,8 +23,8 @@ func New() Datastore {
 }
 
 //SubscribeOps ..
-func (ds Datastore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
-	ds.opChan = make(chan *pbUtils.LogOperation)
+func (ds Datastore) SubscribeOps(msg chan *qpu.LogOperation, ack chan bool, sync bool) (*grpc.ClientConn, <-chan error) {
+	ds.opChan = make(chan *qpu.LogOperation)
 	for op := range ds.opChan {
 		msg <- op
 	}
@@ -33,16 +33,16 @@ func (ds Datastore) SubscribeOps(msg chan *pbUtils.LogOperation, ack chan bool, 
 
 //GetSnapshot reads a snapshot of all objects stored in an Antidotedb bucket,
 // not yet implemented
-func (ds Datastore) GetSnapshot(bucket string, msg chan *pbUtils.LogOperation) <-chan error {
+func (ds Datastore) GetSnapshot(bucket string, msg chan *qpu.LogOperation) <-chan error {
 	for _, item := range ds.data {
 		payload := protoutils.PayloadState(&item.State)
-		msg <- protoutils.LogOperation(item.ObjectID, item.Bucket, pbUtils.LogOperation_S3OBJECT, &item.Timestamp, payload)
+		msg <- protoutils.LogOperation(item.ObjectID, item.Bucket, qpu.LogOperation_S3OBJECT, &item.Timestamp, payload)
 	}
 	return nil
 }
 
 // Op ...
-func (ds Datastore) Op(op *pbUtils.LogOperation) {
+func (ds Datastore) Op(op *qpu.LogOperation) {
 	if ds.opChan != nil {
 		ds.opChan <- op
 	}

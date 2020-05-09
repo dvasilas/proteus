@@ -4,30 +4,30 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dvasilas/proteus/src/protos"
-	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
-	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
+	"github.com/dvasilas/proteus/src/proto"
+	"github.com/dvasilas/proteus/src/proto/qpu"
+	"github.com/dvasilas/proteus/src/proto/qpu_api"
 	testutils "github.com/dvasilas/proteus/src/testUtils"
 	"github.com/stretchr/testify/assert"
 )
 
 var filterTests = []struct {
-	predicate   []*pbUtils.AttributePredicate
-	obj         *pbQPU.ResponseStreamRecord
+	predicate   []*qpu.AttributePredicate
+	obj         *qpu_api.ResponseStreamRecord
 	expectedRes bool
 }{
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.4))),
+		protoutils.ResponseStreamRecord(0, qpu_api.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.4))),
 		true,
 	},
 	{
-		[]*pbUtils.AttributePredicate{
+		[]*qpu.AttributePredicate{
 			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.6))),
+		protoutils.ResponseStreamRecord(0, qpu_api.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.6))),
 		false,
 	},
 }

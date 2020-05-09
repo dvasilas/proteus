@@ -1,10 +1,7 @@
 syntax = "proto3";
 
-package utils;
-option java_multiple_files = true;
-option java_package = "io.grpc.proteusclient";
-option java_outer_classname = "UtilsProto";
-option go_package = "github.com/dvasilas/proteus/src/protos/utils";
+package qpu;
+option go_package = "github.com/dvasilas/proteus/src/proto/qpu";
 
 message LogOperation {
   enum ObjectType {
