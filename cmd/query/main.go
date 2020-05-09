@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/dvasilas/proteus/proteus_client"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 
 func main() {

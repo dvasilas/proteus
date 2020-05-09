@@ -15,7 +15,7 @@ token.pickle
 .vscode
 
 # Gradle
-proteus_java_client/build/
+pkg/proteus-java-client/build/
 gradle.properties
 .gradle
 local.properties

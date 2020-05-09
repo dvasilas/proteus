@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/dvasilas/proteus/src/proto/monitoring"
+	"github.com/dvasilas/proteus/internal/proto/monitoring"
 	"google.golang.org/grpc"
 )
 

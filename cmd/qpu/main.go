@@ -7,8 +7,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/dvasilas/proteus/src/config"
-	"github.com/dvasilas/proteus/src/qpu/server"
+	"github.com/dvasilas/proteus/internal/config"
+	"github.com/dvasilas/proteus/internal/qpu/server"
 	"github.com/pelletier/go-toml"
 	log "github.com/sirupsen/logrus"
 )

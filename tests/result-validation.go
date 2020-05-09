@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/deployment"
-	"github.com/dvasilas/proteus/proteus_client"
-	"github.com/dvasilas/proteus/src/config"
+	"github.com/dvasilas/proteus/internal/config"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )

@@ -2,7 +2,7 @@
 
 // package github.com.dvasilas.datastore.s3;
 
-// option go_package = "github.com/dvasilas/proteus/src/protos/s3client";
+// option go_package = "github.com/dvasilas/proteus/internal/protos/s3client";
 
 // service S3 {
 //   rpc CreateBucket (CreateBucketRequest) returns (Reply) {}

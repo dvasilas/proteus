@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package qpu;
-option go_package = "github.com/dvasilas/proteus/src/proto/qpu";
+option go_package = "github.com/dvasilas/proteus/internal/proto/qpu";
 
 message LogOperation {
   enum ObjectType {

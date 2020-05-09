@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package notificationpubsub;
 
-option go_package = "github.com/dvasilas/proteus/src/proto/s3";
+option go_package = "github.com/dvasilas/proteus/internal/proto/s3";
 
 service NotificationService {
     rpc subscribeNotifications(stream RequestStream) returns (stream NotificationStream) {}
