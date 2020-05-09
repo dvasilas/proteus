@@ -129,7 +129,7 @@ func (q *LQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 				"lambda", "", pbUtils.LogOperation_S3OBJECT, &ts,
 				protoutils.PayloadState(
 					protoutils.ObjectState(
-						[]*pbUtils.Attribute{protoutils.Attribute("counter", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(cnt.(int64)))},
+						[]*pbUtils.Attribute{protoutils.Attribute("counter", protoutils.ValueInt(cnt.(int64)))},
 					),
 				),
 			),

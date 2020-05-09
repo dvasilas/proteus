@@ -18,16 +18,16 @@ var filterTests = []struct {
 }{
 	{
 		[]*pbUtils.AttributePredicate{
-			protoutils.AttributePredicate(protoutils.Attribute("test", pbUtils.Attribute_S3TAGFLT, nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
+			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", pbUtils.Attribute_S3TAGFLT, protoutils.ValueFlt(0.4))),
+		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.4))),
 		true,
 	},
 	{
 		[]*pbUtils.AttributePredicate{
-			protoutils.AttributePredicate(protoutils.Attribute("test", pbUtils.Attribute_S3TAGFLT, nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
+			protoutils.AttributePredicate(protoutils.Attribute("test", nil), protoutils.ValueFlt(0.4), protoutils.ValueFlt(0.6)),
 		},
-		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", pbUtils.Attribute_S3TAGFLT, protoutils.ValueFlt(0.6))),
+		protoutils.ResponseStreamRecord(0, pbQPU.ResponseStreamRecord_STATE, testutils.ObjectLogOp("object", "bucket", "test", protoutils.ValueFlt(0.6))),
 		false,
 	},
 }

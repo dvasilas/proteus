@@ -149,14 +149,14 @@ func (ds AntidoteDataStore) processAndForwardObject(bucket string, key string, v
 				errs <- err
 				close(errs)
 			}
-			attrs[i] = protoutils.Attribute(string(e.Key), pbUtils.Attribute_CRDTLWWREG, protoutils.ValueStr(string(r)))
+			attrs[i] = protoutils.Attribute(string(e.Key), protoutils.ValueStr(string(r)))
 		case antidote.CRDTType_COUNTER:
 			c, err := val.Counter(e.Key)
 			if err != nil {
 				errs <- err
 				close(errs)
 			}
-			attrs[i] = protoutils.Attribute(string(e.Key), pbUtils.Attribute_CRDTCOUNTER, protoutils.ValueInt(int64(c)))
+			attrs[i] = protoutils.Attribute(string(e.Key), protoutils.ValueInt(int64(c)))
 		case antidote.CRDTType_ORSET:
 		case antidote.CRDTType_RRMAP:
 		case antidote.CRDTType_MVREG:
@@ -184,13 +184,13 @@ func (ds AntidoteDataStore) formatOperation(logOp *pbAnt.LogOperation) *pbUtils.
 		attrs := make([]*pbUtils.Attribute, len(ops))
 		updates := make([]*pbUtils.Operation_Update, len(ops))
 		for i := range ops {
-			var typ pbUtils.Attribute_AttributeType
-			if ops[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
-				typ = pbUtils.Attribute_CRDTCOUNTER
-			} else if ops[i].GetObject().GetType() == "antidote_crdt_register_lww" {
-				typ = pbUtils.Attribute_CRDTLWWREG
-			}
-			attrs[i] = protoutils.Attribute(ops[i].GetObject().GetKey(), typ, nil)
+			// var typ pbUtils.Attribute_AttributeType
+			// if ops[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
+			// 	typ = pbUtils.Attribute_CRDTCOUNTER
+			// } else if ops[i].GetObject().GetType() == "antidote_crdt_register_lww" {
+			// 	typ = pbUtils.Attribute_CRDTLWWREG
+			// }
+			attrs[i] = protoutils.Attribute(ops[i].GetObject().GetKey(), nil)
 			updates[i] = protoutils.Update(ops[i].GetUpdate().GetOpType(), crdtValToValue(ops[i].GetUpdate().GetValue()))
 		}
 		payload = protoutils.PayloadOp(attrs, updates)
@@ -213,13 +213,13 @@ func (ds AntidoteDataStore) formatOperation(logOp *pbAnt.LogOperation) *pbUtils.
 func mapCrdtStateToObjectState(crdtSt []*pbAnt.CrdtMapState_MapState) *pbUtils.ObjectState {
 	attrs := make([]*pbUtils.Attribute, len(crdtSt))
 	for i := range crdtSt {
-		var typ pbUtils.Attribute_AttributeType
-		if crdtSt[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
-			typ = pbUtils.Attribute_CRDTCOUNTER
-		} else if crdtSt[i].GetObject().GetType() == "antidote_crdt_register_lww" {
-			typ = pbUtils.Attribute_CRDTLWWREG
-		}
-		attrs[i] = protoutils.Attribute(crdtSt[i].GetObject().GetKey(), typ, crdtValToValue(crdtSt[i].GetValue()))
+		// var typ pbUtils.Attribute_AttributeType
+		// if crdtSt[i].GetObject().GetType() == "antidote_crdt_counter_pn" {
+		// 	typ = pbUtils.Attribute_CRDTCOUNTER
+		// } else if crdtSt[i].GetObject().GetType() == "antidote_crdt_register_lww" {
+		// 	typ = pbUtils.Attribute_CRDTLWWREG
+		// }
+		attrs[i] = protoutils.Attribute(crdtSt[i].GetObject().GetKey(), crdtValToValue(crdtSt[i].GetValue()))
 	}
 	return protoutils.ObjectState(attrs)
 }

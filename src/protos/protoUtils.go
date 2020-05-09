@@ -83,11 +83,10 @@ func ObjectState(attrs []*pbUtils.Attribute) *pbUtils.ObjectState {
 }
 
 //Attribute ...
-func Attribute(key string, typ pbUtils.Attribute_AttributeType, val *pbUtils.Value) *pbUtils.Attribute {
+func Attribute(key string, val *pbUtils.Value) *pbUtils.Attribute {
 	return &pbUtils.Attribute{
-		AttrKey:  key,
-		AttrType: typ,
-		Value:    val,
+		AttrKey: key,
+		Value:   val,
 	}
 }
 

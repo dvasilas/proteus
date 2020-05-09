@@ -51,7 +51,7 @@ func (q *parsedQuery) toQPUQuery() (*pbQPU.Query, error) {
 			return nil, errors.New("incorrect parsed query stack")
 		}
 		pred = protoutils.AttributePredicate(
-			protoutils.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, pbUtils.Attribute_S3TAGFLT, nil),
+			protoutils.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, nil),
 			selectVal.(value).qpuValue,
 			selectVal.(value).qpuValue,
 		)
@@ -190,7 +190,7 @@ func (q *parsedQuery) parseColName(node sqlparser.SQLNode) error {
 		attribute{
 			qpuAttribute: protoutils.Attribute(
 				sqlparser.String(node.(*sqlparser.ColName).Name),
-				pbUtils.Attribute_S3TAGFLT, nil),
+				nil),
 		})
 }
 

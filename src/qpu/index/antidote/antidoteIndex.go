@@ -21,10 +21,11 @@ const maxVersionCount = 10
 // AntidoteIndex ...
 type AntidoteIndex struct {
 	attributeName string
-	attributeType pbUtils.Attribute_AttributeType
+	attributeType config.DatastoreAttributeType
 	client        *antidote.Client
 	bucket        antidote.Bucket
 	mutex         sync.RWMutex
+	config        *config.Config
 }
 
 //---------------- API Functions -------------------
@@ -45,9 +46,10 @@ func New(conf *config.Config) (*AntidoteIndex, error) {
 	bucket := antidote.Bucket{Bucket: []byte(buckName)}
 	return &AntidoteIndex{
 		attributeName: conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey(),
-		attributeType: conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrType(),
+		attributeType: conf.GetAttributeType(buckName, conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey()),
 		client:        c,
 		bucket:        bucket,
+		config:        conf,
 	}, nil
 }
 
@@ -76,7 +78,12 @@ func (i *AntidoteIndex) UpdateCatchUp(attr *pbUtils.Attribute, object utils.Obje
 		var postingListRef []byte
 		if err != nil && strings.Contains(err.Error(), "not found") {
 			var versionIndexUpdate *antidote.CRDTUpdate
-			valueIndexUpdate, versionIndexRef := updateValueIndex(attr)
+			valueIndexUpdate, versionIndexRef, err := i.updateValueIndex(attr)
+			if err != nil {
+				i.mutex.Unlock()
+				utils.ReportError(err)
+				return err
+			}
 			marshalledVC, err := utils.MarshalVectorClock(&ts)
 			if err != nil {
 				i.mutex.Unlock()
@@ -137,7 +144,10 @@ func (i *AntidoteIndex) updateOldIndexEntry(attrOld *pbUtils.Attribute, object u
 		return indexStoreUpdates, true, err
 	}
 	if len(versionIndex.ListMapKeys()) >= maxVersionCount {
-		valueIndexUpdate, versionIndexRefN := updateValueIndex(attrOld)
+		valueIndexUpdate, versionIndexRefN, err := i.updateValueIndex(attrOld)
+		if err != nil {
+			return indexStoreUpdates, false, err
+		}
 		indexStoreUpdates = append(indexStoreUpdates,
 			antidote.MapUpdate(
 				antidote.Key(versionIndexRefN),
@@ -169,7 +179,10 @@ func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object u
 	}
 	versionIndexRef, versionIndex, err := i.getVersionIndexPoint(valueIndex, attrNew, tx)
 	if err != nil && strings.Contains(err.Error(), "not found") {
-		valueIndexUpdate, versionIndexRef := updateValueIndex(attrNew)
+		valueIndexUpdate, versionIndexRef, err := i.updateValueIndex(attrNew)
+		if err != nil {
+			return indexStoreUpdates, true, err
+		}
 		marshalledVC, err := utils.MarshalVectorClock(&ts)
 		if err != nil {
 			return indexStoreUpdates, true, err
@@ -191,7 +204,10 @@ func (i *AntidoteIndex) updateNewIndexEntry(attrNew *pbUtils.Attribute, object u
 			return indexStoreUpdates, true, err
 		}
 		if len(versionIndex.ListMapKeys()) >= maxVersionCount {
-			valueIndexUpdate, versionIndexRefN := updateValueIndex(attrNew)
+			valueIndexUpdate, versionIndexRefN, err := i.updateValueIndex(attrNew)
+			if err != nil {
+				return indexStoreUpdates, false, err
+			}
 			indexStoreUpdates = append(indexStoreUpdates,
 				antidote.MapUpdate(
 					antidote.Key(versionIndexRefN),
@@ -328,7 +344,11 @@ func (i *AntidoteIndex) Lookup(attr *pbUtils.AttributePredicate, ts *pbUtils.Sna
 //---------------- Internal Functions --------------
 
 func (i *AntidoteIndex) getValueIndex(attr *pbUtils.Attribute, tx antidote.Transaction) (*antidote.MapReadResult, error) {
-	valueIndexRef := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
+	attributeTypeStr, err := config.AttributeTypeToString(i.config.GetAttributeType(i.config.IndexConfig.Bucket, attr.GetAttrKey()))
+	if err != nil {
+		return nil, err
+	}
+	valueIndexRef := attr.GetAttrKey() + "_" + attributeTypeStr
 	return i.bucket.ReadMap(tx, antidote.Key([]byte(valueIndexRef)))
 }
 
@@ -365,12 +385,12 @@ func (i *AntidoteIndex) getVersionIndexRange(valueIndex *antidote.MapReadResult,
 	} else {
 		vIndexEntryKeys := valueIndex.ListMapKeys()
 		for _, vIndexEntryK := range vIndexEntryKeys {
-			vIndexEntryKv, err := utils.StringToValue(predicate.GetAttr().GetAttrType(), string(vIndexEntryK.Key))
+			vIndexEntryKv, err := i.config.StringToValue(i.config.IndexConfig.Bucket, i.attributeName, string(vIndexEntryK.Key))
 			if err != nil {
 				utils.ReportError(err)
 				return nil, err
 			}
-			attr := protoutils.Attribute(predicate.GetAttr().GetAttrKey(), predicate.GetAttr().GetAttrType(), vIndexEntryKv)
+			attr := protoutils.Attribute(predicate.GetAttr().GetAttrKey(), vIndexEntryKv)
 			match, err := utils.AttrMatchesPredicate(predicate, attr)
 			if err != nil {
 				utils.ReportError(err)
@@ -398,13 +418,17 @@ func (i *AntidoteIndex) getPostingList(postingListRef []byte, tx antidote.Transa
 	return i.bucket.ReadSet(tx, antidote.Key(postingListRef))
 }
 
-func updateValueIndex(attr *pbUtils.Attribute) (*antidote.CRDTUpdate, []byte) {
+func (i *AntidoteIndex) updateValueIndex(attr *pbUtils.Attribute) (*antidote.CRDTUpdate, []byte, error) {
 	ref := genReference()
-	valueIndexRef := attr.GetAttrKey() + "_" + attr.GetAttrType().String()
+	attributeTypeStr, err := config.AttributeTypeToString(i.config.GetAttributeType(i.config.IndexConfig.Bucket, attr.GetAttrKey()))
+	if err != nil {
+		return nil, ref, err
+	}
+	valueIndexRef := attr.GetAttrKey() + "_" + attributeTypeStr
 	return antidote.MapUpdate(
 		antidote.Key(valueIndexRef),
 		antidote.RegPut(antidote.Key(utils.ValueToString(attr.GetValue())), ref),
-	), ref
+	), ref, nil
 }
 
 func appendNewVersion(versionIndexRef []byte, tsKey []byte, tx antidote.Transaction) (*antidote.CRDTUpdate, []byte) {
@@ -483,7 +507,11 @@ func greater(a, b *pbUtils.Vectorclock) bool {
 
 func (i *AntidoteIndex) print() error {
 	log.Debug("printing index")
-	valueIndexRef := i.attributeName + "_" + i.attributeType.String()
+	attributeTypeStr, err := config.AttributeTypeToString(i.attributeType)
+	if err != nil {
+		return err
+	}
+	valueIndexRef := i.attributeName + "_" + attributeTypeStr
 	tx, err := i.client.StartTransaction()
 	if err != nil {
 		return err

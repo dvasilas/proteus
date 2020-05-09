@@ -59,7 +59,7 @@ var singleDatastore = datastoreDeployment{
 			protoutils.PayloadDelta(nil,
 				protoutils.ObjectState(
 					[]*pbUtils.Attribute{
-						protoutils.Attribute("attr", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(42)),
+						protoutils.Attribute("attr", protoutils.ValueInt(42)),
 					},
 				),
 			),
@@ -86,7 +86,7 @@ var tests = []testScenario{
 		plan: queryPlan{
 			{
 				query: []*pbUtils.AttributePredicate{
-					protoutils.AttributePredicate(protoutils.Attribute("attr", pbUtils.Attribute_S3TAGINT, nil),
+					protoutils.AttributePredicate(protoutils.Attribute("attr", nil),
 						protoutils.ValueInt(40),
 						protoutils.ValueInt(50),
 					),
@@ -122,7 +122,7 @@ var tests = []testScenario{
 		plan: queryPlan{
 			{
 				query: []*pbUtils.AttributePredicate{
-					protoutils.AttributePredicate(protoutils.Attribute("attr", pbUtils.Attribute_S3TAGINT, nil),
+					protoutils.AttributePredicate(protoutils.Attribute("attr", nil),
 						protoutils.ValueInt(40),
 						protoutils.ValueInt(50),
 					),

@@ -68,8 +68,9 @@ func QPU(conf *config.Config) (*IQPU, error) {
 	switch q.qpu.Config.IndexConfig.IndexStore.Store {
 	case config.INMEM:
 		index, err = inmemindex.New(
-			q.qpu.Config.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey(),
-			q.qpu.Config.IndexConfig.IndexingConfig[0].GetAttr().GetAttrType())
+			conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey(),
+			conf.GetAttributeType(conf.IndexConfig.Bucket, conf.IndexConfig.IndexingConfig[0].GetAttr().GetAttrKey()),
+		)
 		if err != nil {
 			return &IQPU{}, err
 		}
@@ -368,7 +369,7 @@ func (q *IQPU) updateIndex(rec *pbQPU.ResponseStreamRecord) error {
 			if rec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
 				if rec.GetLogOp().GetPayload().GetDelta().GetNew() != nil {
 					for _, attrOld := range rec.GetLogOp().GetPayload().GetDelta().GetOld().GetAttrs() {
-						if attr.GetAttrKey() == attrOld.GetAttrKey() && attr.GetAttrType() == attrOld.GetAttrType() {
+						if attr.GetAttrKey() == attrOld.GetAttrKey() {
 							return q.index.Update(attrOld, attr, state, *rec.GetLogOp().GetTimestamp())
 						}
 					}

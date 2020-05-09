@@ -196,28 +196,6 @@ func ValueToString(val *pbUtils.Value) string {
 	}
 }
 
-// StringToValue ...
-func StringToValue(t pbUtils.Attribute_AttributeType, str string) (*pbUtils.Value, error) {
-	var val *pbUtils.Value
-	switch t {
-	case pbUtils.Attribute_S3TAGSTR, pbUtils.Attribute_CRDTLWWREG:
-		val = protoutils.ValueStr(str)
-	case pbUtils.Attribute_S3TAGINT, pbUtils.Attribute_CRDTCOUNTER:
-		i, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		val = protoutils.ValueInt(i)
-	case pbUtils.Attribute_S3TAGFLT:
-		f, err := strconv.ParseFloat(str, 64)
-		if err != nil {
-			return nil, err
-		}
-		val = protoutils.ValueFlt(f)
-	}
-	return val, nil
-}
-
 // CanRespondToQuery ...
 func CanRespondToQuery(predicate []*pbUtils.AttributePredicate, capabilities []*pbUtils.AttributePredicate) (bool, error) {
 	if len(capabilities) == 0 {
@@ -226,7 +204,7 @@ func CanRespondToQuery(predicate []*pbUtils.AttributePredicate, capabilities []*
 	for _, p := range predicate {
 		matchesCapabilities := false
 		for _, c := range capabilities {
-			if p.GetAttr().GetAttrKey() == c.GetAttr().GetAttrKey() && p.GetAttr().GetAttrType() == c.GetAttr().GetAttrType() {
+			if c.GetAttr().GetAttrKey() == p.GetAttr().GetAttrKey() {
 				lb, err := Compare(p.GetLbound(), c.GetLbound())
 				if err != nil {
 					return false, err
@@ -274,7 +252,7 @@ func Compare(a, b *pbUtils.Value) (int, error) {
 
 // AttrMatchesPredicate checks if an object attribute matches a given predicate.
 func AttrMatchesPredicate(predicate *pbUtils.AttributePredicate, attr *pbUtils.Attribute) (bool, error) {
-	if keyMatch(predicate.GetAttr().GetAttrKey(), attr) && typeMatch(predicate.GetAttr().GetAttrType(), attr) {
+	if keyMatch(predicate.GetAttr().GetAttrKey(), attr) {
 		return rangeMatch(predicate, attr)
 	}
 	return false, nil
@@ -282,13 +260,6 @@ func AttrMatchesPredicate(predicate *pbUtils.AttributePredicate, attr *pbUtils.A
 
 func keyMatch(objectName string, attr *pbUtils.Attribute) bool {
 	if objectName == attr.GetAttrKey() {
-		return true
-	}
-	return false
-}
-
-func typeMatch(t pbUtils.Attribute_AttributeType, attr *pbUtils.Attribute) bool {
-	if t == attr.GetAttrType() {
 		return true
 	}
 	return false

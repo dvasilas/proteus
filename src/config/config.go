@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/dvasilas/proteus/src/protos"
@@ -15,6 +16,7 @@ type Config struct {
 	QpuType         pbQPU.ConfigResponse_QPUType
 	Port            string
 	Connections     []QPUConnection
+	Schema          Schema
 	DatastoreConfig struct {
 		Dataset            *pbQPU.DataSet
 		Type               Datastore
@@ -43,6 +45,21 @@ type Config struct {
 		Delay    int64
 	}
 }
+
+// Schema ...
+type Schema map[string]map[string]DatastoreAttributeType
+
+// DatastoreAttributeType ...
+type DatastoreAttributeType int
+
+const (
+	// STR ...
+	STR DatastoreAttributeType = iota
+	// INT ...
+	INT DatastoreAttributeType = iota
+	// FLT ...
+	FLT DatastoreAttributeType = iota
+)
 
 // QPUConnection ...
 type QPUConnection struct {
@@ -79,6 +96,10 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 		})
 	}
 	config.Connections = connections
+
+	if err := config.getSchema(conf); err != nil {
+		return nil, err
+	}
 
 	switch config.QpuType {
 	case pbQPU.ConfigResponse_DBDRIVER:
@@ -236,47 +257,25 @@ func (c *Config) getIndexImplementation(conf ConfJSON) error {
 
 // GetIndexConfig ...
 func (c *Config) getIndexingConfig(conf ConfJSON) error {
-	attrName, attrType, err := c.getIndexAttribute(conf)
-	if err != nil {
-		return err
-	}
-	lb, ub, err := c.getIndexBounds(attrType, conf)
+	attrName := conf.IndexConfig.AttributeName
+	lb, ub, err := c.getIndexBounds(conf)
 	if err != nil {
 		return err
 	}
 	c.IndexConfig.IndexingConfig = append(
 		c.IndexConfig.IndexingConfig,
 		protoutils.AttributePredicate(
-			protoutils.Attribute(attrName, attrType, nil),
+			protoutils.Attribute(attrName, nil),
 			lb, ub,
 		),
 	)
 	return nil
 }
 
-// getIndexAttributeType ...
-func (c *Config) getIndexAttribute(conf ConfJSON) (string, pbUtils.Attribute_AttributeType, error) {
-	switch conf.IndexConfig.AttributeType {
-	case "s3tagStr":
-		return conf.IndexConfig.AttributeName, pbUtils.Attribute_S3TAGSTR, nil
-	case "s3tagInt":
-		return conf.IndexConfig.AttributeName, pbUtils.Attribute_S3TAGINT, nil
-	case "s3tagFlt":
-		return conf.IndexConfig.AttributeName, pbUtils.Attribute_S3TAGFLT, nil
-	case "crdtCounter":
-		return conf.IndexConfig.AttributeName, pbUtils.Attribute_CRDTCOUNTER, nil
-	case "crdtLwwreg":
-		return conf.IndexConfig.AttributeName, pbUtils.Attribute_CRDTLWWREG, nil
-	default:
-		return "", pbUtils.Attribute_S3TAGSTR, errors.New("unknown attribute type in index configuration")
-	}
-}
-
-func (c *Config) getIndexBounds(t pbUtils.Attribute_AttributeType, conf ConfJSON) (*pbUtils.Value, *pbUtils.Value, error) {
-	switch t {
-	case pbUtils.Attribute_S3TAGSTR, pbUtils.Attribute_CRDTLWWREG:
-		return protoutils.ValueStr(conf.IndexConfig.LBound), protoutils.ValueStr(conf.IndexConfig.UBound), nil
-	case pbUtils.Attribute_S3TAGINT, pbUtils.Attribute_CRDTCOUNTER:
+func (c *Config) getIndexBounds(conf ConfJSON) (*pbUtils.Value, *pbUtils.Value, error) {
+	table := c.Schema[conf.IndexConfig.Bucket]
+	switch table[conf.IndexConfig.AttributeName] {
+	case INT:
 		lb, err := strconv.ParseInt(conf.IndexConfig.LBound, 10, 64)
 		if err != nil {
 			return nil, nil, err
@@ -286,7 +285,7 @@ func (c *Config) getIndexBounds(t pbUtils.Attribute_AttributeType, conf ConfJSON
 			return nil, nil, err
 		}
 		return protoutils.ValueInt(lb), protoutils.ValueInt(ub), nil
-	case pbUtils.Attribute_S3TAGFLT:
+	case FLT:
 		lb, err := strconv.ParseFloat(conf.IndexConfig.LBound, 64)
 		if err != nil {
 			return nil, nil, err
@@ -296,17 +295,47 @@ func (c *Config) getIndexBounds(t pbUtils.Attribute_AttributeType, conf ConfJSON
 			return nil, nil, err
 		}
 		return protoutils.ValueFlt(lb), protoutils.ValueFlt(ub), nil
+	case STR:
+		return protoutils.ValueStr(conf.IndexConfig.LBound), protoutils.ValueStr(conf.IndexConfig.UBound), nil
+	default:
+		return nil, nil, errors.New("attribute type is not handled by getIndexBounds")
 	}
-	return nil, nil, errors.New("index configuration: getIndexBounds not implemented for this attribute type")
+}
+
+func (c *Config) getSchema(conf ConfJSON) error {
+	c.Schema = make(map[string]map[string]DatastoreAttributeType, 0)
+	for _, table := range conf.Schema {
+		c.Schema[table.Table] = make(map[string]DatastoreAttributeType, 0)
+		for _, attribute := range table.Attributes {
+			switch attribute.Type {
+			case "int":
+				c.Schema[table.Table][attribute.Key] = INT
+			case "string":
+				c.Schema[table.Table][attribute.Key] = STR
+			case "float":
+				c.Schema[table.Table][attribute.Key] = FLT
+			default:
+				return fmt.Errorf(fmt.Sprintf("invalid attribute type %s in schema", attribute.Type))
+			}
+		}
+	}
+	return nil
 }
 
 //---------------- Auxiliary Functions -------------
 
 // ConfJSON is used to read and marshal a JSON configuration file
 type ConfJSON struct {
-	QpuType         string
-	Port            string
-	Connections     []QPUConnectionJSON
+	QpuType     string
+	Port        string
+	Connections []QPUConnectionJSON
+	Schema      []struct {
+		Table      string
+		Attributes []struct {
+			Key  string
+			Type string
+		}
+	}
 	DataStoreConfig struct {
 		DataSet struct {
 			DB    string
@@ -347,4 +376,47 @@ type ConfJSON struct {
 type QPUConnectionJSON struct {
 	Address string
 	Local   string
+}
+
+//---------------- Auxiliary Functions -------------
+
+// StringToValue ...
+func (c *Config) StringToValue(tableName, attributeName, valueStr string) (*pbUtils.Value, error) {
+	switch c.Schema[tableName][attributeName] {
+	case STR:
+		return protoutils.ValueStr(valueStr), nil
+	case INT:
+		i, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		return protoutils.ValueInt(i), nil
+	case FLT:
+		f, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			return nil, err
+		}
+		return protoutils.ValueFlt(f), nil
+	default:
+		return nil, errors.New("attribute type not handled by StringToValue")
+	}
+}
+
+// GetAttributeType ...
+func (c *Config) GetAttributeType(tableName, attributeName string) DatastoreAttributeType {
+	return c.Schema[tableName][attributeName]
+}
+
+// AttributeTypeToString ...
+func AttributeTypeToString(t DatastoreAttributeType) (string, error) {
+	switch t {
+	case STR:
+		return "STR", nil
+	case INT:
+		return "INT", nil
+	case FLT:
+		return "FLT", nil
+	default:
+		return "", errors.New("attribute type not handled by attributeTypeToString")
+	}
 }

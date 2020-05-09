@@ -7,24 +7,24 @@ import (
 )
 
 // ObjectLogOp ...
-func ObjectLogOp(key, buck, attrK string, attrT pbUtils.Attribute_AttributeType, attrV *pbUtils.Value) *pbUtils.LogOperation {
+func ObjectLogOp(key, buck, attrK string, attrV *pbUtils.Value) *pbUtils.LogOperation {
 	return &pbUtils.LogOperation{
 		ObjectId: key,
 		Bucket:   buck,
 		Payload: protoutils.PayloadState(
 			protoutils.ObjectState([]*pbUtils.Attribute{
-				protoutils.Attribute(attrK, attrT, attrV),
+				protoutils.Attribute(attrK, attrV),
 			})),
 	}
 }
 
 // ObjectState ...
-func ObjectState(key, buck, attrK string, attrT pbUtils.Attribute_AttributeType, attrV *pbUtils.Value) utils.ObjectState {
+func ObjectState(key, buck, attrK string, attrV *pbUtils.Value) utils.ObjectState {
 	return utils.ObjectState{
 		ObjectID: key,
 		Bucket:   buck,
 		State: *protoutils.ObjectState([]*pbUtils.Attribute{
-			protoutils.Attribute(attrK, attrT, attrV),
+			protoutils.Attribute(attrK, attrV),
 		}),
 		Timestamp: *protoutils.Vectorclock(map[string]uint64{"1": 10, "2": 20}),
 	}

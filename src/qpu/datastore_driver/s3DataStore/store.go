@@ -205,12 +205,12 @@ func (ds S3DataStore) processAndForwardObject(key string, bucket string, head ht
 
 	for k := range head {
 		if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") && !strings.Contains(strings.ToLower(k), "s3cmd-attrs") {
-			attrk, attrt, attrv, err := xAmzMetaToAttr(k, head[k][0])
+			attrk, attrv, err := xAmzMetaToAttr(k, head[k][0])
 			if err != nil {
 				errs <- err
 				return
 			}
-			attrs = append(attrs, protoutils.Attribute(attrk, attrt, attrv))
+			attrs = append(attrs, protoutils.Attribute(attrk, attrv))
 		}
 	}
 	v, err := strconv.ParseInt(head["Content-Length"][0], 10, 64)
@@ -218,7 +218,7 @@ func (ds S3DataStore) processAndForwardObject(key string, bucket string, head ht
 		errs <- err
 		return
 	}
-	attrs = append(attrs, protoutils.Attribute("contentLength", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(v)))
+	attrs = append(attrs, protoutils.Attribute("contentLength", protoutils.ValueInt(v)))
 	state := protoutils.ObjectState(attrs)
 	payload = protoutils.PayloadState(state)
 
@@ -272,40 +272,39 @@ func s3UpdateToObjectState(updateAttrs map[string]string, contentLen, lastModDat
 	attrs := make([]*pbUtils.Attribute, len(updateAttrs)+2)
 	i := 0
 	for attrK, attrV := range updateAttrs {
-		k, t, v, err := xAmzMetaToAttr(attrK, attrV)
+		k, v, err := xAmzMetaToAttr(attrK, attrV)
 		if err != nil {
 			return nil, err
 		}
-		attrs[i] = protoutils.Attribute(k, t, v)
+		attrs[i] = protoutils.Attribute(k, v)
 		i++
 	}
-	attrs[i] = protoutils.Attribute("contentLength", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(contentLen))
+	attrs[i] = protoutils.Attribute("contentLength", protoutils.ValueInt(contentLen))
 	i++
-	attrs[i] = protoutils.Attribute("lastModified", pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(lastModDate))
+	attrs[i] = protoutils.Attribute("lastModified", protoutils.ValueInt(lastModDate))
 
 	return protoutils.ObjectState(attrs), nil
 }
 
-//xAmzMetaToAttr a key-value pair (strings) of s3 metadata attributes
+// xAmzMetaToAttr a key-value pair (strings) of s3 metadata attributes
 // and based on the format of the key, it infers the datatype of the attribute's value
 // and returns the key without the "x-amz-meta.." prefix,
-// the data type (pbUtils.Attribute_AttributeType)
 // and the value (*pbUtils.Value) of the attribute
-func xAmzMetaToAttr(k string, v string) (string, pbUtils.Attribute_AttributeType, *pbUtils.Value, error) {
+func xAmzMetaToAttr(k string, v string) (string, *pbUtils.Value, error) {
 	if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-f-") {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return "", pbUtils.Attribute_S3TAGFLT, nil, err
+			return "", nil, err
 		}
-		return strings.Split(strings.ToLower(k), "x-amz-meta-f-")[1], pbUtils.Attribute_S3TAGFLT, protoutils.ValueFlt(f), err
+		return strings.Split(strings.ToLower(k), "x-amz-meta-f-")[1], protoutils.ValueFlt(f), err
 	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-i-") {
 		i, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return "", pbUtils.Attribute_S3TAGINT, nil, err
+			return "", nil, err
 		}
-		return strings.Split(strings.ToLower(k), "x-amz-meta-i-")[1], pbUtils.Attribute_S3TAGINT, protoutils.ValueInt(i), nil
+		return strings.Split(strings.ToLower(k), "x-amz-meta-i-")[1], protoutils.ValueInt(i), nil
 	} else if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") {
-		return strings.Split(strings.ToLower(k), "x-amz-meta-")[1], pbUtils.Attribute_S3TAGSTR, protoutils.ValueStr(v), nil
+		return strings.Split(strings.ToLower(k), "x-amz-meta-")[1], protoutils.ValueStr(v), nil
 	}
-	return k, pbUtils.Attribute_S3TAGSTR, protoutils.ValueStr(v), nil
+	return k, protoutils.ValueStr(v), nil
 }

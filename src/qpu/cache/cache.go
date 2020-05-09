@@ -31,7 +31,7 @@ type CQPU struct {
 // to work with this module.
 type cacheImplementation interface {
 	Put(bucket string, predicate []*pbUtils.AttributePredicate, objects []utils.ObjectState, size int, client client.Client) error
-	Get(p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool)
+	Get(bucket string, p []*pbUtils.AttributePredicate) ([]utils.ObjectState, bool, error)
 }
 
 //---------------- API Functions -------------------
@@ -63,7 +63,10 @@ func (q *CQPU) Query(streamOut pbQPU.QPU_QueryServer, query *pbQPU.QueryInternal
 		return nil
 	}
 	if query.GetClock().GetLbound().GetType() == pbUtils.SnapshotTime_LATEST || query.GetClock().GetUbound().GetType() == pbUtils.SnapshotTime_LATEST {
-		cachedResult, hit := q.cache.Get(query.GetPredicate())
+		cachedResult, hit, err := q.cache.Get(query.GetBucket(), query.GetPredicate())
+		if err != nil {
+			return err
+		}
 		if hit {
 			seqID := int64(0)
 			for _, item := range cachedResult {

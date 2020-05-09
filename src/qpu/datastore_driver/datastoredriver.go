@@ -10,7 +10,6 @@ import (
 	"github.com/dvasilas/proteus/src/protos"
 	pbQPU "github.com/dvasilas/proteus/src/protos/qpu"
 	pbUtils "github.com/dvasilas/proteus/src/protos/utils"
-	antDS "github.com/dvasilas/proteus/src/qpu/datastore_driver/antidoteDataStore"
 	mockDS "github.com/dvasilas/proteus/src/qpu/datastore_driver/mockDatastore"
 	s3DS "github.com/dvasilas/proteus/src/qpu/datastore_driver/s3DataStore"
 	log "github.com/sirupsen/logrus"
@@ -46,11 +45,6 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 		q.ds = s3DS.New(
 			conf.DatastoreConfig.ΑwsAccessKeyID,
 			conf.DatastoreConfig.AwsSecretAccessKey,
-			conf.DatastoreConfig.Endpoint,
-			conf.DatastoreConfig.LogStreamEndpoint,
-		)
-	case config.ANTIDOTE:
-		q.ds = antDS.New(
 			conf.DatastoreConfig.Endpoint,
 			conf.DatastoreConfig.LogStreamEndpoint,
 		)

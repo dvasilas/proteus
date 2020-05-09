@@ -162,7 +162,6 @@ func logOpToObjectState(record *pbQPU.ResponseStreamRecord) ObjectState {
 	for i, attr := range attrs {
 		state[i] = Attribute{
 			AttrName: attr.GetAttrKey(),
-			AttrType: getAttrType(attr.GetAttrType()),
 			Value:    attr.GetValue(),
 		}
 	}
@@ -184,7 +183,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 			default:
 				return nil, errors.New("attribute datatype and bound type missmatch")
 			}
-			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, pbUtils.Attribute_S3TAGSTR, nil),
+			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, nil),
 				protoutils.ValueStr(p.Lbound.(string)),
 				protoutils.ValueStr(p.Ubound.(string)))
 		case S3TAGINT:
@@ -198,7 +197,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 			default:
 				return nil, errors.New("attribute datatype and bound type missmatch")
 			}
-			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, pbUtils.Attribute_S3TAGINT, nil),
+			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, nil),
 				protoutils.ValueInt(p.Lbound.(int64)),
 				protoutils.ValueInt(p.Ubound.(int64)))
 		case S3TAGFLT:
@@ -212,7 +211,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 			default:
 				return nil, errors.New("attribute datatype and bound type missmatch")
 			}
-			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, pbUtils.Attribute_S3TAGFLT, nil),
+			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, nil),
 				protoutils.ValueFlt(p.Lbound.(float64)),
 				protoutils.ValueFlt(p.Ubound.(float64)))
 		case CRDTCOUNTER:
@@ -226,7 +225,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 			default:
 				return nil, errors.New("attribute datatype and bound type missmatch")
 			}
-			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, pbUtils.Attribute_CRDTCOUNTER, nil),
+			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, nil),
 				protoutils.ValueInt(p.Lbound.(int64)),
 				protoutils.ValueInt(p.Ubound.(int64)))
 		case CRDTLWWREG:
@@ -240,7 +239,7 @@ func inputToAttributePredicate(predicate []AttributePredicate) ([]*pbUtils.Attri
 			default:
 				return nil, errors.New("attribute datatype and bound type missmatch")
 			}
-			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, pbUtils.Attribute_S3TAGSTR, nil),
+			pred[i] = protoutils.AttributePredicate(protoutils.Attribute(p.AttrName, nil),
 				protoutils.ValueStr(p.Lbound.(string)),
 				protoutils.ValueStr(p.Ubound.(string)))
 		default:
@@ -256,20 +255,5 @@ func getObjectType(strRecord *pbQPU.ResponseStreamRecord) ObjectType {
 		return S3OBJECT
 	default: //pbUtils.LogOperation_MAPCRDT:
 		return MAPCRDT
-	}
-}
-
-func getAttrType(attrType pbUtils.Attribute_AttributeType) AttributeType {
-	switch attrType {
-	case pbUtils.Attribute_S3TAGSTR:
-		return S3TAGSTR
-	case pbUtils.Attribute_S3TAGINT:
-		return S3TAGINT
-	case pbUtils.Attribute_S3TAGFLT:
-		return S3TAGFLT
-	case pbUtils.Attribute_CRDTCOUNTER:
-		return CRDTCOUNTER
-	default: //pbUtils.Attribute_CRDTLWWREG:
-		return CRDTLWWREG
 	}
 }

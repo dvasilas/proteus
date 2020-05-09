@@ -47,15 +47,7 @@ message Operation {
 }
 
 message Attribute {
-  enum AttributeType {
-    S3TAGSTR = 0;
-    S3TAGINT = 1;
-    S3TAGFLT = 2;
-    CRDTCOUNTER = 3;
-    CRDTLWWREG = 4;
-  }
-  string attr_key= 1;
-  AttributeType attr_type = 2;
+  string attr_key = 1;
   Value value = 3;
 }
 message Value {

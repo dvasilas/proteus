@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/dvasilas/proteus/src/config"
 	"github.com/dvasilas/proteus/src/protos"
 
 	utils "github.com/dvasilas/proteus/src"
@@ -19,7 +20,7 @@ import (
 type InMemIndex struct {
 	index         indexImplementation
 	attributeName string
-	attributeType pbUtils.Attribute_AttributeType
+	attributeType config.DatastoreAttributeType
 }
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
@@ -33,13 +34,14 @@ type indexImplementation interface {
 //---------------- API Functions -------------------
 
 // New creates a new in-memory index
-func New(attrName string, attrType pbUtils.Attribute_AttributeType) (*InMemIndex, error) {
+func New(attrName string, attrType config.DatastoreAttributeType) (*InMemIndex, error) {
 	ind := &InMemIndex{
 		attributeName: attrName,
 		attributeType: attrType,
 	}
-	ind.index = newBTreeIndex(ind.attributeType)
-	return ind, nil
+	var err error
+	ind.index, err = newBTreeIndex(attrType)
+	return ind, err
 }
 
 // Update updates the index based on a given operation
@@ -66,16 +68,15 @@ type bTreeIndex struct {
 	entry indexEntry
 }
 
-func newBTreeIndex(t pbUtils.Attribute_AttributeType) *bTreeIndex {
-	index := &bTreeIndex{tree: btree.New(2)}
+func newBTreeIndex(t config.DatastoreAttributeType) (*bTreeIndex, error) {
 	switch t {
-	case pbUtils.Attribute_S3TAGFLT:
-		index.entry = newIndexFloat()
-	case pbUtils.Attribute_S3TAGSTR, pbUtils.Attribute_CRDTLWWREG:
-	case pbUtils.Attribute_S3TAGINT, pbUtils.Attribute_CRDTCOUNTER:
-		index.entry = newIndexInt()
+	case config.INT:
+		return &bTreeIndex{tree: btree.New(2), entry: newIndexInt()}, nil
+	case config.FLT:
+		return &bTreeIndex{tree: btree.New(2), entry: newIndexFloat()}, nil
+	default:
+		return nil, errors.New("attribute type not supported in newBTreeIndex")
 	}
-	return index
 }
 
 func (i *bTreeIndex) update(attrOld *pbUtils.Attribute, attrNew *pbUtils.Attribute, object utils.ObjectState, ts pbUtils.Vectorclock) error {
