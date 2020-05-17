@@ -156,6 +156,8 @@ type Datastore int
 const (
 	// S3 is the enum value for an S3 backend data store
 	S3 Datastore = iota
+	// MYSQL is the enum value for an MySQL backend data store
+	MYSQL Datastore = iota
 	// ANTIDOTE is the enum value for an Antidote backend data store
 	ANTIDOTE Datastore = iota
 	// MOCK ...
@@ -184,6 +186,8 @@ func (c *Config) getDatastore(store string) error {
 		c.DatastoreConfig.Type = S3
 	case "antidote":
 		c.DatastoreConfig.Type = ANTIDOTE
+	case "mysql":
+		c.DatastoreConfig.Type = MYSQL
 	case "mock":
 		c.DatastoreConfig.Type = MOCK
 	default:

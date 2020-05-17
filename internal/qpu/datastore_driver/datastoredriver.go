@@ -2,6 +2,7 @@ package datastoredriver
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mockDS "github.com/dvasilas/proteus/internal/qpu/datastore_driver/mockDatastore"
+	mysqlDS "github.com/dvasilas/proteus/internal/qpu/datastore_driver/mysql"
 	s3DS "github.com/dvasilas/proteus/internal/qpu/datastore_driver/s3DataStore"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -39,7 +41,7 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 			Config:               conf,
 		},
 	}
-
+	var err error
 	switch conf.DatastoreConfig.Type {
 	case config.S3:
 		q.ds = s3DS.New(
@@ -48,10 +50,15 @@ func QPU(conf *config.Config) (*DriverQPU, error) {
 			conf.DatastoreConfig.Endpoint,
 			conf.DatastoreConfig.LogStreamEndpoint,
 		)
+	case config.MYSQL:
+		q.ds, err = mysqlDS.New(
+			conf,
+		)
 	case config.MOCK:
 		q.ds = mockDS.New()
 	}
-	return q, nil
+	fmt.Println(q.ds)
+	return q, err
 }
 
 //Query implements the Query API for the data store QPU

@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/dvasilas/proteus/deployment"
+	"github.com/dvasilas/proteus/deployments"
 	"github.com/dvasilas/proteus/internal/config"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client"

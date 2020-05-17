@@ -135,7 +135,7 @@ var tests = []testScenario{
 
 func TestEndToEnd(t *testing.T) {
 	deployPopulateDatastore(singleDatastore)
-	cmd := exec.Command("../../../deployment/wait-for-it.sh", "--host=127.0.0.1", "--port=50150", "--timeout=0")
+	cmd := exec.Command("../../../deployments/wait-for-it.sh", "--host=127.0.0.1", "--port=50150", "--timeout=0")
 	err := cmd.Run()
 	if err != nil {
 		log.Fatal(err)

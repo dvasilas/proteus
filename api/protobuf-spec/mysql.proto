@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option go_package = "github.com/dvasilas/proteus/internal/proto/mysql";
+
+package mysql;
+
+service PublishUpdates {
+    rpc SubscribeToUpdates(stream RequestStream) returns (stream NotificationStream) {}
+}
+
+message NotificationStream {
+    int64 sequence_id = 1;
+    string payload = 2;
+    int64 timestamp = 3;
+}
+
+message Payload {
+    message ObjectState {
+      int64 contentLength = 1;
+      int64 lastModified = 2;
+      map<string, string> attributes = 3;
+    }
+    string object_id = 1;
+    string bucket = 2;
+    ObjectState old_state = 3;
+    ObjectState new_state = 4;
+}
+
+message RequestStream {
+  oneof val {
+    SubRequest request = 1;
+    AckMsg ack = 2;
+  }
+}
+
+message SubRequest {
+    int64 timestamp = 1;
+    bool sync = 2;
+}
+
+message AckMsg {
+    int64 timestamp = 1;
+}

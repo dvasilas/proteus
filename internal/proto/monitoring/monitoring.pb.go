@@ -97,7 +97,9 @@ func init() {
 	proto.RegisterType((*ResponseTime)(nil), "responseTime")
 }
 
-func init() { proto.RegisterFile("api/protobuf-spec/monitoring.proto", fileDescriptor_05ceeedfe1d0b41c) }
+func init() {
+	proto.RegisterFile("api/protobuf-spec/monitoring.proto", fileDescriptor_05ceeedfe1d0b41c)
+}
 
 var fileDescriptor_05ceeedfe1d0b41c = []byte{
 	// 194 bytes of a gzipped FileDescriptorProto
