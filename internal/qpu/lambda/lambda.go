@@ -2,10 +2,10 @@ package lambda
 
 import (
 	"context"
-	"errors"
+	"database/sql"
+	"fmt"
 	"io"
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/internal"
@@ -13,6 +13,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,50 +22,54 @@ type LQPU struct {
 	qpu         *utils.QPU
 	config      *config.Config
 	cancelFuncs []context.CancelFunc
-	state       lambdaState
+	state       *sql.DB
 }
 
-type lambdaState interface {
-	Initialize() error
-	Update(*qpu.LogOperation) error
-	Read() (interface{}, qpu.Vectorclock, error)
-	GetTimestamp() (qpu.Vectorclock, error)
-}
-
-type lambdaCounter struct {
-	counter int64
-	clock   qpu.Vectorclock
-	mutex   sync.RWMutex
-}
-
-func (l *lambdaCounter) Initialize() error {
-	l.counter = 0
-	l.clock = *(protoutils.Vectorclock(map[string]uint64{"": 0}))
-	return nil
-}
-
-func (l *lambdaCounter) Update(logOp *qpu.LogOperation) error {
+func (q *LQPU) update(logOp *qpu.LogOperation) error {
 	log.WithFields(log.Fields{
 		"operation": logOp,
 	}).Debug("lambda update")
 
-	l.mutex.Lock()
-	l.counter++
-	l.clock = *(logOp.GetTimestamp())
-	l.mutex.Unlock()
+	stmtOut, err := q.state.Prepare("SELECT vote_count FROM stories_with_vote WHERE story_id = ?")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer stmtOut.Close()
+
+	var storyID, opVoteCount, stateVoteCount int64
+	for _, attr := range logOp.GetPayload().GetDelta().GetNew().GetAttrs() {
+		if attr.GetAttrKey() == "story_id" {
+			storyID = attr.GetValue().GetInt()
+		}
+		if attr.GetAttrKey() == "vote" {
+			opVoteCount = attr.GetValue().GetInt()
+		}
+	}
+	err = stmtOut.QueryRow(storyID).Scan(&stateVoteCount)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			fmt.Println("no rows in result set")
+			insForm, err := q.state.Prepare("INSERT INTO stories_with_vote (story_id, vote_count) VALUES(?,?)")
+			if err != nil {
+				panic(err.Error())
+			}
+			insForm.Exec(storyID, opVoteCount)
+		} else {
+			panic(err.Error())
+		}
+	} else {
+		fmt.Printf("got vote_count: %d", stateVoteCount)
+		stateVoteCount += opVoteCount
+		insForm, err := q.state.Prepare("UPDATE stories_with_vote SET vote_count=? WHERE story_id=?")
+		if err != nil {
+			panic(err.Error())
+		}
+		insForm.Exec(stateVoteCount, storyID)
+
+		fmt.Printf("new vote_count: %d", stateVoteCount)
+	}
+
 	return nil
-}
-
-func (l *lambdaCounter) Read() (interface{}, qpu.Vectorclock, error) {
-	l.mutex.RLock()
-	c := l.counter
-	ts, _ := l.GetTimestamp()
-	l.mutex.RUnlock()
-	return c, ts, nil
-}
-
-func (l *lambdaCounter) GetTimestamp() (qpu.Vectorclock, error) {
-	return l.clock, nil
 }
 
 //---------------- API Functions -------------------
@@ -76,13 +81,17 @@ func QPU(conf *config.Config) (*LQPU, error) {
 		qpu: &utils.QPU{
 			Config: conf,
 		},
-		state: &lambdaCounter{},
 	}
-	q.state.Initialize()
 
 	if err := utils.ConnectToQPUGraph(q.qpu); err != nil {
 		return nil, err
 	}
+
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3308)/proteus")
+	if err != nil {
+		return nil, err
+	}
+	q.state = db
 
 	pred := []*qpu.AttributePredicate{}
 	q.cancelFuncs = make([]context.CancelFunc, len(q.qpu.Conns))
@@ -112,41 +121,6 @@ func QPU(conf *config.Config) (*LQPU, error) {
 // Query implements the Query API for the fault injection QPU
 func (q *LQPU) Query(streamOut qpu_api.QPU_QueryServer, query *qpu_api.QueryInternalQuery, metadata map[string]string, block bool) error {
 	log.WithFields(log.Fields{"query": query, "QPU": "lambda"}).Debug("query received")
-	_, err := streamOut.Recv()
-	if err == io.EOF {
-		return errors.New("Query received EOF")
-	}
-	if err != nil {
-		return err
-	}
-
-	cnt, ts, _ := q.state.Read()
-	if err := streamOut.Send(
-		protoutils.ResponseStreamRecord(
-			0,
-			qpu_api.ResponseStreamRecord_STATE,
-			protoutils.LogOperation(
-				"lambda", "", qpu.LogOperation_S3OBJECT, &ts,
-				protoutils.PayloadState(
-					protoutils.ObjectState(
-						[]*qpu.Attribute{protoutils.Attribute("counter", protoutils.ValueInt(cnt.(int64)))},
-					),
-				),
-			),
-		),
-	); err != nil {
-		return err
-	}
-
-	if err := streamOut.Send(
-		protoutils.ResponseStreamRecord(
-			1,
-			qpu_api.ResponseStreamRecord_END_OF_STREAM,
-			&qpu.LogOperation{},
-		),
-	); err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -168,6 +142,7 @@ func (q *LQPU) GetDataTransfer() float32 {
 // Cleanup is called when the QPU receives a SIGTERM signcal
 func (q *LQPU) Cleanup() {
 	log.Info("lambda QPU cleanup")
+	q.state.Close()
 }
 
 //----------- Stream Consumer Functions ------------
@@ -188,7 +163,7 @@ func (q *LQPU) opConsumer(stream qpu_api.QPU_QueryClient) {
 					"operation": streamRec,
 				}).Debug("lambda QPU received operation")
 
-				q.state.Update(streamRec.GetLogOp())
+				q.update(streamRec.GetLogOp())
 			}
 		}
 	}

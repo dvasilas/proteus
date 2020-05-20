@@ -50,7 +50,7 @@ func New(conf *config.Config) (MySQLDataStore, error) {
 		conn:                 conn,
 		schema:               conf.Schema,
 	}
-	fmt.Println("MySQLDataStore", s)
+	fmt.Println("MySQLDataStore", s.schema)
 	return s, nil
 }
 
@@ -139,10 +139,11 @@ func (ds MySQLDataStore) attributeValue(table, attributeKey, valueStr string) (*
 func (ds MySQLDataStore) formatOperation(notificationMsg *mysql.NotificationStream) (*qpu.LogOperation, error) {
 	var update MySQLUpdate
 	updateStr := notificationMsg.GetPayload()
+	fmt.Println("formatOperation", updateStr)
 	if err := json.Unmarshal([]byte(updateStr), &update); err != nil {
 		panic(err)
 	}
-	fmt.Println(update)
+	fmt.Println("formatOperation", update)
 	var payload *qpu.Payload
 	attributesNew := make([]*qpu.Attribute, 0)
 	attributesOld := make([]*qpu.Attribute, 0)
@@ -156,13 +157,15 @@ func (ds MySQLDataStore) formatOperation(notificationMsg *mysql.NotificationStre
 				protoutils.Attribute(attribute.Key, value),
 			)
 		}
-		value, err := ds.attributeValue(update.Table, attribute.Key, attribute.ValueNew)
-		if err != nil {
-			return nil, err
+		if attribute.ValueNew != "" {
+			value, err := ds.attributeValue(update.Table, attribute.Key, attribute.ValueNew)
+			if err != nil {
+				return nil, err
+			}
+			attributesNew = append(attributesNew,
+				protoutils.Attribute(attribute.Key, value),
+			)
 		}
-		attributesNew = append(attributesNew,
-			protoutils.Attribute(attribute.Key, value),
-		)
 	}
 
 	stateOld := protoutils.ObjectState(attributesOld)

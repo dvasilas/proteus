@@ -1,0 +1,25 @@
+qpuType = "lambda"
+port = "50250"
+
+[[connections]]
+# address = "dsdriver:50150"
+address = "127.0.0.1:50150"
+local = "local"
+
+# [[Schema]]
+# table = "buck"
+#   [[Schema.Attributes]]
+#   key = "tripdistance"
+#   type = "float"
+
+# [indexConfig]
+# bucket = "buck"
+# attributeName = "tripdistance"
+# attributeType = "s3tagFlt"
+# lBound = "0"
+# uBound = "10000"
+# consLevel = "async"
+
+# [indexConfig.IndexStore]
+# store = "in_mem"
+# indexDataStruct = "btree"

@@ -6,6 +6,7 @@ require (
 	github.com/AntidoteDB/antidote-go-client v0.0.0-20190606082231-75786c0ac196
 	github.com/aws/aws-sdk-go v1.20.11
 	github.com/fsnotify/fsnotify v1.4.7
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
