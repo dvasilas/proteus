@@ -1,4 +1,4 @@
-qpuType = "lambda"
+qpuType = "sum"
 port = "50250"
 
 [[connections]]

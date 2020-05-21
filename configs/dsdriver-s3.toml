@@ -1,0 +1,16 @@
+qpuType = "datastore_driver"
+port = "50150"
+
+[dataStoreConfig]
+type = "s3"
+# endpoint = "http://cloudserver-0:8000"
+# logStreamEndpoint = "cloudserver-0:50000"
+endpoint = "http://127.0.0.1:8001"
+logStreamEndpoint = "127.0.0.1:50001"
+awsAccessKeyID = "accessKey1"
+awsSecretAccessKey = "verySecretKey1"
+
+[dataStoreConfig.dataset]
+  db = "1"
+  dc = "1"
+  shard = "1"

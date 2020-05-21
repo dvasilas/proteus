@@ -1,7 +1,0 @@
-{
-    "qpuType": "filter",
-    "port": "50250",
-    "connections": [
-      "qpu_datastore:50150"
-    ]
-}

@@ -102,18 +102,10 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 	}
 
 	switch config.QpuType {
-	case qpu_api.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
 		if err := config.getDatastoreConfig(conf); err != nil {
 			return nil, err
 		}
-	case qpu_api.ConfigResponse_CACHE:
-		config.getCacheConfig(conf)
-	case qpu_api.ConfigResponse_INDEX:
-		if err := config.getIndexConfig(conf); err != nil {
-			return nil, err
-		}
-	case qpu_api.ConfigResponse_NETWORK:
-		config.getNetworkQPUConfig(conf)
 	}
 	return config, nil
 }
@@ -123,25 +115,10 @@ func GetConfig(conf ConfJSON) (*Config, error) {
 //QpuType ...
 func (c *Config) getQpuType(t string) error {
 	switch t {
-	case "dbdriver":
-		c.QpuType = qpu_api.ConfigResponse_DBDRIVER
-	case "filter":
-		c.QpuType = qpu_api.ConfigResponse_FILTER
-	case "index":
-		c.QpuType = qpu_api.ConfigResponse_INDEX
-	case "cache":
-		c.QpuType = qpu_api.ConfigResponse_CACHE
-	case "federation":
-		c.QpuType = qpu_api.ConfigResponse_FEDERATION_DISPATCHER
-	case "load_balancer":
-		c.QpuType = qpu_api.ConfigResponse_LOAD_BALANCER
-	case "lambda":
-		c.QpuType = qpu_api.ConfigResponse_LAMBDA
-	case "network":
-		c.QpuType = qpu_api.ConfigResponse_NETWORK
-	case "intersection":
-		c.QpuType = qpu_api.ConfigResponse_INTERSECTION
-
+	case "datastore_driver":
+		c.QpuType = qpu_api.ConfigResponse_DATASTORE_DRIVER
+	case "sum":
+		c.QpuType = qpu_api.ConfigResponse_SUM
 	default:
 		return errors.New("unknown QPU type")
 	}
@@ -154,14 +131,8 @@ func (c *Config) getQpuType(t string) error {
 type Datastore int
 
 const (
-	// S3 is the enum value for an S3 backend data store
-	S3 Datastore = iota
 	// MYSQL is the enum value for an MySQL backend data store
 	MYSQL Datastore = iota
-	// ANTIDOTE is the enum value for an Antidote backend data store
-	ANTIDOTE Datastore = iota
-	// MOCK ...
-	MOCK Datastore = iota
 )
 
 func (c *Config) getDatastoreConfig(conf ConfJSON) error {
@@ -182,14 +153,8 @@ func (c *Config) getDatastoreConfig(conf ConfJSON) error {
 
 func (c *Config) getDatastore(store string) error {
 	switch store {
-	case "s3":
-		c.DatastoreConfig.Type = S3
-	case "antidote":
-		c.DatastoreConfig.Type = ANTIDOTE
 	case "mysql":
 		c.DatastoreConfig.Type = MYSQL
-	case "mock":
-		c.DatastoreConfig.Type = MOCK
 	default:
 		return errors.New("unknown backend datastore")
 	}

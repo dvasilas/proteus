@@ -11,15 +11,8 @@ import (
 
 	"github.com/dvasilas/proteus/internal/config"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	"github.com/dvasilas/proteus/internal/qpu/cache"
 	"github.com/dvasilas/proteus/internal/qpu/datastore_driver"
-	"github.com/dvasilas/proteus/internal/qpu/federation_dispatcher"
-	"github.com/dvasilas/proteus/internal/qpu/filter"
-	"github.com/dvasilas/proteus/internal/qpu/index"
-	"github.com/dvasilas/proteus/internal/qpu/intersection"
-	"github.com/dvasilas/proteus/internal/qpu/lambda"
-	"github.com/dvasilas/proteus/internal/qpu/load_balancer"
-	"github.com/dvasilas/proteus/internal/qpu/network"
+	"github.com/dvasilas/proteus/internal/qpu/sum"
 	"github.com/dvasilas/proteus/internal/sqlparser"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -106,48 +99,13 @@ func Server(confArg config.ConfJSON) error {
 	var server QPUServer
 	var api QPUAPI
 	switch conf.QpuType {
-	case qpu_api.ConfigResponse_DBDRIVER:
+	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
 		api, err = datastoredriver.QPU(conf)
 		if err != nil {
 			return err
 		}
-	case qpu_api.ConfigResponse_FILTER:
-		api, err = filter.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_CACHE:
-		api, err = cache.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_INDEX:
-		api, err = index.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_FEDERATION_DISPATCHER:
-		api, err = federation.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_NETWORK:
-		api, err = network.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_LOAD_BALANCER:
-		api, err = loadbalancer.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_LAMBDA:
-		api, err = lambda.QPU(conf)
-		if err != nil {
-			return err
-		}
-	case qpu_api.ConfigResponse_INTERSECTION:
-		api, err = intersection.QPU(conf)
+	case qpu_api.ConfigResponse_SUM:
+		api, err = sumqpu.QPU(conf)
 		if err != nil {
 			return err
 		}

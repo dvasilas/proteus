@@ -1,7 +1,0 @@
-{
-    "qpuType": "filter",
-    "port": "50251",
-    "connections": [
-      "localhost:50151"
-    ]
-}

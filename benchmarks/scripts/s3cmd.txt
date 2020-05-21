@@ -1,2 +1,0 @@
-s3cmd mb s3://local-s3 --host=127.0.0.1:8000
-s3cmd put --host=127.0.0.1:8000 --add-header=x-amz-meta-f-test:0.2 ./test.go s3://local-s3/obj
