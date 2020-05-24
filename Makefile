@@ -75,11 +75,7 @@ proto: $(PROTOC_CMD)
 	# go get ./vendor/github.com/golang/protobuf/protoc-gen-go
 	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
-	protoc api/protobuf-spec/antidote.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	protoc api/protobuf-spec/monitoring.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	protoc api/protobuf-spec/s3.proto --go_out=plugins=grpc:$(GOPATH)/src/
 	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	# python3 -m grpc_tools.protoc -I./src/protos/s3client --python_out=./proteus-bench/s3/ --grpc_python_out=./proteus-bench/s3/ ./src/protos/s3client/s3client.proto
 
 .PHONY: clean
 ## clean: cleans the binary

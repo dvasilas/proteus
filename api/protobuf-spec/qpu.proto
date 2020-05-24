@@ -4,15 +4,10 @@ package qpu;
 option go_package = "github.com/dvasilas/proteus/internal/proto/qpu";
 
 message LogOperation {
-  enum ObjectType {
-    S3OBJECT = 0;
-    MAPCRDT = 1;
-  }
   string object_id = 1;
-  ObjectType object_type = 2;
-  string bucket = 3;
-  Vectorclock timestamp = 5;
-  Payload payload = 6;
+  string bucket = 2;
+  Vectorclock timestamp = 3;
+  Payload payload = 4;
 }
 
 message Payload {
@@ -28,7 +23,8 @@ message Payload {
 }
 
 message ObjectState {
-  repeated Attribute attrs = 1;
+  map<string, Value> attributes = 1;
+  // repeated Attribute attrs = 1;
 }
 
 message Operation {
@@ -47,6 +43,7 @@ message Attribute {
   string attr_key = 1;
   Value value = 3;
 }
+
 message Value {
   oneof val {
     string str = 1;
@@ -71,7 +68,13 @@ message Vectorclock {
   }
 
 message AttributePredicate {
+    enum PredicateType {
+      ISNULL = 0;
+      ISNOTNULL = 1;
+      RANGE = 2;
+    }
     Attribute attr = 1;
+    PredicateType type = 2;
     Value lbound = 3;
     Value ubound = 4;
 }

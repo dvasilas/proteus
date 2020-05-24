@@ -4,8 +4,8 @@ option go_package = "github.com/dvasilas/proteus/internal/proto/qpu_api";
 
 import "api/protobuf-spec/qpu.proto";
 
-service QPU {
-  rpc Query(stream RequestStream) returns (stream ResponseStreamRecord) {}
+service QPUAPI {
+  rpc Query(stream RequestStreamRecord) returns (stream ResponseStreamRecord) {}
   rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
   rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
 }
@@ -17,9 +17,9 @@ message DataTransferResponse {
   float kBytesTranferred = 1;
 }
 
-message RequestStream {
-  oneof payload {
-    QueryRequest request = 1;
+message RequestStreamRecord {
+  oneof request {
+    QueryRequest queryRequest = 1;
     AckMsg ack = 2;
     PingMsg ping = 3;
   }
@@ -46,9 +46,10 @@ message QueryRequest {
 
 message Query {
   message internalQuery {
-    qpu.SnapshotTimePredicate clock = 1;
-    string bucket = 2;
+    string table = 1;
+    repeated string projection = 2;
     repeated qpu.AttributePredicate predicate = 3;
+    qpu.SnapshotTimePredicate tsPredicate = 4;
   }
   message SQLQuery {
     string queryStr = 1;
@@ -71,6 +72,7 @@ message ConfigResponse {
   enum QPUType {
     DATASTORE_DRIVER = 0;
     SUM = 1;
+    JOIN = 2;
   }
   QPUType qpu_type = 1;
   repeated qpu.AttributePredicate supportedQueries = 2;

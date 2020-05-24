@@ -36,6 +36,7 @@ message RequestStream {
 message SubRequest {
     int64 timestamp = 1;
     bool sync = 2;
+    string table = 3;
 }
 
 message AckMsg {

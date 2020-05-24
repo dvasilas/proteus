@@ -48,6 +48,7 @@ RUN set -xe && \
     make && \
     cp lib_sys_exec.so /usr/local/mysql/lib/plugin/ && \
     mkdir votes && chown -R mysql:mysql votes && \
+    mkdir stories && chown -R mysql:mysql stories && \
     /usr/local/mysql/bin/mysql --defaults-extra-file=/opt/proteus-mysql/cred.cnf  < /opt/proteus-mysql/schema.sql && \
     /usr/local/mysql/support-files/mysql.server stop
 

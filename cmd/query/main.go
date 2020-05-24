@@ -38,8 +38,7 @@ func main() {
 	connection := strings.Split(endpoint, ":")
 	port, err := strconv.ParseInt(connection[1], 10, 64)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
 	c, err := proteusclient.NewClient(proteusclient.Host{Name: connection[0], Port: int(port)})
 	if err != nil {
@@ -77,11 +76,13 @@ func doQuery(c *proteusclient.Client, query string) {
 
 func processResponseRecord(respRecord proteusclient.ResponseRecord) {
 	fmt.Printf("%s: ( ", respRecord.ObjectID)
-	for i, attr := range respRecord.State {
-		fmt.Printf("%s: %s", attr.Name, attr.Value)
+	i := 0
+	for attrKey, attrValue := range respRecord.State {
+		fmt.Printf("%s: %s", attrKey, attrValue)
 		if i < len(respRecord.State)-1 {
 			fmt.Printf(", ")
 		}
+		i++
 	}
 	fmt.Printf(" )\n")
 }

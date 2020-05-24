@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `stories` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user_id` bigint unsigned NOT NULL,
   `title` varchar(150) NOT NULL DEFAULT '',
-  `description` mediumtext,
+  `description` mediumtext NOT NULL,
   `short_id` varchar(6) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `short_id` (`short_id`),
@@ -69,20 +69,30 @@ CREATE OR REPLACE VIEW `comments_with_votecount`
 DROP FUNCTION IF EXISTS sys_exec;
 CREATE FUNCTION sys_exec RETURNS INT SONAME 'lib_sys_exec.so';
 DELIMITER $
-DROP TRIGGER IF EXISTS `propagate_to_proteus` $
-CREATE TRIGGER `propagate_to_proteus`
+DROP TRIGGER IF EXISTS `votes_trigger` $
+CREATE TRIGGER `votes_trigger`
 AFTER INSERT ON `votes`
 FOR EACH ROW
 BEGIN
   DECLARE cmd CHAR(255);
   DECLARE result int(10);
       IF NEW.comment_id IS NULL THEN
-          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', New.id, ' ', New.story_id, ' ', New.vote);
+          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'votes ', New.id, ' story_id:', New.story_id, ' vote:', New.vote);
           SET result = sys_exec(cmd);
       ELSE
-          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', New.id, ' ', NEW.story_id, ' ', New.comment_id, ' ', New.vote);
+          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'votes ', New.id, ' story_id:', New.story_id, ' comment_id:', New.comment_id, ' vote:', New.vote);
           SET result = sys_exec(cmd);
       END IF;
+END;
+DROP TRIGGER IF EXISTS `stories_trigger` $
+CREATE TRIGGER `stories_trigger`
+AFTER INSERT ON `stories`
+FOR EACH ROW
+BEGIN
+  DECLARE cmd CHAR(255);
+  DECLARE result int(10);
+      SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'stories ', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
+      SET result = sys_exec(cmd);
 END;
 $
 DELIMITER ;

@@ -1,69 +1,69 @@
 package sqlparser
 
 import (
-	"errors"
 	"strconv"
 
-	"github.com/dvasilas/proteus/internal/proto"
+	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	log "github.com/sirupsen/logrus"
 	"github.com/xwb1989/sqlparser"
 )
 
 // Parse ...
-func Parse(query string) (*qpu_api.Query, error) {
-	log.WithFields(log.Fields{"query": query}).Debug("query received")
+func Parse(query string) (libqpu.InternalQuery, error) {
 	stmt, err := sqlparser.Parse(query)
 	if err != nil {
-		return nil, err
+		return libqpu.InternalQuery{}, err
 	}
 
 	switch stmt.(type) {
 	case *sqlparser.Select:
 		return parseSelect(stmt)
 	default:
-		return nil, errors.New("only select queries are supported")
+		return libqpu.InternalQuery{}, libqpu.Error("only select queries are supported")
 	}
 }
 
-func parseSelect(stmt sqlparser.Statement) (*qpu_api.Query, error) {
+func parseSelect(stmt sqlparser.Statement) (libqpu.InternalQuery, error) {
 	query := parsedQuery{}
 	query.parseSelect(stmt)
 
 	return query.toQPUQuery()
 }
 
-func (q *parsedQuery) toQPUQuery() (*qpu_api.Query, error) {
+func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
 	var pred *qpu.AttributePredicate
 
 	var selectOp, selectAttr, selectVal expr
 	var ok bool
 	if selectOp, ok = q.popExpr(); !ok {
-		return nil, errors.New("incorrect parsed query stack")
+		return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
 	}
 	switch selectOp.(operator) {
 	case "=":
 		if selectVal, ok = q.popExpr(); !ok {
-			return nil, errors.New("incorrect parsed query stack")
+			return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
 		}
 		if selectAttr, ok = q.popExpr(); !ok {
-			return nil, errors.New("incorrect parsed query stack")
+			return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
 		}
-		pred = protoutils.AttributePredicate(
-			protoutils.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, nil),
+		pred = libqpu.AttributePredicate(
+			libqpu.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, nil),
 			selectVal.(value).qpuValue,
 			selectVal.(value).qpuValue,
 		)
 	default:
-		return nil, errors.New("only = is supported for now")
+		return libqpu.InternalQuery{}, libqpu.Error("only = is supported for now")
 	}
 
-	return protoutils.QueryInternal(
-		q.table,
-		protoutils.SnapshotTimePredicate(protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil), protoutils.SnapshotTime(qpu.SnapshotTime_LATEST, nil)),
-		[]*qpu.AttributePredicate{pred},
-	), nil
+	return libqpu.InternalQuery{
+			Q: libqpu.QueryInternal(
+				q.table,
+				libqpu.SnapshotTimePredicate(libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil), libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil)),
+				[]*qpu.AttributePredicate{pred},
+				nil,
+			),
+		},
+		nil
 }
 
 func (q *parsedQuery) parseSelect(node sqlparser.SQLNode) error {
@@ -96,7 +96,7 @@ func (q *parsedQuery) parseSelect(node sqlparser.SQLNode) error {
 		case *sqlparser.Limit:
 			return false, nil
 		default:
-			return false, errors.New("should not have reached here")
+			return false, libqpu.Error("should not have reached here")
 		}
 	}, node)
 
@@ -113,7 +113,7 @@ func (q *parsedQuery) parseExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.SQLVal:
 			return false, q.parseSQLVal(node)
 		default:
-			return false, errors.New("parseExpr: not supported")
+			return false, libqpu.Error("parseExpr: not supported")
 		}
 	}, node)
 
@@ -135,7 +135,7 @@ func (q *parsedQuery) parseSelectExprs(node sqlparser.SQLNode) error {
 			}
 			return false, q.parseStarExpr(node)
 		default:
-			return false, errors.New("only SELECT '*' is supported for now")
+			return false, libqpu.Error("only SELECT '*' is supported for now")
 		}
 	}, node)
 
@@ -154,11 +154,11 @@ func (q *parsedQuery) parseTableExprs(node sqlparser.SQLNode) error {
 		case *sqlparser.AliasedTableExpr:
 			return false, q.parseAliasedTableExpr(node)
 		case *sqlparser.ParenTableExpr:
-			return false, errors.New("ParenTableExpr: not supported")
+			return false, libqpu.Error("ParenTableExpr: not supported")
 		case *sqlparser.JoinTableExpr:
-			return false, errors.New("JoinTableExpr: not supported")
+			return false, libqpu.Error("JoinTableExpr: not supported")
 		default:
-			return false, errors.New("should not have reached here")
+			return false, libqpu.Error("should not have reached here")
 		}
 	}, node)
 
@@ -188,7 +188,7 @@ func (q *parsedQuery) ComparisonExpr(node sqlparser.SQLNode) error {
 func (q *parsedQuery) parseColName(node sqlparser.SQLNode) error {
 	return q.pushExpr(
 		attribute{
-			qpuAttribute: protoutils.Attribute(
+			qpuAttribute: libqpu.Attribute(
 				sqlparser.String(node.(*sqlparser.ColName).Name),
 				nil),
 		})
@@ -203,7 +203,7 @@ func (q *parsedQuery) parseSQLVal(node sqlparser.SQLNode) error {
 		}
 		return q.pushExpr(
 			value{
-				qpuValue: protoutils.ValueInt(val),
+				qpuValue: libqpu.ValueInt(val),
 			})
 	case sqlparser.FloatVal:
 		val, err := strconv.ParseFloat(string(node.(*sqlparser.SQLVal).Val), 64)
@@ -212,10 +212,10 @@ func (q *parsedQuery) parseSQLVal(node sqlparser.SQLNode) error {
 		}
 		return q.pushExpr(
 			value{
-				qpuValue: protoutils.ValueFlt(val),
+				qpuValue: libqpu.ValueFlt(val),
 			})
 	default:
-		return errors.New("parseExpr: not supported")
+		return libqpu.Error("parseExpr: not supported")
 	}
 }
 
@@ -236,7 +236,7 @@ func (q *parsedQuery) parseAliasedTableExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.IndexHints:
 			return false, nil
 		default:
-			return false, errors.New("should not have reached here")
+			return false, libqpu.Error("should not have reached here")
 		}
 	}, node)
 
@@ -255,7 +255,7 @@ func (q *parsedQuery) parseStarExpr(node sqlparser.SQLNode) error {
 		case sqlparser.TableName:
 			return false, nil
 		default:
-			return false, errors.New("parseStarExpr: not supported")
+			return false, libqpu.Error("parseStarExpr: not supported")
 		}
 	}, node)
 

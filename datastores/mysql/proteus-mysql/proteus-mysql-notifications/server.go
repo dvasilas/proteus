@@ -13,24 +13,21 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type config struct {
-	Port string
-}
-
 type datastoreGRPCServer struct {
-	acitveConnections []chan string
+	acitveConnections map[string]chan string
 }
 
 // SubscribeToUpdates ...
 func (s *datastoreGRPCServer) SubscribeToUpdates(stream mysql.PublishUpdates_SubscribeToUpdatesServer) error {
-	_, err := stream.Recv()
+	request, err := stream.Recv()
 	if err != nil {
 		return err
 	}
+	table := request.GetRequest().GetTable()
 
 	seqID := int64(0)
 	notificationCh := make(chan string)
-	s.acitveConnections = append(s.acitveConnections, notificationCh)
+	s.acitveConnections[table] = notificationCh
 
 	for updateMsg := range notificationCh {
 		stream.Send(
@@ -45,6 +42,7 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream mysql.PublishUpdates_Sub
 }
 
 func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) error {
+	fmt.Println(logPath)
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		os.Mkdir(logPath, os.ModeDir)
 	}
@@ -53,7 +51,7 @@ func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) e
 	if err != nil {
 		return err
 	}
-	defer watcher.Close()
+	// defer watcher.Close()
 
 	go processEvents(watcher, updateCh, errs)
 
@@ -61,14 +59,16 @@ func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) e
 	if err != nil {
 		return err
 	}
-	<-errs
+	// <-errs
 	return nil
 }
 
 func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
 	for {
+		fmt.Println("processEvents loop")
 		select {
 		case event := <-w.Events:
+			fmt.Println(event)
 			if event.Op.String() == "WRITE" {
 				data, err := ioutil.ReadFile(event.Name)
 				if err != nil {
@@ -78,59 +78,55 @@ func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
 				updateCh <- string(data)
 			}
 		case err := <-w.Errors:
+			fmt.Println(err)
 			errs <- err
 			break
 		}
 	}
 }
 
-func (s *datastoreGRPCServer) publishUpdates(updateCh chan string) {
+func (s *datastoreGRPCServer) publishUpdates(table string, updateCh chan string, errCh chan error) {
 	for updateMsg := range updateCh {
-		for _, subscriberCh := range s.acitveConnections {
-			subscriberCh <- updateMsg
+		if ch, found := s.acitveConnections[table]; found {
+			ch <- updateMsg
 		}
 	}
 }
 
 func main() {
-	var ok bool
-	var port, path string
-	if port, ok = os.LookupEnv("PROTEUS_PUBLISH_PORT"); !ok {
+	port, ok := os.LookupEnv("PROTEUS_PUBLISH_PORT")
+	if !ok {
 		port = "50000"
 	}
 
-	if path, ok = os.LookupEnv("PROTEUS_LOG_PATH"); !ok {
-		path = "/opt/proteus-mysql/votes"
-	}
-
-	fmt.Println(port, path)
-
-	conf := config{
-		Port: port,
-	}
+	tables := []string{"stories", "votes"}
 
 	server := datastoreGRPCServer{
-		acitveConnections: make([]chan string, 0),
+		acitveConnections: make(map[string]chan string, 0),
 	}
 
 	s := grpc.NewServer()
 	mysql.RegisterPublishUpdatesServer(s, &server)
 	reflection.Register(s)
 
-	lis, err := net.Listen("tcp", ":"+conf.Port)
+	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatal(err)
 	}
-	go s.Serve(lis)
 
-	errs := make(chan error)
-	updateCh := make(chan string)
+	var errCh chan error
+	var updateCh chan string
+	for _, table := range tables {
+		errCh = make(chan error)
+		updateCh = make(chan string)
 
-	go server.publishUpdates(updateCh)
+		go server.publishUpdates(table, updateCh, errCh)
 
-	err = subscribeUpdatesFS(path, updateCh, errs)
-	if err != nil {
-		log.Fatal(err)
+		err = subscribeUpdatesFS("/opt/proteus-mysql/"+table, updateCh, errCh)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	err = <-errs
+
+	s.Serve(lis)
 }

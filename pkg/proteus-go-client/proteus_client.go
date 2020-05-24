@@ -1,17 +1,22 @@
 package proteusclient
 
 import (
+	"fmt"
 	"strconv"
 
-	"github.com/dvasilas/proteus/internal"
+	"github.com/dvasilas/proteus/internal/apiclient"
+	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	"github.com/dvasilas/proteus/internal/qpu/client"
+	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
+	"github.com/dvasilas/proteus/internal/queries"
+	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 )
 
 // Client represents a connection to Proteus.
 type Client struct {
-	client client.Client
+	// client apiclient.QPUAPIClient
+	client *libqpu.AdjacentQPU
 }
 
 // Host represents a QPU server.
@@ -25,14 +30,8 @@ type ResponseRecord struct {
 	SequenceID int64
 	ObjectID   string
 	Bucket     string
-	State      []Attribute
+	State      map[string]string
 	Timestamp  Vectorclock
-}
-
-// Attribute ...
-type Attribute struct {
-	Name  string
-	Value string
 }
 
 // Vectorclock ...
@@ -40,20 +39,24 @@ type Vectorclock map[string]uint64
 
 // NewClient creates a new Proteus client connected to the given QPU server.
 func NewClient(host Host) (*Client, error) {
-	c, err := client.NewClient(host.Name + ":" + strconv.Itoa(host.Port))
+	proteusClient, err := apiclient.NewClient(host.Name + ":" + strconv.Itoa(host.Port))
 	if err != nil {
 		return nil, err
 	}
+
 	return &Client{
-		client: c,
+		client: &libqpu.AdjacentQPU{
+			APIClient: proteusClient,
+		},
 	}, nil
 }
 
 // Close closes the connection to Proteus.
-func (c *Client) Close() {
-	c.client.CloseConnection()
+func (c *Client) Close() error {
+	return c.client.APIClient.CloseConnection()
 }
-func (c *Client) getResponse(stream qpu_api.QPU_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
+
+func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
 	for {
 		streamRec, err := stream.Recv()
 		if err != nil {
@@ -80,58 +83,75 @@ func (c *Client) getResponse(stream qpu_api.QPU_QueryClient, responseCh chan Res
 }
 
 // QueryInternal ...
-func (c *Client) QueryInternal(bucket string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, metadata map[string]string, sync bool) (<-chan ResponseRecord, <-chan error, error) {
-	stream, _, err := c.client.Query(bucket, predicate, ts, metadata, sync)
+func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, metadata map[string]string, sync bool) (<-chan ResponseRecord, <-chan error, error) {
+	query := queries.GetSnapshot(table, []string{}, []string{}, []string{})
+	responseStream, err := qpugraph.SendQueryI(query, c.client)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	respCh := make(chan ResponseRecord)
 	errCh := make(chan error)
+	err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
 
-	go c.getResponse(stream, respCh, errCh)
+	return respCh, errCh, err
+}
 
-	return respCh, errCh, nil
+func processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	// var responseCh chan ResponseRecord
+	// responseCh = data.(chan ResponseRecord)
+
+	fmt.Println(respRecord)
+	return nil
 }
 
 // Query ...
 func (c *Client) Query(query string) (<-chan ResponseRecord, <-chan error, error) {
-	stream, _, err := c.client.QuerySQL(query, nil, false)
+	responseStream, err := qpugraph.SendQuerySQL(query, c.client)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	respCh := make(chan ResponseRecord)
 	errCh := make(chan error)
+	err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
 
-	go c.getResponse(stream, respCh, errCh)
-
-	return respCh, errCh, nil
+	return respCh, errCh, err
 }
 
 // GetDataTransfer ...
-func (c *Client) GetDataTransfer() (float64, error) {
-	dataTransferred, err := c.client.GetDataTransfer()
-	if err != nil {
-		return -1.0, err
-	}
-	return float64(dataTransferred.GetKBytesTranferred()), nil
-}
+// func (c *Client) GetDataTransfer() (float64, error) {
+// 	dataTransferred, err := c.client.GetDataTransfer()
+// 	if err != nil {
+// 		return -1.0, err
+// 	}
+// 	return float64(dataTransferred.GetKBytesTranferred()), nil
+// }
 
-func logOpToObjectState(record *qpu_api.ResponseStreamRecord) []Attribute {
+func logOpToObjectState(record *qpu_api.ResponseStreamRecord) map[string]string {
 	logOp := record.GetLogOp()
-	var attrs []*qpu.Attribute
+	var attrs map[string]*qpu.Value
 	if record.GetType() == qpu_api.ResponseStreamRecord_STATE {
-		attrs = logOp.GetPayload().GetState().GetAttrs()
+		attrs = logOp.GetPayload().GetState().GetAttributes()
 	} else if record.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
-		attrs = logOp.GetPayload().GetDelta().GetNew().GetAttrs()
+		attrs = logOp.GetPayload().GetDelta().GetNew().GetAttributes()
 	}
-	state := make([]Attribute, len(attrs))
-	for i, attr := range attrs {
-		state[i] = Attribute{
-			Name:  attr.GetAttrKey(),
-			Value: utils.ValueToString(attr.GetValue()),
-		}
+	state := make(map[string]string, 0)
+	for attrKey, attrVal := range attrs {
+		state[attrKey] = valueToString(attrVal)
 	}
 	return state
+}
+
+func valueToString(val *qpu.Value) string {
+	switch val.Val.(type) {
+	case *qpu.Value_Int:
+		return strconv.Itoa(int(val.GetInt()))
+	case *qpu.Value_Flt:
+		return fmt.Sprintf("%f", val.GetFlt())
+	case *qpu.Value_Str:
+		return val.GetStr()
+	default:
+		return ""
+	}
 }
