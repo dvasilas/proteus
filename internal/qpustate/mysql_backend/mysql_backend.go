@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu"
 )
 
 // This package provides an implementation of the libqpu.QPUState interface
@@ -52,6 +53,7 @@ func (s MySQLStateBackend) Init(database, table, createTable string) error {
 		return err
 	}
 
+	libqpu.Trace("creating table", map[string]interface{}{"stmt": createTable})
 	if _, err := s.db.Exec(createTable); err != nil {
 		return err
 	}
@@ -62,6 +64,7 @@ func (s MySQLStateBackend) Init(database, table, createTable string) error {
 // Insert inserts a record in the state.
 func (s MySQLStateBackend) Insert(table, columns, values string, args ...interface{}) error {
 	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, columns, values)
+	libqpu.Trace("insert", map[string]interface{}{"query": query, "args": args})
 	stmtInsert, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -75,6 +78,7 @@ func (s MySQLStateBackend) Insert(table, columns, values string, args ...interfa
 // Update updates a state record.
 func (s MySQLStateBackend) Update(table, update, condition string, args ...interface{}) error {
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, update, condition)
+	libqpu.Trace("update", map[string]interface{}{"query": query, "args": args})
 	stmtInsert, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -88,6 +92,7 @@ func (s MySQLStateBackend) Update(table, update, condition string, args ...inter
 // Get retrieves a state record, and returns the values specified by 'projection'
 func (s MySQLStateBackend) Get(projection, table, condition string, args ...interface{}) (interface{}, error) {
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s", projection, table, condition)
+	libqpu.Trace("get", map[string]interface{}{"query": query, "args": args})
 	stmtSelect, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -144,4 +149,64 @@ func (s MySQLStateBackend) Scan(table string, columns []string) (<-chan map[stri
 // Cleanup closes the connection to the MySQL instance
 func (s MySQLStateBackend) Cleanup() {
 	s.db.Close()
+}
+
+// ConstructSelect ...
+func ConstructSelect(predicate map[string]*qpu.Value) (string, []interface{}) {
+	whereStmt := ""
+	whereValues := make([]interface{}, len(predicate))
+	i := 0
+
+	for attrKey, val := range predicate {
+		if i < len(predicate) {
+			if len(predicate) > 1 {
+				whereStmt += "AND "
+			}
+		}
+		whereStmt += fmt.Sprintf("%s = ? ", attrKey)
+		whereValues[i] = val.GetInt()
+		i++
+	}
+
+	return whereStmt, whereValues
+}
+
+// ConstructInsert ...
+func ConstructInsert(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value) (string, string, []interface{}) {
+	attrKeyStmt := fmt.Sprintf("(%s", attrToSum)
+	attrValStmt := "(?"
+	insertValues := make([]interface{}, len(predicate)+1)
+	insertValues[0] = valToInsert
+	i := 0
+
+	for attrKey, val := range predicate {
+		if i < len(predicate) {
+			attrKeyStmt += ", "
+			attrValStmt += ", "
+		}
+
+		attrKeyStmt += attrKey
+		attrValStmt += "?"
+
+		insertValues[i+1] = val.GetInt()
+		i++
+	}
+	attrKeyStmt += ")"
+	attrValStmt += ")"
+
+	return attrKeyStmt, attrValStmt, insertValues
+}
+
+// ConstructUpdate ...
+func ConstructUpdate(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value) (string, []interface{}) {
+	updateValues := make([]interface{}, len(predicate)+1)
+	updateValues[0] = valToInsert
+	i := 0
+
+	for _, val := range predicate {
+		updateValues[i+1] = val.GetInt()
+		i++
+	}
+
+	return fmt.Sprintf("%s = ?", attrToSum), updateValues
 }

@@ -75,7 +75,6 @@ func (q *DatastoreDriverQPU) snapshotConsumer(query libqpu.InternalQuery, stream
 }
 
 func (q DatastoreDriverQPU) opConsumer(query libqpu.InternalQuery, stream libqpu.RequestStream) error {
-	fmt.Println("opConsumer")
 	logOpCh, cancel, errCh := q.datastore.SubscribeOps(query.GetTable())
 
 	var seqID int64
@@ -99,7 +98,6 @@ func logOpConsumer(logOpCh <-chan libqpu.LogOperation, errCh <-chan error, cance
 	for {
 		select {
 		case logOp, ok := <-logOpCh:
-			fmt.Println(logOp)
 			if !ok {
 				logOpCh = nil
 			} else {

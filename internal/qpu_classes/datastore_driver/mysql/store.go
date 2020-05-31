@@ -108,7 +108,6 @@ func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan lib
 		}
 	}
 	query := fmt.Sprintf("SELECT %s FROM %s", projection, table)
-	fmt.Println(query)
 
 	rows, err := ds.db.Query(query)
 	if err != nil {

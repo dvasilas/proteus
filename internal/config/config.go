@@ -43,6 +43,15 @@ type inputQPUConfig struct {
 			SecretAccessKey string
 		}
 	}
+	SumConfig struct {
+		SourceTable       string
+		RecordIDAttribute []string
+		AttributeToSum    string
+		Query             struct {
+			Projection []string
+			IsNull     []string
+		}
+	}
 	IndexConfig struct {
 		Bucket        string
 		AttributeName string
@@ -106,6 +115,10 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	// DatastoreConfiguration
 	if config.QpuType == qpu_api.ConfigResponse_DATASTORE_DRIVER {
 		if err := getDatastoreConfig(inputConfig, config); err != nil {
+			return err
+		}
+	} else if config.QpuType == qpu_api.ConfigResponse_SUM {
+		if err := getSumConfig(inputConfig, config); err != nil {
 			return err
 		}
 	}
@@ -202,6 +215,17 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 	config.DatastoreConfig.LogStreamEndpoint = inputConf.DatastoreConfig.LogStreamEndpoint
 	config.DatastoreConfig.Credentials.AccessKeyID = inputConf.DatastoreConfig.Credentials.AccessKeyID
 	config.DatastoreConfig.Credentials.SecretAccessKey = inputConf.DatastoreConfig.Credentials.SecretAccessKey
+
+	return nil
+}
+
+func getSumConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	config.SumConfig.SourceTable = inputConf.SumConfig.SourceTable
+	config.SumConfig.RecordIDAttribute = inputConf.SumConfig.RecordIDAttribute
+	config.SumConfig.AttributeToSum = inputConf.SumConfig.AttributeToSum
+
+	config.SumConfig.Query.Projection = inputConf.SumConfig.Query.Projection
+	config.SumConfig.Query.IsNull = inputConf.SumConfig.Query.IsNull
 
 	return nil
 }

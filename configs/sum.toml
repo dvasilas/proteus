@@ -13,6 +13,14 @@ endpoint = "127.0.0.1:3308"
 accessKeyID = "root"
 secretAccessKey = "123456"
 
+[SumConfig]
+SourceTable = "votes"
+RecordIDAttribute = ["story_id"]
+AttributeToSum = "vote"
+[SumConfig.Query]
+Projection = ["id", "story_id", "vote"]
+IsNull = ["comment_id"]
+
 [[Schema]]
 table = "votes"
 [[Schema.Attributes]]

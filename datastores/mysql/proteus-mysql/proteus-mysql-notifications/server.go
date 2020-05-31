@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -14,7 +13,7 @@ import (
 )
 
 type datastoreGRPCServer struct {
-	acitveConnections map[string]chan string
+	activeConnections map[string]chan string
 }
 
 // SubscribeToUpdates ...
@@ -27,7 +26,7 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream mysql.PublishUpdates_Sub
 
 	seqID := int64(0)
 	notificationCh := make(chan string)
-	s.acitveConnections[table] = notificationCh
+	s.activeConnections[table] = notificationCh
 
 	for updateMsg := range notificationCh {
 		stream.Send(
@@ -42,7 +41,6 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream mysql.PublishUpdates_Sub
 }
 
 func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) error {
-	fmt.Println(logPath)
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		os.Mkdir(logPath, os.ModeDir)
 	}
@@ -59,16 +57,13 @@ func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) e
 	if err != nil {
 		return err
 	}
-	// <-errs
 	return nil
 }
 
 func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
 	for {
-		fmt.Println("processEvents loop")
 		select {
 		case event := <-w.Events:
-			fmt.Println(event)
 			if event.Op.String() == "WRITE" {
 				data, err := ioutil.ReadFile(event.Name)
 				if err != nil {
@@ -78,7 +73,6 @@ func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
 				updateCh <- string(data)
 			}
 		case err := <-w.Errors:
-			fmt.Println(err)
 			errs <- err
 			break
 		}
@@ -87,7 +81,7 @@ func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
 
 func (s *datastoreGRPCServer) publishUpdates(table string, updateCh chan string, errCh chan error) {
 	for updateMsg := range updateCh {
-		if ch, found := s.acitveConnections[table]; found {
+		if ch, found := s.activeConnections[table]; found {
 			ch <- updateMsg
 		}
 	}
@@ -102,7 +96,7 @@ func main() {
 	tables := []string{"stories", "votes"}
 
 	server := datastoreGRPCServer{
-		acitveConnections: make(map[string]chan string, 0),
+		activeConnections: make(map[string]chan string, 0),
 	}
 
 	s := grpc.NewServer()

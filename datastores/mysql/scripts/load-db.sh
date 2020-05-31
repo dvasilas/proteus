@@ -16,5 +16,5 @@ PASSWD=$1
 ./lobsters.py -p $PASSWD upvote_story -u 2 -s 1
 ./lobsters.py -p $PASSWD upvote_story -u 3 -s 1
 
-./lobsters.py -p 123456 upvote_comment -u 2 -s 1 -c 1
-./lobsters.py -p 123456 upvote_comment -u 1 -s 2 -c 2
+# ./lobsters.py -p 123456 upvote_comment -u 2 -s 1 -c 1
+# ./lobsters.py -p 123456 upvote_comment -u 1 -s 2 -c 2

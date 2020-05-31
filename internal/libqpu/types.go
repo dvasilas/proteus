@@ -77,6 +77,15 @@ type QPUConfig struct {
 			SecretAccessKey string
 		}
 	}
+	SumConfig struct {
+		SourceTable       string
+		RecordIDAttribute []string
+		AttributeToSum    string
+		Query             struct {
+			Projection []string
+			IsNull     []string
+		}
+	}
 }
 
 // QPUConnection ...

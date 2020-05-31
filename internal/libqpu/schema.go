@@ -1,7 +1,6 @@
 package libqpu
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -47,7 +46,6 @@ func (s Schema) GetValue(attributes map[string]*qpu.Value, table, attrName strin
 	if !found {
 		return nil, Error("attribute not in attributes map")
 	}
-	fmt.Println(s)
 	tbl, found := s[table]
 	if !found {
 		return nil, Error("unkown table: not in schema")

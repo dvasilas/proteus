@@ -1,8 +1,6 @@
 package join
 
 import (
-	"fmt"
-
 	"github.com/dvasilas/proteus/internal/libqpu"
 
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
@@ -90,46 +88,49 @@ func (q JoinQPU) ProcessQuery(libqpu.InternalQuery, libqpu.RequestStream, map[st
 // ---------------- Internal Functions --------------
 
 func (q JoinQPU) processStoriesRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	attributes := respRecord.GetAttributes()
-	id := respRecord.GetRecordID()
-	userID, err := q.schema.GetValue(attributes, "stories", "user_id")
-	if err != nil {
-		return err
-	}
-	title, err := q.schema.GetValue(attributes, "stories", "title")
-	if err != nil {
-		return err
-	}
-	description, err := q.schema.GetValue(attributes, "stories", "description")
-	if err != nil {
-		return err
-	}
-	shortID, err := q.schema.GetValue(attributes, "stories", "short_id")
-	if err != nil {
-		return err
-	}
+	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
 
-	story, err := q.state.Get("*", "stories", "id = ?", id)
-	fmt.Println(story, err)
-	if err != nil && err.Error() == "sql: no rows in result set" {
-		return q.state.Insert("stories", "(id, user_id, title, description, short_id)", "(?,?,?,?,?)",
-			id, userID, title, description, shortID)
-	}
+	// attributes := respRecord.GetAttributes()
+	// id := respRecord.GetRecordID()
+	// userID, err := q.schema.GetValue(attributes, "stories", "user_id")
+	// if err != nil {
+	// 	return err
+	// }
+	// title, err := q.schema.GetValue(attributes, "stories", "title")
+	// if err != nil {
+	// 	return err
+	// }
+	// description, err := q.schema.GetValue(attributes, "stories", "description")
+	// if err != nil {
+	// 	return err
+	// }
+	// shortID, err := q.schema.GetValue(attributes, "stories", "short_id")
+	// if err != nil {
+	// 	return err
+	// }
+
+	// story, err := q.state.Get("*", "stories", "id = ?", id)
+	// fmt.Println(story, err)
+	// if err != nil && err.Error() == "sql: no rows in result set" {
+	// 	return q.state.Insert("stories", "(id, user_id, title, description, short_id)", "(?,?,?,?,?)",
+	// 		id, userID, title, description, shortID)
+	// }
 	return nil
 }
 
 func (q JoinQPU) processVoteCountRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	fmt.Println(respRecord)
+	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
 
-	attributes := respRecord.GetAttributes()
-	storyID := attributes["story_id"].GetInt()
+	// attributes := respRecord.GetAttributes()
+	// storyID := attributes["story_id"].GetInt()
 
-	voteCount, err := q.schema.GetValue(attributes, "stories_with_votes", "vote_count")
-	if err != nil {
-		return err
-	}
-	fmt.Println(storyID, voteCount)
+	// voteCount, err := q.schema.GetValue(attributes, "stories_with_votes", "vote_count")
+	// if err != nil {
+	// 	return err
+	// }
+	// fmt.Println(storyID, voteCount)
 
-	return q.state.Update("stories", "vote_count = ?", "id = ?",
-		voteCount.(int64), storyID)
+	// return q.state.Update("stories", "vote_count = ?", "id = ?",
+	// 	voteCount.(int64), storyID)
+	return nil
 }

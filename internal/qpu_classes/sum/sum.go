@@ -7,6 +7,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
+	mysqlbackend "github.com/dvasilas/proteus/internal/qpustate/mysql_backend"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 
@@ -14,11 +15,23 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// assumptions
+// "id" and "sum" attributes are of type Value_Int
+// the state only stores those two attributes (but "id" can be compose of
+// multiple attributes)
+
+const stateDatabase = "stateDB"
+const stateTable = "stateTable"
+
 // SumQPU ...
 type SumQPU struct {
-	state            libqpu.QPUState
-	schema           libqpu.Schema
-	subscribeQueries []subscribeQuery
+	state             libqpu.QPUState
+	schema            libqpu.Schema
+	subscribeQueries  []subscribeQuery
+	attributeToSum    string
+	idAttributes      []string
+	stateSumAttribute string
+	sourceTable       string
 }
 
 type subscribeQuery struct {
@@ -32,21 +45,55 @@ type subscribeQuery struct {
 // InitClass ...
 func InitClass(qpu *libqpu.QPU) (*SumQPU, error) {
 	sqpu := &SumQPU{
-		state:            qpu.State,
-		schema:           qpu.Schema,
-		subscribeQueries: make([]subscribeQuery, 0),
+		state:             qpu.State,
+		schema:            qpu.Schema,
+		subscribeQueries:  make([]subscribeQuery, 0),
+		attributeToSum:    qpu.Config.SumConfig.AttributeToSum,
+		idAttributes:      qpu.Config.SumConfig.RecordIDAttribute,
+		stateSumAttribute: qpu.Config.SumConfig.AttributeToSum + "_sum",
+		sourceTable:       qpu.Config.SumConfig.SourceTable,
 	}
 
+	idAttributesColumns := ""
+	idAttributesUniqueKey := "("
+	for i, attr := range sqpu.idAttributes {
+		idAttributesColumns += attr + " bigint unsigned NOT NULL,"
+		idAttributesUniqueKey += attr
+		if i > 0 {
+			idAttributesUniqueKey += ", "
+		}
+	}
+	idAttributesUniqueKey += ")"
+
 	if err := sqpu.state.Init(
-		"proteus",
-		"stories_with_votes",
-		"CREATE TABLE stories_with_votes (story_id bigint unsigned NOT NULL, comment_id bigint unsigned DEFAULT NULL, vote_count int, UNIQUE KEY story_comment (story_id, comment_id) )",
+		stateDatabase,
+		stateTable,
+
+		fmt.Sprintf(
+			// vote_count int
+			"CREATE TABLE %s (%s %s int NOT NULL, UNIQUE KEY %s )",
+			stateTable,
+			idAttributesColumns,
+			sqpu.stateSumAttribute,
+			idAttributesUniqueKey,
+		),
 	); err != nil {
 		return &SumQPU{}, err
 	}
 
-	querySnapshot := queries.GetSnapshot("votes", []string{"id", "story_id", "comment_id", "vote"}, []string{"comment_id"}, []string{})
-	querySubscribe := queries.SubscribeToAllUpdates("votes", []string{"id", "story_id", "comment_id", "vote"}, []string{"comment_id"}, []string{})
+	querySnapshot := queries.GetSnapshot(
+		sqpu.sourceTable,
+		qpu.Config.SumConfig.Query.Projection,
+		qpu.Config.SumConfig.Query.IsNull,
+		[]string{},
+	)
+	querySubscribe := queries.SubscribeToAllUpdates(
+		sqpu.sourceTable,
+		qpu.Config.SumConfig.Query.Projection,
+		qpu.Config.SumConfig.Query.IsNull,
+		[]string{},
+	)
+	// sqpu.sourceTable, []string{"id", "story_id", "vote"}, []string{"comment_id"}, []string{})
 	for _, adjQPU := range qpu.AdjacentQPUs {
 		responseStream, err := qpugraph.SendQueryI(querySnapshot, adjQPU)
 		if err != nil {
@@ -57,24 +104,15 @@ func InitClass(qpu *libqpu.QPU) (*SumQPU, error) {
 			return &SumQPU{}, err
 		}
 
-		recordCh := make(chan libqpu.ResponseRecord)
 		responseStream, err = qpugraph.SendQueryI(querySubscribe, adjQPU)
 		if err != nil {
 			return &SumQPU{}, err
 		}
 		go func() {
-			if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecord, nil, recordCh); err != nil {
+			if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecord, nil, nil); err != nil {
 				panic(err)
 			}
 		}()
-
-		go func() {
-			for respRecord := range recordCh {
-				fmt.Println("here we need to forward ", respRecord)
-				fmt.Println(sqpu.subscribeQueries)
-			}
-		}()
-
 	}
 
 	return sqpu, nil
@@ -82,7 +120,6 @@ func InitClass(qpu *libqpu.QPU) (*SumQPU, error) {
 
 // ProcessQuery ...
 func (q *SumQPU) ProcessQuery(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) error {
-	fmt.Println("ProcessQuery")
 	if queries.IsSubscribeToAllQuery(query) {
 		return q.subscribeQuery(query, stream)
 	} else if queries.IsGetSnapshotQuery(query) {
@@ -94,8 +131,6 @@ func (q *SumQPU) ProcessQuery(query libqpu.InternalQuery, stream libqpu.RequestS
 // ---------------- Internal Functions --------------
 
 func (q *SumQPU) subscribeQuery(query libqpu.InternalQuery, stream libqpu.RequestStream) error {
-	fmt.Println("subscribeQuery")
-
 	q.subscribeQueries = append(q.subscribeQueries,
 		subscribeQuery{
 			query:  query,
@@ -103,28 +138,28 @@ func (q *SumQPU) subscribeQuery(query libqpu.InternalQuery, stream libqpu.Reques
 			seqID:  0,
 		},
 	)
-	fmt.Println(q.subscribeQueries)
 	ch := make(chan int)
 	<-ch
 	return nil
 }
 
 func (q *SumQPU) snapshotQuery(query libqpu.InternalQuery, stream libqpu.RequestStream) error {
-	fmt.Println("snapshotQuery")
-	stateCh, err := q.state.Scan("stories_with_votes", []string{"story_id", "vote_count"})
+	stateCh, err := q.state.Scan(
+		stateTable,
+		append(q.idAttributes, q.stateSumAttribute),
+	)
 	if err != nil {
 		return err
 	}
 
 	var seqID int64
 	for record := range stateCh {
-		recordID := record["story_id"]
-		fmt.Println(recordID)
-		// delete(record, "story_id")
+		recordID := ""
+		for _, attr := range q.idAttributes {
+			recordID += record[attr]
+		}
 
 		attributes, err := q.schema.StrToAttributes(query.GetTable(), record)
-		fmt.Println(record)
-		fmt.Println(attributes, err)
 
 		logOp := libqpu.LogOperationState(
 			recordID,
@@ -137,7 +172,6 @@ func (q *SumQPU) snapshotQuery(query libqpu.InternalQuery, stream libqpu.Request
 			return err
 		}
 		if ok {
-			fmt.Println("Sending ..")
 			if err := stream.Send(seqID, libqpu.State, logOp); err != nil {
 				return err
 			}
@@ -152,48 +186,34 @@ func (q *SumQPU) snapshotQuery(query libqpu.InternalQuery, stream libqpu.Request
 }
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
+
 	if recordCh != nil {
 		recordCh <- respRecord
 	}
 
+	recordID := make(map[string]*qpu.Value)
+
 	attributes := respRecord.GetAttributes()
-	storyID, err := q.schema.GetValue(attributes, "votes", "story_id")
+	var err error
+	for _, idAttr := range q.idAttributes {
+		recordID[idAttr] = attributes[idAttr]
+	}
+
+	sumValue := attributes[q.attributeToSum].GetInt()
+
+	attributesNew, err := q.updateState(recordID, sumValue)
 	if err != nil {
 		return err
 	}
-	vote, err := q.schema.GetValue(attributes, "votes", "vote")
-	if err != nil {
-		return err
-	}
-	var attributesNew map[string]*qpu.Value
-	if !libqpu.HasAttribute(attributes, "comment_id") {
-		attributesNew, err = q.processStoryVote(storyID.(int64), vote.(int64))
-		fmt.Println(attributesNew)
-		if err != nil {
-			return err
-		}
-	} else {
-		commentID, err := q.schema.GetValue(attributes, "votes", "comment_id")
-		if err != nil {
-			return err
-		}
-
-		attributesNew, err = q.processCommentVote(storyID.(int64), commentID.(int64), vote.(int64))
-		if err != nil {
-			return err
-		}
-	}
-
-	fmt.Println(attributesNew)
 
 	logOp := libqpu.LogOperationDelta(
 		respRecord.GetRecordID(),
-		"stories_with_votes",
+		stateTable,
 		libqpu.Vectorclock(map[string]uint64{"TODO": uint64(time.Now().UnixNano())}),
 		nil,
 		attributesNew,
 	)
-	fmt.Println(logOp)
 
 	for _, query := range q.subscribeQueries {
 		ok, err := queries.SatisfiesPredicate(logOp, query.query)
@@ -201,7 +221,7 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 			return err
 		}
 		if ok {
-			fmt.Println("sending")
+
 			if err := query.stream.Send(query.seqID, libqpu.Delta, logOp); err != nil {
 				panic(err)
 			}
@@ -212,55 +232,30 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	return nil
 }
 
-func (q *SumQPU) processStoryVote(storyID, vote int64) (map[string]*qpu.Value, error) {
-	var newVoteCount int64
-	voteCount, err := q.state.Get("vote_count", "stories_with_votes", "story_id = ? AND comment_id IS NULL",
-		storyID)
+func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64) (map[string]*qpu.Value, error) {
+	var newSumValue int64
+
+	selectStmt, selectValues := mysqlbackend.ConstructSelect(recordID)
+	currentSumValue, err := q.state.Get(q.stateSumAttribute, stateTable, selectStmt, selectValues...)
 	if err != nil && err.Error() == "sql: no rows in result set" {
-		err = q.state.Insert("stories_with_votes", "(story_id, vote_count)", "(?,?)",
-			storyID, vote)
-		newVoteCount = vote
+		insertStmt, insertValStmt, insertValues := mysqlbackend.ConstructInsert(q.stateSumAttribute, sumVal, recordID)
+		err = q.state.Insert(stateTable, insertStmt, insertValStmt, insertValues...)
+
+		newSumValue = sumVal
+	} else if err != nil {
+		return nil, err
 	} else {
-		err = q.state.Update("stories_with_votes", "vote_count = ?", "story_id = ? AND comment_id IS NULL",
-			voteCount.(int64)+vote, storyID)
-		newVoteCount = voteCount.(int64) + vote
+		newSumValue = currentSumValue.(int64) + sumVal
+		setStmt, updateValues := mysqlbackend.ConstructUpdate(q.stateSumAttribute, newSumValue, recordID)
+		err = q.state.Update(stateTable, setStmt, selectStmt, updateValues...)
+
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	attributes := map[string]*qpu.Value{
-		"story_id":   libqpu.ValueInt(storyID),
-		"vote_count": libqpu.ValueInt(newVoteCount),
-	}
+	recordID[q.stateSumAttribute] = libqpu.ValueInt(newSumValue)
 
-	return attributes, err
-}
-
-func (q *SumQPU) processCommentVote(storyID, commentID, vote int64) (map[string]*qpu.Value, error) {
-	var newVoteCount int64
-	voteCount, err := q.state.Get("vote_count", "stories_with_votes", "story_id = ? AND comment_id = ?",
-		storyID, commentID)
-	if err != nil && err.Error() == "sql: no rows in result set" {
-		err = q.state.Insert("stories_with_votes", "(story_id, comment_id, vote_count)", "(?,?,?)",
-			storyID, commentID, vote)
-		newVoteCount = vote
-	} else {
-		err = q.state.Update("stories_with_votes", "vote_count = ?", "story_id = ? AND comment_id = ?",
-			voteCount.(int64)+vote, storyID, commentID)
-		newVoteCount = voteCount.(int64) + vote
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	attributes := map[string]*qpu.Value{
-		"story_id":   libqpu.ValueInt(storyID),
-		"comment_id": libqpu.ValueInt(commentID),
-		"vote_count": libqpu.ValueInt(newVoteCount),
-	}
-
-	return attributes, err
+	return recordID, nil
 }
