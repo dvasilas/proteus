@@ -158,12 +158,10 @@ func ConstructSelect(predicate map[string]*qpu.Value) (string, []interface{}) {
 	i := 0
 
 	for attrKey, val := range predicate {
-		if i < len(predicate) {
-			if len(predicate) > 1 {
-				whereStmt += "AND "
-			}
-		}
 		whereStmt += fmt.Sprintf("%s = ? ", attrKey)
+		if len(predicate) > 1 && i < len(predicate)-1 {
+			whereStmt += "AND "
+		}
 		whereValues[i] = val.GetInt()
 		i++
 	}

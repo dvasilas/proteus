@@ -85,6 +85,7 @@ type QPUConfig struct {
 		Query             struct {
 			Projection []string
 			IsNull     []string
+			IsNotNull  []string
 		}
 	}
 }

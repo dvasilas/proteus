@@ -50,6 +50,7 @@ type inputQPUConfig struct {
 		Query             struct {
 			Projection []string
 			IsNull     []string
+			IsNotNull  []string
 		}
 	}
 	IndexConfig struct {
@@ -226,6 +227,7 @@ func getSumConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 
 	config.SumConfig.Query.Projection = inputConf.SumConfig.Query.Projection
 	config.SumConfig.Query.IsNull = inputConf.SumConfig.Query.IsNull
+	config.SumConfig.Query.IsNotNull = inputConf.SumConfig.Query.IsNotNull
 
 	return nil
 }

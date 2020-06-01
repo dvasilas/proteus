@@ -94,6 +94,7 @@ func IsGetSnapshotQuery(query libqpu.InternalQuery) bool {
 
 // SatisfiesPredicate ...
 func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (bool, error) {
+	libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"logOp": logOp, "query": query})
 	if query.GetTable() != logOp.GetTable() {
 		return false, nil
 	}

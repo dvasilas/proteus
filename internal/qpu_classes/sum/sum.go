@@ -71,9 +71,9 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 	idAttributesColumns := ""
 	idAttributesUniqueKey := "("
 	for i, attr := range sqpu.idAttributes {
-		idAttributesColumns += attr + " bigint unsigned NOT NULL,"
+		idAttributesColumns += attr + " bigint unsigned NOT NULL, "
 		idAttributesUniqueKey += attr
-		if i > 0 {
+		if len(sqpu.idAttributes) > 1 && i < len(sqpu.idAttributes)-1 {
 			idAttributesUniqueKey += ", "
 		}
 	}
@@ -99,13 +99,13 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 		sqpu.sourceTable,
 		q.Config.SumConfig.Query.Projection,
 		q.Config.SumConfig.Query.IsNull,
-		[]string{},
+		q.Config.SumConfig.Query.IsNotNull,
 	)
 	querySubscribe := queries.SubscribeToAllUpdates(
 		sqpu.sourceTable,
 		q.Config.SumConfig.Query.Projection,
 		q.Config.SumConfig.Query.IsNull,
-		[]string{},
+		q.Config.SumConfig.Query.IsNotNull,
 	)
 	// sqpu.sourceTable, []string{"id", "story_id", "vote"}, []string{"comment_id"}, []string{})
 	for _, adjQPU := range q.AdjacentQPUs {
