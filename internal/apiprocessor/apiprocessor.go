@@ -2,12 +2,14 @@ package apiprocessor
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
-	"github.com/dvasilas/proteus/internal/qpu_classes/join"
+	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
+	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
 )
 
@@ -40,7 +42,8 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 	switch queryReq.QueryType() {
 	case libqpu.InternalQueryType:
 		internalQuery = queryReq.GetQueryI()
-		return s.qpuClass.ProcessQuery(queryReq.GetQueryI(), stream, queryReq.GetMetadata(), queryReq.GetSync())
+
+		// return s.qpuClass.ProcessQuery(queryReq.GetQueryI(), stream, queryReq.GetMetadata(), queryReq.GetSync())
 	// for query requests with SQL queries, first parse SQL to get a libqpu.InternalQuery
 	case libqpu.SQLQueryType:
 		var err error
@@ -53,8 +56,71 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 	default:
 		return libqpu.Error("default")
 	}
+
+	var respRecordType libqpu.ResponseRecordType
+	var errCh <-chan error
+	var logOpCh <-chan libqpu.LogOperation
+
+	if queries.IsSubscribeToAllQuery(internalQuery) {
+		respRecordType = libqpu.Delta
+		logOpCh, errCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+	} else if queries.IsGetSnapshotQuery(internalQuery) {
+		respRecordType = libqpu.State
+		logOpCh, errCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+	} else {
+		return libqpu.Error("invalid query for datastore_driver QPU")
+	}
+
+	var seqID int64
+
+	for {
+		select {
+		case logOp, ok := <-logOpCh:
+			if !ok {
+				logOpCh = nil
+			} else {
+				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
+				if err != nil {
+					return err
+				}
+				libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
+				if ok {
+					fmt.Println("Sending ..")
+					if err := stream.Send(seqID, respRecordType, logOp); err != nil {
+						return err
+					}
+					seqID++
+				}
+				// 			err := processOp(logOp, stream, seqID)
+				// 			if err != nil {
+				// 				if cancel != nil {
+				// 					cancel()
+				// 				}
+				// 				return err
+				// 			}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else {
+				// 			if cancel != nil {
+				// 				cancel()
+				// 			}
+				return err
+			}
+		}
+		if logOpCh == nil && errCh == nil {
+			return stream.Send(
+				seqID,
+				libqpu.EndOfStream,
+				libqpu.LogOperation{},
+			)
+		}
+	}
+
 	// libqpu.QPUClass.ProcessQuery provides the actual query processing functionality
-	return s.qpuClass.ProcessQuery(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+	// return s.qpuClass.ProcessQuery(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
@@ -76,7 +142,7 @@ func getQPUClass(qpu *libqpu.QPU) (libqpu.QPUClass, error) {
 	case qpu_api.ConfigResponse_SUM:
 		return sumqpu.InitClass(qpu)
 	case qpu_api.ConfigResponse_JOIN:
-		return join.InitClass(qpu)
+		return joinqpu.InitClass(qpu)
 	default:
 		return nil, libqpu.Error("Unknown QPU class")
 	}

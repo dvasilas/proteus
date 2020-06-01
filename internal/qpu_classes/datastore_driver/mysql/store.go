@@ -68,14 +68,14 @@ func NewDatastore(conf *libqpu.QPUConfig, schema libqpu.Schema) (MySQLDataStore,
 // SubscribeOps ...
 func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation, context.CancelFunc, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
-	errs := make(chan error, 1)
+	errCh := make(chan error, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := ds.cli.SubscribeToUpdates(ctx)
 	if err != nil {
-		errs <- err
+		errCh <- err
 		cancel()
-		return nil, nil, errs
+		return nil, nil, errCh
 	}
 
 	err = stream.Send(
@@ -90,20 +90,20 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 		},
 	)
 
-	go ds.opConsumer(stream, logOpCh, errs)
+	go ds.opConsumer(stream, logOpCh, errCh)
 
-	return logOpCh, cancel, errs
+	return logOpCh, cancel, errCh
 }
 
 // GetSnapshot ...
-func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan libqpu.LogOperation, <-chan error) {
+func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
-	errs := make(chan error, 1)
+	errCh := make(chan error)
 
 	projection := ""
-	for i, col := range colunms {
+	for i, col := range columns {
 		projection += col
-		if i < len(colunms)-1 {
+		if i < len(columns)-1 {
 			projection += ", "
 		}
 	}
@@ -111,12 +111,12 @@ func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan lib
 
 	rows, err := ds.db.Query(query)
 	if err != nil {
-		errs <- err
-		return logOpCh, errs
+		errCh <- err
+		return logOpCh, errCh
 	}
 
-	values := make([]sql.RawBytes, len(colunms))
-	scanArgs := make([]interface{}, len(colunms))
+	values := make([]sql.RawBytes, len(columns))
+	scanArgs := make([]interface{}, len(columns))
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
@@ -125,7 +125,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan lib
 		for rows.Next() {
 			err = rows.Scan(scanArgs...)
 			if err != nil {
-				errs <- err
+				errCh <- err
 				break
 			}
 
@@ -135,12 +135,12 @@ func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan lib
 				if i == 0 {
 					recordID = string(col)
 				} else if col != nil {
-					value, err := ds.schema.StrToValue(table, colunms[i], string(col))
+					value, err := ds.schema.StrToValue(table, columns[i], string(col))
 					if err != nil {
-						errs <- err
+						errCh <- err
 						break
 					}
-					attributes[colunms[i]] = value
+					attributes[columns[i]] = value
 				}
 			}
 
@@ -152,35 +152,35 @@ func (ds MySQLDataStore) GetSnapshot(table string, colunms []string) (<-chan lib
 
 		}
 		close(logOpCh)
-		close(errs)
+		close(errCh)
 	}()
 
-	return logOpCh, errs
+	return logOpCh, errCh
 }
 
 // ---------------- Internal Functions --------------
 
-func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdatesClient, msg chan libqpu.LogOperation, errs chan error) {
+func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdatesClient, msg chan libqpu.LogOperation, errCh chan error) {
 	for {
 		op, err := stream.Recv()
 		if err == io.EOF {
-			errs <- libqpu.Error("opConsumer received EOF")
+			errCh <- libqpu.Error("opConsumer received EOF")
 			break
 		}
 		if err != nil {
-			errs <- err
+			errCh <- err
 			break
 		}
 		formattedOp, err := ds.formatLogOpDelta(op)
 		if err != nil {
-			errs <- err
+			errCh <- err
 			break
 		}
 		msg <- formattedOp
 
 	}
 	close(msg)
-	close(errs)
+	close(errCh)
 }
 
 func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.NotificationStream) (libqpu.LogOperation, error) {

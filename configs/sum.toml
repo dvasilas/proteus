@@ -20,24 +20,3 @@ AttributeToSum = "vote"
 [SumConfig.Query]
 Projection = ["id", "story_id", "vote"]
 IsNull = ["comment_id"]
-
-[[Schema]]
-table = "votes"
-[[Schema.Attributes]]
-key = "story_id"
-type = "int"
-[[Schema.Attributes]]
-key = "comment_id"
-type = "int"
-[[Schema.Attributes]]
-key = "vote"
-type = "int"
-
-[[Schema]]
-table = "stories_with_votes"
-[[Schema.Attributes]]
-key = "story_id"
-type = "int"
-[[Schema.Attributes]]
-key = "vote_count"
-type = "int"

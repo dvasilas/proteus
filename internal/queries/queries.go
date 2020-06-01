@@ -1,7 +1,7 @@
 package queries
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -94,10 +94,6 @@ func IsGetSnapshotQuery(query libqpu.InternalQuery) bool {
 
 // SatisfiesPredicate ...
 func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (bool, error) {
-	fmt.Println("SatisfiesPredicate")
-	fmt.Println("query", query)
-	fmt.Println("logOp", logOp)
-
 	if query.GetTable() != logOp.GetTable() {
 		return false, nil
 	}
@@ -114,7 +110,7 @@ func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (
 		case qpu.AttributePredicate_ISNOTNULL:
 			return found, nil
 		case qpu.AttributePredicate_RANGE:
-			fmt.Println("RANGE check ", pred)
+			panic(errors.New("RANGE check not implemented"))
 		}
 	}
 	return true, nil
