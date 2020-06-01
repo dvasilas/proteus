@@ -2,6 +2,9 @@ package sumqpu
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -40,18 +43,23 @@ type subscribeQuery struct {
 	seqID  int64
 }
 
+type inMemState struct {
+	state map[string]int64
+	mutex sync.Mutex
+}
+
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(qpu *libqpu.QPU) (*SumQPU, error) {
+func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 	sqpu := &SumQPU{
-		state:             qpu.State,
-		schema:            qpu.Schema,
+		state:             q.State,
+		schema:            q.Schema,
 		subscribeQueries:  make([]chan libqpu.LogOperation, 0),
-		attributeToSum:    qpu.Config.SumConfig.AttributeToSum,
-		idAttributes:      qpu.Config.SumConfig.RecordIDAttribute,
-		stateSumAttribute: qpu.Config.SumConfig.AttributeToSum + "_sum",
-		sourceTable:       qpu.Config.SumConfig.SourceTable,
+		attributeToSum:    q.Config.SumConfig.AttributeToSum,
+		idAttributes:      q.Config.SumConfig.RecordIDAttribute,
+		stateSumAttribute: q.Config.SumConfig.AttributeToSum + "_sum",
+		sourceTable:       q.Config.SumConfig.SourceTable,
 	}
 
 	sqpu.schema[stateTable] = make(map[string]libqpu.DatastoreAttributeType, len(sqpu.idAttributes)+1)
@@ -89,24 +97,28 @@ func InitClass(qpu *libqpu.QPU) (*SumQPU, error) {
 
 	querySnapshot := queries.GetSnapshot(
 		sqpu.sourceTable,
-		qpu.Config.SumConfig.Query.Projection,
-		qpu.Config.SumConfig.Query.IsNull,
+		q.Config.SumConfig.Query.Projection,
+		q.Config.SumConfig.Query.IsNull,
 		[]string{},
 	)
 	querySubscribe := queries.SubscribeToAllUpdates(
 		sqpu.sourceTable,
-		qpu.Config.SumConfig.Query.Projection,
-		qpu.Config.SumConfig.Query.IsNull,
+		q.Config.SumConfig.Query.Projection,
+		q.Config.SumConfig.Query.IsNull,
 		[]string{},
 	)
 	// sqpu.sourceTable, []string{"id", "story_id", "vote"}, []string{"comment_id"}, []string{})
-	for _, adjQPU := range qpu.AdjacentQPUs {
+	for _, adjQPU := range q.AdjacentQPUs {
 		responseStream, err := qpugraph.SendQueryI(querySnapshot, adjQPU)
 		if err != nil {
 			return &SumQPU{}, err
 		}
+		tempState := &inMemState{state: make(map[string]int64)}
+		if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecordInMem, tempState, nil); err != nil {
+			return &SumQPU{}, err
+		}
 
-		if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecord, nil, nil); err != nil {
+		if err = sqpu.flushStateFromMem(tempState); err != nil {
 			return &SumQPU{}, err
 		}
 
@@ -178,6 +190,35 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu
 
 // ---------------- Internal Functions --------------
 
+func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
+
+	var state *inMemState
+	state = data.(*inMemState)
+
+	attributes := respRecord.GetAttributes()
+	sumValue := attributes[q.attributeToSum].GetInt()
+
+	stateMapKey := ""
+	for i, idAttr := range q.idAttributes {
+		stateMapKey += idAttr + ":" + strconv.Itoa(int(attributes[idAttr].GetInt()))
+		if i < len(q.idAttributes)-1 {
+			stateMapKey += "__"
+		}
+	}
+
+	state.mutex.Lock()
+	value, found := state.state[stateMapKey]
+	if found {
+		state.state[stateMapKey] = value + sumValue
+	} else {
+		state.state[stateMapKey] = sumValue
+	}
+	state.mutex.Unlock()
+
+	return nil
+}
+
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
 
@@ -241,4 +282,28 @@ func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64) (map[
 	recordID[q.stateSumAttribute] = libqpu.ValueInt(newSumValue)
 
 	return recordID, nil
+}
+
+func (q *SumQPU) flushStateFromMem(stateToFlush *inMemState) error {
+	stateToFlush.mutex.Lock()
+	for stateMapKey, value := range stateToFlush.state {
+		stateRecordID := make(map[string]*qpu.Value)
+		keyComposites := strings.Split(stateMapKey, "__")
+		for _, attr := range keyComposites {
+			recordIDAttr := strings.Split(attr, ":")
+			val, err := strconv.ParseInt(recordIDAttr[1], 10, 64)
+			if err != nil {
+				stateToFlush.mutex.Unlock()
+				return err
+			}
+			stateRecordID[recordIDAttr[0]] = libqpu.ValueInt(val)
+		}
+		_, err := q.updateState(stateRecordID, value)
+		if err != nil {
+			stateToFlush.mutex.Unlock()
+			return err
+		}
+	}
+	stateToFlush.mutex.Unlock()
+	return nil
 }
