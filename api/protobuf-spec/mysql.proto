@@ -1,32 +1,29 @@
 syntax = "proto3";
 
 option go_package = "github.com/dvasilas/proteus/internal/proto/mysql";
+import "google/protobuf/timestamp.proto";
 
 package mysql;
 
 service PublishUpdates {
-    rpc SubscribeToUpdates(stream RequestStream) returns (stream NotificationStream) {}
+    rpc SubscribeToUpdates(stream Request) returns (stream UpdateRecord) {}
 }
 
-message NotificationStream {
+message UpdateRecord {
     int64 sequence_id = 1;
-    string payload = 2;
-    int64 timestamp = 3;
+    string recordID = 2;
+    string table = 3;
+    repeated Attributes attributes = 4;
+    google.protobuf.Timestamp timestamp = 5;
 }
 
-message Payload {
-    message ObjectState {
-      int64 contentLength = 1;
-      int64 lastModified = 2;
-      map<string, string> attributes = 3;
-    }
-    string object_id = 1;
-    string bucket = 2;
-    ObjectState old_state = 3;
-    ObjectState new_state = 4;
+message Attributes {
+    string Key = 1;
+    string ValueOld = 2;
+    string ValueNew = 3;
 }
 
-message RequestStream {
+message Request {
   oneof val {
     SubRequest request = 1;
     AckMsg ack = 2;
@@ -34,11 +31,11 @@ message RequestStream {
 }
 
 message SubRequest {
-    int64 timestamp = 1;
+    google.protobuf.Timestamp timestamp = 1;
     bool sync = 2;
     string table = 3;
 }
 
 message AckMsg {
-    int64 timestamp = 1;
+    int64 sequence_id = 1;
 }

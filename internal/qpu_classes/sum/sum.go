@@ -13,6 +13,8 @@ import (
 	mysqlbackend "github.com/dvasilas/proteus/internal/qpustate/mysql_backend"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/golang/protobuf/ptypes"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
 	//
 	_ "github.com/go-sql-driver/mysql"
@@ -43,8 +45,13 @@ type subscribeQuery struct {
 	seqID  int64
 }
 
+type stateEntry struct {
+	val int64
+	ts  *qpu.Vectorclock
+}
+
 type inMemState struct {
-	state map[string]int64
+	state map[string]stateEntry
 	mutex sync.Mutex
 }
 
@@ -85,7 +92,7 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 
 		fmt.Sprintf(
 			// vote_count int
-			"CREATE TABLE %s (%s %s int NOT NULL, UNIQUE KEY %s )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(20), ts TIMESTAMP, UNIQUE KEY %s )",
 			stateTable,
 			idAttributesColumns,
 			sqpu.stateSumAttribute,
@@ -113,7 +120,7 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 		if err != nil {
 			return &SumQPU{}, err
 		}
-		tempState := &inMemState{state: make(map[string]int64)}
+		tempState := &inMemState{state: make(map[string]stateEntry)}
 		if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecordInMem, tempState, nil); err != nil {
 			return &SumQPU{}, err
 		}
@@ -157,15 +164,31 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.
 				recordID += record[attr]
 			}
 
+			vectorClockKey := record["ts_key"]
+			vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
+			if err != nil {
+				errCh <- err
+				break
+			}
+			timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
+			if err != nil {
+				errCh <- err
+				break
+			}
+
+			delete(record, "unix_timestamp(ts)")
+			delete(record, "ts")
+
 			attributes, err := q.schema.StrToAttributes(stateTable, record)
 			if err != nil {
 				errCh <- err
+				break
 			}
 
 			logOpCh <- libqpu.LogOperationState(
 				recordID,
 				stateTable,
-				libqpu.Vectorclock(map[string]uint64{"tmp": uint64(time.Now().UnixNano())}),
+				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
 				attributes,
 			)
 
@@ -209,11 +232,14 @@ func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 
 	state.mutex.Lock()
 	value, found := state.state[stateMapKey]
+	var newState stateEntry
 	if found {
-		state.state[stateMapKey] = value + sumValue
+		newState = stateEntry{val: value.val + sumValue}
 	} else {
-		state.state[stateMapKey] = sumValue
+		newState = stateEntry{val: sumValue}
 	}
+	newState.ts = respRecord.GetLogOp().GetTimestamp()
+	state.state[stateMapKey] = newState
 	state.mutex.Unlock()
 
 	return nil
@@ -236,7 +262,7 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 
 	sumValue := attributes[q.attributeToSum].GetInt()
 
-	attributesNew, err := q.updateState(recordID, sumValue)
+	attributesNew, err := q.updateState(recordID, sumValue, respRecord.GetLogOp().GetTimestamp().GetVc())
 	if err != nil {
 		return err
 	}
@@ -244,7 +270,8 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	logOp := libqpu.LogOperationDelta(
 		respRecord.GetRecordID(),
 		stateTable,
-		libqpu.Vectorclock(map[string]uint64{"TODO": uint64(time.Now().UnixNano())}),
+		//libqpu.Vectorclock(map[string]*tspb.Timestamp{"TODO": timestamp}),
+		respRecord.GetLogOp().GetTimestamp(),
 		nil,
 		attributesNew,
 	)
@@ -256,13 +283,13 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	return nil
 }
 
-func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64) (map[string]*qpu.Value, error) {
+func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
 	var newSumValue int64
 
 	selectStmt, selectValues := mysqlbackend.ConstructSelect(recordID)
 	currentSumValue, err := q.state.Get(q.stateSumAttribute, stateTable, selectStmt, selectValues...)
 	if err != nil && err.Error() == "sql: no rows in result set" {
-		insertStmt, insertValStmt, insertValues := mysqlbackend.ConstructInsert(q.stateSumAttribute, sumVal, recordID)
+		insertStmt, insertValStmt, insertValues := mysqlbackend.ConstructInsert(q.stateSumAttribute, sumVal, recordID, vc)
 		err = q.state.Insert(stateTable, insertStmt, insertValStmt, insertValues...)
 
 		newSumValue = sumVal
@@ -270,7 +297,7 @@ func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64) (map[
 		return nil, err
 	} else {
 		newSumValue = currentSumValue.(int64) + sumVal
-		setStmt, updateValues := mysqlbackend.ConstructUpdate(q.stateSumAttribute, newSumValue, recordID)
+		setStmt, updateValues := mysqlbackend.ConstructUpdate(q.stateSumAttribute, newSumValue, recordID, vc)
 		err = q.state.Update(stateTable, setStmt, selectStmt, updateValues...)
 
 	}
@@ -286,7 +313,7 @@ func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64) (map[
 
 func (q *SumQPU) flushStateFromMem(stateToFlush *inMemState) error {
 	stateToFlush.mutex.Lock()
-	for stateMapKey, value := range stateToFlush.state {
+	for stateMapKey, stateEntry := range stateToFlush.state {
 		stateRecordID := make(map[string]*qpu.Value)
 		keyComposites := strings.Split(stateMapKey, "__")
 		for _, attr := range keyComposites {
@@ -298,7 +325,8 @@ func (q *SumQPU) flushStateFromMem(stateToFlush *inMemState) error {
 			}
 			stateRecordID[recordIDAttr[0]] = libqpu.ValueInt(val)
 		}
-		_, err := q.updateState(stateRecordID, value)
+
+		_, err := q.updateState(stateRecordID, stateEntry.val, stateEntry.ts.GetVc())
 		if err != nil {
 			stateToFlush.mutex.Unlock()
 			return err

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // ---------------- LogOperation -------------------
@@ -66,6 +67,11 @@ func (op LogOperation) GetAttributes() map[string]*qpu.Value {
 		return op.Op.GetPayload().GetDelta().GetNew().GetAttributes()
 	}
 	return nil
+}
+
+// GetTimestamp ...
+func (op LogOperation) GetTimestamp() *qpu.Vectorclock {
+	return op.Op.GetTimestamp()
 }
 
 // ---------------- RequestStream -------------------
@@ -430,7 +436,7 @@ func SnapshotTime(t qpu.SnapshotTime_SnapshotTimeType, vc *qpu.Vectorclock) *qpu
 }
 
 //Vectorclock creates a protos/utils/Vectorclock object
-func Vectorclock(vc map[string]uint64) *qpu.Vectorclock {
+func Vectorclock(vc map[string]*timestamp.Timestamp) *qpu.Vectorclock {
 	return &qpu.Vectorclock{
 		Vc: vc,
 	}

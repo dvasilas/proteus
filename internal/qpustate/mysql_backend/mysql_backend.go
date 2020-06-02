@@ -6,6 +6,8 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	ptypes "github.com/golang/protobuf/ptypes"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // This package provides an implementation of the libqpu.QPUState interface
@@ -110,12 +112,17 @@ func (s MySQLStateBackend) Get(projection, table, condition string, args ...inte
 // The channel returns records of type map[<attributeName>]<string_value>.
 func (s MySQLStateBackend) Scan(table string, columns []string) (<-chan map[string]string, error) {
 	projection := ""
+
+	columns = append(columns, "ts_key")
+	columns = append(columns, "unix_timestamp(ts)")
+
 	for i, col := range columns {
 		projection += col
 		if i < len(columns)-1 {
 			projection += ", "
 		}
 	}
+
 	query := fmt.Sprintf("SELECT %s FROM %s", projection, table)
 	rows, err := s.db.Query(query)
 	if err != nil {
@@ -170,41 +177,61 @@ func ConstructSelect(predicate map[string]*qpu.Value) (string, []interface{}) {
 }
 
 // ConstructInsert ...
-func ConstructInsert(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value) (string, string, []interface{}) {
+func ConstructInsert(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) (string, string, []interface{}) {
 	attrKeyStmt := fmt.Sprintf("(%s", attrToSum)
 	attrValStmt := "(?"
-	insertValues := make([]interface{}, len(predicate)+1)
-	insertValues[0] = valToInsert
+	insertValues := make([]interface{}, len(predicate)+1+2)
 	i := 0
+	insertValues[i] = valToInsert
+	i++
 
 	for attrKey, val := range predicate {
-		if i < len(predicate) {
-			attrKeyStmt += ", "
-			attrValStmt += ", "
-		}
+		attrKeyStmt += ", " + attrKey
+		attrValStmt += ", ?"
 
-		attrKeyStmt += attrKey
-		attrValStmt += "?"
-
-		insertValues[i+1] = val.GetInt()
+		insertValues[i] = val.GetInt()
 		i++
 	}
-	attrKeyStmt += ")"
-	attrValStmt += ")"
+
+	for k, v := range vc {
+		insertValues[i] = k
+		i++
+		ts, err := ptypes.Timestamp(v)
+		if err != nil {
+			panic(err)
+		}
+		insertValues[i] = ts
+		i++
+	}
+
+	attrKeyStmt += ", ts_key, ts)"
+	attrValStmt += ", ?, ?)"
 
 	return attrKeyStmt, attrValStmt, insertValues
 }
 
 // ConstructUpdate ...
-func ConstructUpdate(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value) (string, []interface{}) {
-	updateValues := make([]interface{}, len(predicate)+1)
-	updateValues[0] = valToInsert
+func ConstructUpdate(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) (string, []interface{}) {
+	updateValues := make([]interface{}, len(predicate)+1+2)
 	i := 0
+	updateValues[i] = valToInsert
+	i++
 
-	for _, val := range predicate {
-		updateValues[i+1] = val.GetInt()
+	for k, v := range vc {
+		updateValues[i] = k
+		i++
+		ts, err := ptypes.Timestamp(v)
+		if err != nil {
+			panic(err)
+		}
+		updateValues[i] = ts
 		i++
 	}
 
-	return fmt.Sprintf("%s = ?", attrToSum), updateValues
+	for _, val := range predicate {
+		updateValues[i] = val.GetInt()
+		i++
+	}
+
+	return fmt.Sprintf("%s = ?, ts_key = ?, ts = ?", attrToSum), updateValues
 }

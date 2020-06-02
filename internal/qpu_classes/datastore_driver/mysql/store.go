@@ -3,14 +3,16 @@ package mysqldriver
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/mysql"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	"github.com/golang/protobuf/ptypes"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/grpc"
 )
 
@@ -27,6 +29,7 @@ type MySQLDataStore struct {
 type MySQLUpdate struct {
 	RecordID   string
 	Table      string
+	Timestamp  string
 	Attributes []struct {
 		Key      string
 		ValueOld string
@@ -79,12 +82,12 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 	}
 
 	err = stream.Send(
-		&mysql.RequestStream{
-			Val: &mysql.RequestStream_Request{
+		&mysql.Request{
+			Val: &mysql.Request_Request{
 				Request: &mysql.SubRequest{
-					Timestamp: 0,
-					Sync:      false,
-					Table:     table,
+					// Timestamp: 0,
+					Sync:  false,
+					Table: table,
 				},
 			},
 		},
@@ -100,6 +103,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan lib
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
+	columns = append(columns, "unix_timestamp(ts)")
 	projection := ""
 	for i, col := range columns {
 		projection += col
@@ -144,10 +148,23 @@ func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan lib
 				}
 			}
 
+			ts, err := strconv.ParseInt(attributes["unix_timestamp(ts)"].GetStr(), 10, 64)
+			if err != nil {
+				errCh <- err
+				break
+			}
+			delete(attributes, "unix_timestamp(ts)")
+
+			timestamp, err := ptypes.TimestampProto(time.Unix(ts, 0))
+			if err != nil {
+				errCh <- err
+				break
+			}
+
 			logOpCh <- libqpu.LogOperationState(
 				recordID,
 				table,
-				libqpu.Vectorclock(map[string]uint64{ds.subscriptionEndpoint: uint64(time.Now().UnixNano())}),
+				libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
 				attributes)
 
 		}
@@ -183,24 +200,21 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 	close(errCh)
 }
 
-func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.NotificationStream) (libqpu.LogOperation, error) {
-	var update MySQLUpdate
-	if err := json.Unmarshal([]byte(notificationMsg.GetPayload()), &update); err != nil {
-		panic(err)
-	}
+func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (libqpu.LogOperation, error) {
+	libqpu.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
 
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)
-	for _, attribute := range update.Attributes {
+	for _, attribute := range notificationMsg.Attributes {
 		if attribute.ValueOld != "" {
-			value, err := ds.schema.StrToValue(update.Table, attribute.Key, attribute.ValueOld)
+			value, err := ds.schema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
 			if err != nil {
 				return libqpu.LogOperation{}, err
 			}
 			attributesOld[attribute.Key] = value
 		}
 		if attribute.ValueNew != "" {
-			value, err := ds.schema.StrToValue(update.Table, attribute.Key, attribute.ValueNew)
+			value, err := ds.schema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
 			if err != nil {
 				return libqpu.LogOperation{}, err
 			}
@@ -209,8 +223,10 @@ func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.NotificationStr
 	}
 
 	return libqpu.LogOperationDelta(
-		update.RecordID,
-		update.Table,
-		libqpu.Vectorclock(map[string]uint64{ds.subscriptionEndpoint: uint64(time.Now().UnixNano())}),
-		attributesOld, attributesNew), nil
+		notificationMsg.RecordID,
+		notificationMsg.Table,
+		libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: notificationMsg.Timestamp}),
+		attributesOld,
+		attributesNew,
+	), nil
 }

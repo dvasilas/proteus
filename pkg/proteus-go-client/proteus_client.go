@@ -11,6 +11,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // Client represents a connection to Proteus.
@@ -35,7 +36,7 @@ type ResponseRecord struct {
 }
 
 // Vectorclock ...
-type Vectorclock map[string]uint64
+type Vectorclock map[string]*tspb.Timestamp
 
 // NewClient creates a new Proteus client connected to the given QPU server.
 func NewClient(host Host) (*Client, error) {

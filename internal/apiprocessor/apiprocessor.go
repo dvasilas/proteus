@@ -2,7 +2,6 @@ package apiprocessor
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -86,19 +85,11 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				}
 				libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
-					fmt.Println("Sending ..")
 					if err := stream.Send(seqID, respRecordType, logOp); err != nil {
 						return err
 					}
 					seqID++
 				}
-				// 			err := processOp(logOp, stream, seqID)
-				// 			if err != nil {
-				// 				if cancel != nil {
-				// 					cancel()
-				// 				}
-				// 				return err
-				// 			}
 			}
 		case err, ok := <-errCh:
 			if !ok {

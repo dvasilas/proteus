@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package qpu;
 option go_package = "github.com/dvasilas/proteus/internal/proto/qpu";
+import "google/protobuf/timestamp.proto";
 
 message LogOperation {
   string object_id = 1;
@@ -24,7 +25,6 @@ message Payload {
 
 message ObjectState {
   map<string, Value> attributes = 1;
-  // repeated Attribute attrs = 1;
 }
 
 message Operation {
@@ -64,19 +64,19 @@ message SnapshotTime {
 }
 
 message Vectorclock {
-    map<string, uint64> vc = 1;
-  }
+  map<string, google.protobuf.Timestamp> vc = 1;
+}
 
 message AttributePredicate {
-    enum PredicateType {
-      ISNULL = 0;
-      ISNOTNULL = 1;
-      RANGE = 2;
-    }
-    Attribute attr = 1;
-    PredicateType type = 2;
-    Value lbound = 3;
-    Value ubound = 4;
+  enum PredicateType {
+    ISNULL = 0;
+    ISNOTNULL = 1;
+    RANGE = 2;
+  }
+  Attribute attr = 1;
+  PredicateType type = 2;
+  Value lbound = 3;
+  Value ubound = 4;
 }
 
 message SnapshotTimePredicate {
