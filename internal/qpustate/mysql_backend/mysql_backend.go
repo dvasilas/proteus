@@ -63,38 +63,24 @@ func (s MySQLStateBackend) Init(database, table, createTable string) error {
 	return nil
 }
 
-// Insert inserts a record in the state.
-func (s MySQLStateBackend) Insert(table, columns, values string, args ...interface{}) error {
-	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, columns, values)
-	libqpu.Trace("insert", map[string]interface{}{"query": query, "args": args})
-	stmtInsert, err := s.db.Prepare(query)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmtInsert.Exec(args...)
-
-	return err
-}
-
-// Update updates a state record.
-func (s MySQLStateBackend) Update(table, update, condition string, args ...interface{}) error {
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, update, condition)
-	libqpu.Trace("update", map[string]interface{}{"query": query, "args": args})
-	stmtInsert, err := s.db.Prepare(query)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmtInsert.Exec(args...)
-
-	return err
-}
-
 // Get retrieves a state record, and returns the values specified by 'projection'
-func (s MySQLStateBackend) Get(projection, table, condition string, args ...interface{}) (interface{}, error) {
-	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s", projection, table, condition)
-	libqpu.Trace("get", map[string]interface{}{"query": query, "args": args})
+func (s MySQLStateBackend) Get(table, projection string, predicate map[string]*qpu.Value) (interface{}, error) {
+
+	whereStmt := ""
+	whereValues := make([]interface{}, len(predicate))
+	i := 0
+
+	for attrKey, val := range predicate {
+		whereStmt += fmt.Sprintf("%s = ? ", attrKey)
+		if len(predicate) > 1 && i < len(predicate)-1 {
+			whereStmt += "AND "
+		}
+		whereValues[i] = val.GetInt()
+		i++
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s", projection, table, whereStmt)
+	libqpu.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
 	stmtSelect, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -102,9 +88,107 @@ func (s MySQLStateBackend) Get(projection, table, condition string, args ...inte
 	defer stmtSelect.Close()
 
 	var destValue interface{}
-	err = stmtSelect.QueryRow(args...).Scan(&destValue)
+	err = stmtSelect.QueryRow(whereValues...).Scan(&destValue)
 
 	return destValue, err
+}
+
+// Insert inserts a record in the state.
+func (s MySQLStateBackend) Insert(table string, row map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) error {
+
+	insertStmtAttrs := "("
+	insertStmtAttrsValues := "("
+	insertValues := make([]interface{}, len(row)+2)
+
+	i := 0
+	for k, v := range row {
+		insertStmtAttrs += k + ", "
+		insertStmtAttrsValues += "?, "
+		insertValues[i] = v.GetInt()
+		i++
+	}
+
+	for k, v := range vc {
+		insertValues[i] = k
+		i++
+		ts, err := ptypes.Timestamp(v)
+		if err != nil {
+			panic(err)
+		}
+		insertValues[i] = ts
+		i++
+	}
+
+	insertStmtAttrs += "ts_key, ts)"
+	insertStmtAttrsValues += "?, ?)"
+
+	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, insertStmtAttrs, insertStmtAttrsValues)
+	libqpu.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
+	stmtInsert, err := s.db.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmtInsert.Exec(insertValues...)
+
+	return err
+}
+
+// Update updates a state record.
+func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) error {
+
+	updateStmt := ""
+	whereStmt := ""
+	updateValues := make([]interface{}, len(newValues)+len(predicate)+2)
+	i := 0
+
+	for k, v := range newValues {
+		updateStmt += k + " = ?, "
+		switch v.Val.(type) {
+		case *qpu.Value_Int:
+			updateValues[i] = v.GetInt()
+		case *qpu.Value_Flt:
+			updateValues[i] = v.GetFlt()
+		default:
+			updateValues[i] = v.GetStr()
+		}
+		i++
+	}
+
+	updateStmt += "ts_key = ?, ts = ?"
+
+	for k, v := range vc {
+		updateValues[i] = k
+		i++
+		ts, err := ptypes.Timestamp(v)
+		if err != nil {
+			panic(err)
+		}
+		updateValues[i] = ts
+		i++
+	}
+
+	for k, v := range predicate {
+		whereStmt += fmt.Sprintf("%s = ? ", k)
+		if len(predicate) > 1 && i < len(predicate)-1 {
+			whereStmt += "AND "
+		}
+		updateValues[i] = v.GetInt()
+		i++
+	}
+
+	// updateValues = append(updateValues, whereValues)
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, updateStmt, whereStmt)
+	libqpu.Trace("update", map[string]interface{}{"query": query, "updateValues": updateValues})
+	stmtInsert, err := s.db.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmtInsert.Exec(updateValues...)
+
+	return err
 }
 
 // Scan retrieves all state records.
@@ -156,82 +240,4 @@ func (s MySQLStateBackend) Scan(table string, columns []string) (<-chan map[stri
 // Cleanup closes the connection to the MySQL instance
 func (s MySQLStateBackend) Cleanup() {
 	s.db.Close()
-}
-
-// ConstructSelect ...
-func ConstructSelect(predicate map[string]*qpu.Value) (string, []interface{}) {
-	whereStmt := ""
-	whereValues := make([]interface{}, len(predicate))
-	i := 0
-
-	for attrKey, val := range predicate {
-		whereStmt += fmt.Sprintf("%s = ? ", attrKey)
-		if len(predicate) > 1 && i < len(predicate)-1 {
-			whereStmt += "AND "
-		}
-		whereValues[i] = val.GetInt()
-		i++
-	}
-
-	return whereStmt, whereValues
-}
-
-// ConstructInsert ...
-func ConstructInsert(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) (string, string, []interface{}) {
-	attrKeyStmt := fmt.Sprintf("(%s", attrToSum)
-	attrValStmt := "(?"
-	insertValues := make([]interface{}, len(predicate)+1+2)
-	i := 0
-	insertValues[i] = valToInsert
-	i++
-
-	for attrKey, val := range predicate {
-		attrKeyStmt += ", " + attrKey
-		attrValStmt += ", ?"
-
-		insertValues[i] = val.GetInt()
-		i++
-	}
-
-	for k, v := range vc {
-		insertValues[i] = k
-		i++
-		ts, err := ptypes.Timestamp(v)
-		if err != nil {
-			panic(err)
-		}
-		insertValues[i] = ts
-		i++
-	}
-
-	attrKeyStmt += ", ts_key, ts)"
-	attrValStmt += ", ?, ?)"
-
-	return attrKeyStmt, attrValStmt, insertValues
-}
-
-// ConstructUpdate ...
-func ConstructUpdate(attrToSum string, valToInsert int64, predicate map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) (string, []interface{}) {
-	updateValues := make([]interface{}, len(predicate)+1+2)
-	i := 0
-	updateValues[i] = valToInsert
-	i++
-
-	for k, v := range vc {
-		updateValues[i] = k
-		i++
-		ts, err := ptypes.Timestamp(v)
-		if err != nil {
-			panic(err)
-		}
-		updateValues[i] = ts
-		i++
-	}
-
-	for _, val := range predicate {
-		updateValues[i] = val.GetInt()
-		i++
-	}
-
-	return fmt.Sprintf("%s = ?, ts_key = ?, ts = ?", attrToSum), updateValues
 }

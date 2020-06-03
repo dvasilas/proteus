@@ -3,7 +3,9 @@ package libqpu
 import (
 	"context"
 
+	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // QPUService ...
@@ -42,9 +44,9 @@ type APIProcessor interface {
 // QPUState ...
 type QPUState interface {
 	Init(string, string, string) error
-	Insert(string, string, string, ...interface{}) error
-	Update(string, string, string, ...interface{}) error
-	Get(string, string, string, ...interface{}) (interface{}, error)
+	Insert(string, map[string]*qpu.Value, map[string]*timestamp.Timestamp) error
+	Update(string, map[string]*qpu.Value, map[string]*qpu.Value, map[string]*timestamp.Timestamp) error
+	Get(string, string, map[string]*qpu.Value) (interface{}, error)
 	Scan(string, []string) (<-chan map[string]string, error)
 	Cleanup()
 }

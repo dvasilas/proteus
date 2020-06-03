@@ -48,11 +48,11 @@ func (s Schema) GetValue(attributes map[string]*qpu.Value, table, attrName strin
 	}
 	tbl, found := s[table]
 	if !found {
-		return nil, Error("unkown table: not in schema")
+		return nil, Error("unknown table: not in schema")
 	}
 	attrType, found := tbl[attrName]
 	if !found {
-		return nil, Error("unkown attribute: not in schema")
+		return nil, Error("unknown attribute: not in schema")
 	}
 	switch val.GetVal().(type) {
 	case *qpu.Value_Str:

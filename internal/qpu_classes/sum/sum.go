@@ -10,7 +10,6 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
-	mysqlbackend "github.com/dvasilas/proteus/internal/qpustate/mysql_backend"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 	"github.com/golang/protobuf/ptypes"
@@ -270,7 +269,6 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	logOp := libqpu.LogOperationDelta(
 		respRecord.GetRecordID(),
 		stateTable,
-		//libqpu.Vectorclock(map[string]*tspb.Timestamp{"TODO": timestamp}),
 		respRecord.GetLogOp().GetTimestamp(),
 		nil,
 		attributesNew,
@@ -286,20 +284,16 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
 	var newSumValue int64
 
-	selectStmt, selectValues := mysqlbackend.ConstructSelect(recordID)
-	currentSumValue, err := q.state.Get(q.stateSumAttribute, stateTable, selectStmt, selectValues...)
+	currentSumValue, err := q.state.Get(stateTable, q.stateSumAttribute, recordID)
 	if err != nil && err.Error() == "sql: no rows in result set" {
-		insertStmt, insertValStmt, insertValues := mysqlbackend.ConstructInsert(q.stateSumAttribute, sumVal, recordID, vc)
-		err = q.state.Insert(stateTable, insertStmt, insertValStmt, insertValues...)
-
+		recordID[q.stateSumAttribute] = libqpu.ValueInt(sumVal)
+		err = q.state.Insert(stateTable, recordID, vc)
 		newSumValue = sumVal
 	} else if err != nil {
 		return nil, err
 	} else {
 		newSumValue = currentSumValue.(int64) + sumVal
-		setStmt, updateValues := mysqlbackend.ConstructUpdate(q.stateSumAttribute, newSumValue, recordID, vc)
-		err = q.state.Update(stateTable, setStmt, selectStmt, updateValues...)
-
+		err = q.state.Update(stateTable, recordID, map[string]*qpu.Value{q.stateSumAttribute: libqpu.ValueInt(newSumValue)}, vc)
 	}
 
 	if err != nil {
