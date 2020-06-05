@@ -26,7 +26,7 @@ var filterTests = []struct {
 			Predicate: []*qpu.AttributePredicate{
 				libqpu.AttributePredicate(libqpu.Attribute("x", nil), libqpu.ValueInt(42), libqpu.ValueInt(42)),
 			},
-			TsPredicate: libqpu.SnapshotTimePredicate(libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil), libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil)),
+			TsPredicate: libqpu.SnapshotTimePredicate(libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true), libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true)),
 		},
 	},
 }

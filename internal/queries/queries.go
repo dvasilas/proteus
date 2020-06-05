@@ -32,8 +32,8 @@ func SubscribeToAllUpdates(table string, projection []string, isNull []string, i
 		Q: libqpu.QueryInternal(
 			table,
 			libqpu.SnapshotTimePredicate(
-				libqpu.SnapshotTime(qpu.SnapshotTime_INF, nil),
-				libqpu.SnapshotTime(qpu.SnapshotTime_INF, nil),
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, false),
+				libqpu.SnapshotTime(qpu.SnapshotTime_INF, nil, false),
 			),
 			predicate,
 			projection,
@@ -65,8 +65,8 @@ func GetSnapshot(table string, projection []string, isNull []string, isNotNull [
 		Q: libqpu.QueryInternal(
 			table,
 			libqpu.SnapshotTimePredicate(
-				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
-				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil),
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
 			),
 			predicate,
 			projection,
@@ -76,8 +76,10 @@ func GetSnapshot(table string, projection []string, isNull []string, isNotNull [
 
 // IsSubscribeToAllQuery ...
 func IsSubscribeToAllQuery(query libqpu.InternalQuery) bool {
-	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_INF &&
-		query.GetTsPredicate().GetUbound().GetType() == qpu.SnapshotTime_INF {
+	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_LATEST &&
+		!query.GetTsPredicate().GetLbound().GetIsClosed() &&
+		query.GetTsPredicate().GetUbound().GetType() == qpu.SnapshotTime_INF &&
+		!query.GetTsPredicate().GetUbound().GetIsClosed() {
 		return true
 	}
 	return false
@@ -85,8 +87,10 @@ func IsSubscribeToAllQuery(query libqpu.InternalQuery) bool {
 
 // IsGetSnapshotQuery ...
 func IsGetSnapshotQuery(query libqpu.InternalQuery) bool {
-	if query.GetTsPredicate().GetLbound().GetType() != qpu.SnapshotTime_LATEST ||
-		query.GetTsPredicate().GetUbound().GetType() != qpu.SnapshotTime_LATEST {
+	if query.GetTsPredicate().GetLbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetTsPredicate().GetLbound().GetIsClosed() &&
+		query.GetTsPredicate().GetUbound().GetType() != qpu.SnapshotTime_LATEST &&
+		query.GetTsPredicate().GetUbound().GetIsClosed() {
 		return false
 	}
 	return true

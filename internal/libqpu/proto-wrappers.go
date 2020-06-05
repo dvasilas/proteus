@@ -245,6 +245,21 @@ func (q InternalQuery) GetPredicate() []*qpu.AttributePredicate {
 	return q.Q.GetPredicate()
 }
 
+// GetPredicateContains ...
+func (q InternalQuery) GetPredicateContains() ([]string, []string) {
+	isNull := make([]string, 0)
+	isNotNull := make([]string, 0)
+	for _, pred := range q.Q.GetPredicate() {
+		if pred.GetType() == qpu.AttributePredicate_ISNULL {
+			isNull = append(isNull, pred.GetAttr().GetAttrKey())
+		} else if pred.GetType() == qpu.AttributePredicate_ISNOTNULL {
+			isNotNull = append(isNotNull, pred.GetAttr().GetAttrKey())
+		}
+	}
+
+	return isNull, isNotNull
+}
+
 // GetTsPredicate ...
 func (q InternalQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
 	return q.Q.GetTsPredicate()
@@ -428,10 +443,11 @@ func SnapshotTimePredicate(lb *qpu.SnapshotTime, ub *qpu.SnapshotTime) *qpu.Snap
 }
 
 //SnapshotTime creates a protos/utils/SnapshotTime object
-func SnapshotTime(t qpu.SnapshotTime_SnapshotTimeType, vc *qpu.Vectorclock) *qpu.SnapshotTime {
+func SnapshotTime(t qpu.SnapshotTime_SnapshotTimeType, vc *qpu.Vectorclock, isClosed bool) *qpu.SnapshotTime {
 	return &qpu.SnapshotTime{
-		Type:  t,
-		Value: vc,
+		Type:     t,
+		Value:    vc,
+		IsClosed: isClosed,
 	}
 }
 

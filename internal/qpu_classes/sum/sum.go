@@ -204,15 +204,18 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.
 }
 
 // ProcessQuerySubscribe ...
-func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	// q.snapshotConsumer(query, stream)
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
 	q.subscribeQueries = append(q.subscribeQueries, logOpCh)
 
-	return logOpCh, errCh
+	return -1, logOpCh, errCh
 }
+
+// RemovePersistentQuery ...
+func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {}
 
 // ---------------- Internal Functions --------------
 

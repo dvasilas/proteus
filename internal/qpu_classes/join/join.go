@@ -153,9 +153,13 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu
 }
 
 // ProcessQuerySubscribe ...
-func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	// q.snapshotConsumer(query, stream)
-	return nil, nil
+	return -1, nil, nil
+}
+
+// RemovePersistentQuery ...
+func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // ---------------- Internal Functions --------------

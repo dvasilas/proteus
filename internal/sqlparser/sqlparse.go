@@ -58,7 +58,10 @@ func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
 	return libqpu.InternalQuery{
 			Q: libqpu.QueryInternal(
 				q.table,
-				libqpu.SnapshotTimePredicate(libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil), libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil)),
+				libqpu.SnapshotTimePredicate(
+					libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				 libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				),
 				[]*qpu.AttributePredicate{pred},
 				nil,
 			),

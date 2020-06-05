@@ -26,7 +26,8 @@ type QPU struct {
 // QPUClass ...
 type QPUClass interface {
 	ProcessQuerySnapshot(InternalQuery, RequestStream, map[string]string, bool) (<-chan LogOperation, <-chan error)
-	ProcessQuerySubscribe(InternalQuery, RequestStream, map[string]string, bool) (<-chan LogOperation, <-chan error)
+	ProcessQuerySubscribe(InternalQuery, RequestStream, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
+	RemovePersistentQuery(string, int)
 }
 
 // AdjacentQPU ...

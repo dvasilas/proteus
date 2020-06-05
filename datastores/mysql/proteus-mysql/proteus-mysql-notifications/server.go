@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -115,10 +116,12 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 			Table:      update.Table,
 			Attributes: attributes,
 			Timestamp:  timestamp,
-		},
-		)
+		})
+
 		if err != nil {
-			return err
+			fmt.Println("stream.Send: ", err)
+			delete(s.activeConnections, table)
+			break
 		}
 		seqID++
 	}

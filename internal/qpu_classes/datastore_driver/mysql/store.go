@@ -71,7 +71,7 @@ func NewDatastore(conf *libqpu.QPUConfig, schema libqpu.Schema) (MySQLDataStore,
 // SubscribeOps ...
 func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation, context.CancelFunc, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := ds.cli.SubscribeToUpdates(ctx)
@@ -99,28 +99,43 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 }
 
 // GetSnapshot ...
-func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan libqpu.LogOperation, <-chan error) {
+func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull []string) (<-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	columns = append(columns, "unix_timestamp(ts)")
-	projection := ""
-	for i, col := range columns {
-		projection += col
-		if i < len(columns)-1 {
-			projection += ", "
+	projection = append(projection, "unix_timestamp(ts)")
+	projectionStmt := ""
+	for i, attr := range projection {
+		projectionStmt += attr
+		if i < len(projection)-1 {
+			projectionStmt += ", "
 		}
 	}
-	query := fmt.Sprintf("SELECT %s FROM %s", projection, table)
+
+	whereStmt := ""
+	if len(isNull) > 0 || len(isNotNull) > 0 {
+		whereStmt += "WHERE "
+	}
+	for _, attr := range isNull {
+		whereStmt += attr + " IS NULL"
+	}
+
+	for _, attr := range isNotNull {
+		whereStmt += attr + " IS NOT NULL"
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s %s", projectionStmt, table, whereStmt)
+	fmt.Println("query", query)
 
 	rows, err := ds.db.Query(query)
 	if err != nil {
+		fmt.Println("err", err)
 		errCh <- err
 		return logOpCh, errCh
 	}
 
-	values := make([]sql.RawBytes, len(columns))
-	scanArgs := make([]interface{}, len(columns))
+	values := make([]sql.RawBytes, len(projection))
+	scanArgs := make([]interface{}, len(projection))
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
@@ -140,12 +155,12 @@ func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan lib
 					recordID = string(col)
 				}
 				if col != nil {
-					value, err := ds.schema.StrToValue(table, columns[i], string(col))
+					value, err := ds.schema.StrToValue(table, projection[i], string(col))
 					if err != nil {
 						errCh <- err
 						break
 					}
-					attributes[columns[i]] = value
+					attributes[projection[i]] = value
 				}
 			}
 

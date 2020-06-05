@@ -2,6 +2,7 @@ package apiprocessor
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -56,17 +57,23 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 		return libqpu.Error("default")
 	}
 
+	libqpu.Trace("internalQuery received", map[string]interface{}{"internalQuery": internalQuery})
+
 	var respRecordType libqpu.ResponseRecordType
 	var errCh <-chan error
 	var logOpCh <-chan libqpu.LogOperation
+	queryID := -1
 
 	if queries.IsSubscribeToAllQuery(internalQuery) {
+		fmt.Println("IsSubscribeToAllQuery")
 		respRecordType = libqpu.Delta
-		logOpCh, errCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+		queryID, logOpCh, errCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
 	} else if queries.IsGetSnapshotQuery(internalQuery) {
+		fmt.Println("IsGetSnapshotQuery")
 		respRecordType = libqpu.State
 		logOpCh, errCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
 	} else {
+		fmt.Println("query type not recognized")
 		return libqpu.Error("invalid query for datastore_driver QPU")
 	}
 
@@ -83,10 +90,13 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				if err != nil {
 					return err
 				}
-				libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
+				// libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
 					if err := stream.Send(seqID, respRecordType, logOp); err != nil {
-						return err
+						// fmt.Println("stream.Send err: ", err)
+						libqpu.Trace("stream.Send", map[string]interface{}{"err": err})
+						//return err
+						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
 					}
 					seqID++
 				}
@@ -95,6 +105,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 			if !ok {
 				errCh = nil
 			} else {
+				libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
 				// 			if cancel != nil {
 				// 				cancel()
 				// 			}

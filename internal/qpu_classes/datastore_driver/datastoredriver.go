@@ -2,6 +2,8 @@ package datastoredriver
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
@@ -9,68 +11,80 @@ import (
 
 // DatastoreDriverQPU ...
 type DatastoreDriverQPU struct {
-	datastore               dataStore
-	perTableSubscribeStream map[string][]respChannels
+	datastore         dataStore
+	persistentQueries map[string]map[int]respChannels
 }
 
 type respChannels struct {
+	id      int
 	logOpCh chan libqpu.LogOperation
 	errCh   chan error
 }
 
 type dataStore interface {
-	GetSnapshot(string, []string) (<-chan libqpu.LogOperation, <-chan error)
+	GetSnapshot(string, []string, []string, []string) (<-chan libqpu.LogOperation, <-chan error)
 	SubscribeOps(string) (<-chan libqpu.LogOperation, context.CancelFunc, <-chan error)
 }
 
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(qpu *libqpu.QPU) (DatastoreDriverQPU, error) {
+func InitClass(qpu *libqpu.QPU) (*DatastoreDriverQPU, error) {
 	var ds dataStore
 	var err error
 	switch qpu.Config.DatastoreConfig.Type {
 	case libqpu.MYSQL:
 		ds, err = mysqldriver.NewDatastore(qpu.Config, qpu.Schema)
 		if err != nil {
-			return DatastoreDriverQPU{}, err
+			return &DatastoreDriverQPU{}, err
 		}
 	default:
-		return DatastoreDriverQPU{}, libqpu.Error("unknown datastore type")
+		return &DatastoreDriverQPU{}, libqpu.Error("unknown datastore type")
 	}
 
-	return DatastoreDriverQPU{
-		datastore:               ds,
-		perTableSubscribeStream: make(map[string][]respChannels),
+	return &DatastoreDriverQPU{
+		datastore:         ds,
+		persistentQueries: make(map[string]map[int]respChannels),
 	}, nil
 }
 
 // ProcessQuerySnapshot ...
-func (q DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
-	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection())
+func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+
+	isNull, isNotNull := query.GetPredicateContains()
+	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }
 
 // ProcessQuerySubscribe ...
-func (q DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
+	id := rand.Int()
 
-	if _, found := q.perTableSubscribeStream[query.GetTable()]; !found {
-		logOpChFromStore, _, errChFromStore := q.datastore.SubscribeOps(query.GetTable())
-		q.perTableSubscribeStream[query.GetTable()] = make([]respChannels, 1)
-		q.perTableSubscribeStream[query.GetTable()][0] = respChannels{
+	if _, found := q.persistentQueries[query.GetTable()]; !found {
+		logOpChFromStore, cancel, errChFromStore := q.datastore.SubscribeOps(query.GetTable())
+		q.persistentQueries[query.GetTable()] = make(map[int]respChannels, 1)
+
+		q.persistentQueries[query.GetTable()][id] = respChannels{
+			id:      id,
 			logOpCh: logOpCh,
 			errCh:   errCh,
 		}
 		go func() {
 			for {
+				fmt.Println(q.persistentQueries[query.GetTable()])
 				select {
 				case logOp, ok := <-logOpChFromStore:
 					if !ok {
 						logOpCh = nil
 					} else {
 						libqpu.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
-						for _, respChs := range q.perTableSubscribeStream[query.GetTable()] {
+						if len(q.persistentQueries[query.GetTable()]) == 0 {
+							cancel()
+							delete(q.persistentQueries, query.GetTable())
+							return
+						}
+						for _, respChs := range q.persistentQueries[query.GetTable()] {
 							respChs.logOpCh <- logOp
 						}
 					}
@@ -78,14 +92,21 @@ func (q DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, st
 					if !ok {
 						errCh = nil
 					} else {
-						for _, respChs := range q.perTableSubscribeStream[query.GetTable()] {
+						if len(q.persistentQueries[query.GetTable()]) == 0 {
+							cancel()
+							delete(q.persistentQueries, query.GetTable())
+							return
+						}
+						for _, respChs := range q.persistentQueries[query.GetTable()] {
 							respChs.errCh <- err
+							close(respChs.logOpCh)
+							close(respChs.errCh)
 						}
 						return
 					}
 				}
 				if logOpCh == nil && errCh == nil {
-					for _, respChs := range q.perTableSubscribeStream[query.GetTable()] {
+					for _, respChs := range q.persistentQueries[query.GetTable()] {
 						close(respChs.logOpCh)
 						close(respChs.errCh)
 					}
@@ -93,14 +114,22 @@ func (q DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, st
 			}
 		}()
 	} else {
-		q.perTableSubscribeStream[query.GetTable()] = append(
-			q.perTableSubscribeStream[query.GetTable()],
-			respChannels{
-				logOpCh: logOpCh,
-				errCh:   errCh,
-			},
-		)
+
+		q.persistentQueries[query.GetTable()][id] = respChannels{
+			id:      id,
+			logOpCh: logOpCh,
+			errCh:   errCh,
+		}
 	}
 
-	return logOpCh, errCh
+	return id, logOpCh, errCh
+}
+
+// RemovePersistentQuery ...
+func (q *DatastoreDriverQPU) RemovePersistentQuery(table string, queryID int) {
+	if _, found := q.persistentQueries[table][queryID]; found {
+		close(q.persistentQueries[table][queryID].logOpCh)
+		close(q.persistentQueries[table][queryID].errCh)
+		delete(q.persistentQueries[table], queryID)
+	}
 }
