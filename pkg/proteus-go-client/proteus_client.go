@@ -99,10 +99,6 @@ func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate
 }
 
 func processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	// var responseCh chan ResponseRecord
-	// responseCh = data.(chan ResponseRecord)
-
-	fmt.Println(respRecord)
 	return nil
 }
 

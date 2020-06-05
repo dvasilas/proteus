@@ -94,7 +94,7 @@ FOR EACH ROW
 BEGIN
   DECLARE cmd CHAR(255);
   DECLARE result int(10);
-      SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'stories ', New.id, ' ', unix_timestamp(New.ts), ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
+      SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'stories ', New.id, ' ', unix_timestamp(New.ts), ' id:', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
       SET result = sys_exec(cmd);
 END;
 $

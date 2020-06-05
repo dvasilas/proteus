@@ -156,10 +156,10 @@ class DB(object):
             print("user_id: {}, username: {}".format(user_id, username))
 
     def stories(self):
-        for (story_id, user_id, title, description, short_id) in self.cursor:
+        for (story_id, user_id, title, description, short_id, ts) in self.cursor:
             print(
-                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}".format(
-                    story_id, user_id, title, description, short_id
+                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}, ts: {}".format(
+                    story_id, user_id, title, description, short_id, ts
                 )
             )
 

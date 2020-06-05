@@ -15,6 +15,29 @@ endpoint = "127.0.0.1:3308"
 accessKeyID = "root"
 secretAccessKey = "123456"
 
+# assumptions
+# - the first attribute in 'Projection' is the one to use for the join and is treated as libqpu.INT
+#   (better make sure it actually is libqpu.INT)
+# - the order of JoinConfig.Source entries match the order of connecions
+# - i.e. the 1st entry of source is used to construct queries that are then sent to
+#   the 1st connection, etc.
+[[JoinConfig.Source]]
+table = "stories"
+Projection = ["id", "user_id", "title", "description", "short_id"]
+[[JoinConfig.Source]]
+table = "stateTableSum"
+Projection = ["story_id", "vote_sum"]
+
+[[Schema]]
+table = "stateTableSum"
+[[Schema.Attributes]]
+key = "story_id"
+type = "int"
+[[Schema.Attributes]]
+key = "vote_sum"
+type = "int"
+
+
 [[Schema]]
 table = "stories"
 [[Schema.Attributes]]
@@ -32,12 +55,3 @@ type = "string"
 [[Schema.Attributes]]
 key = "short_id"
 type = "string"
-
-[[Schema]]
-table = "stories_with_votes"
-[[Schema.Attributes]]
-key = "story_id"
-type = "int"
-[[Schema.Attributes]]
-key = "vote_count"
-type = "int"

@@ -53,6 +53,12 @@ type inputQPUConfig struct {
 			IsNotNull  []string
 		}
 	}
+	JoinConfig struct {
+		Source []struct {
+			Table      string
+			Projection []string
+		}
+	}
 	IndexConfig struct {
 		Bucket        string
 		AttributeName string
@@ -120,6 +126,10 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 		}
 	} else if config.QpuType == qpu_api.ConfigResponse_SUM {
 		if err := getSumConfig(inputConfig, config); err != nil {
+			return err
+		}
+	} else if config.QpuType == qpu_api.ConfigResponse_JOIN {
+		if err := getJoinConfig(inputConfig, config); err != nil {
 			return err
 		}
 	}
@@ -228,6 +238,26 @@ func getSumConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.SumConfig.Query.Projection = inputConf.SumConfig.Query.Projection
 	config.SumConfig.Query.IsNull = inputConf.SumConfig.Query.IsNull
 	config.SumConfig.Query.IsNotNull = inputConf.SumConfig.Query.IsNotNull
+
+	return nil
+}
+
+func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	joinConfig := make([]struct {
+		Table      string
+		Projection []string
+	}, len(inputConf.JoinConfig.Source))
+	for i, src := range inputConf.JoinConfig.Source {
+		joinConfig[i] = struct {
+			Table      string
+			Projection []string
+		}{
+			Table:      src.Table,
+			Projection: src.Projection,
+		}
+	}
+
+	config.JoinConfig.Source = joinConfig
 
 	return nil
 }

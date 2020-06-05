@@ -57,7 +57,6 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 	if err != nil {
 		return err
 	}
-	libqpu.Trace("query", map[string]interface{}{"requestRecord": requestRecord})
 
 	switch requestRecord.GetRequest().(type) {
 	case *qpu_api.RequestStreamRecord_QueryRequest:

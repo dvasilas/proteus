@@ -30,99 +30,7 @@ type MySQLUpdate struct {
 }
 
 type datastoreGRPCServer struct {
-	activeConnections map[string]chan *pb.UpdateRecord
-}
-
-// SubscribeToUpdates ...
-func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_SubscribeToUpdatesServer) error {
-	request, err := stream.Recv()
-	if err != nil {
-		return err
-	}
-	table := request.GetRequest().GetTable()
-
-	seqID := int64(0)
-	notificationCh := make(chan *pb.UpdateRecord)
-	s.activeConnections[table] = notificationCh
-
-	for update := range notificationCh {
-		update.SequenceId = seqID
-		stream.Send(update)
-		seqID++
-	}
-	return nil
-}
-
-func subscribeUpdatesFS(logPath string, updateCh chan string, errs chan error) error {
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		os.Mkdir(logPath, os.ModeDir)
-	}
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	// defer watcher.Close()
-
-	go processEvents(watcher, updateCh, errs)
-
-	err = watcher.Add(logPath)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func processEvents(w *fsnotify.Watcher, updateCh chan string, errs chan error) {
-	for {
-		select {
-		case event := <-w.Events:
-			if event.Op.String() == "WRITE" {
-				data, err := ioutil.ReadFile(event.Name)
-				if err != nil {
-					errs <- err
-					break
-				}
-				updateCh <- string(data)
-			}
-		case err := <-w.Errors:
-			errs <- err
-			break
-		}
-	}
-}
-
-func (s *datastoreGRPCServer) publishUpdates(table string, updateCh chan string, errCh chan error) {
-	for updateMsg := range updateCh {
-		var update MySQLUpdate
-		if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-			errCh <- err
-		}
-		attributes := make([]*pb.Attributes, len(update.Attributes))
-		for i, entry := range update.Attributes {
-			attributes[i] = &pb.Attributes{
-				Key:      entry.Key,
-				ValueNew: entry.ValueNew,
-			}
-		}
-		ts, err := strconv.ParseInt(update.Timestamp, 10, 64)
-		if err != nil {
-			errCh <- err
-		}
-		timestamp, err := ptypes.TimestampProto(time.Unix(ts, 0))
-		if err != nil {
-			errCh <- err
-		}
-
-		if ch, found := s.activeConnections[table]; found {
-			ch <- &pb.UpdateRecord{
-				RecordID:   update.RecordID,
-				Table:      update.Table,
-				Attributes: attributes,
-				Timestamp:  timestamp,
-			}
-		}
-	}
+	activeConnections map[string]chan string
 }
 
 func main() {
@@ -133,12 +41,12 @@ func main() {
 
 	tables := []string{"stories", "votes"}
 
-	server := datastoreGRPCServer{
-		activeConnections: make(map[string]chan *pb.UpdateRecord, 0),
+	server := &datastoreGRPCServer{
+		activeConnections: make(map[string]chan string),
 	}
 
 	s := grpc.NewServer()
-	mysql.RegisterPublishUpdatesServer(s, &server)
+	mysql.RegisterPublishUpdatesServer(s, server)
 	reflection.Register(s)
 
 	lis, err := net.Listen("tcp", ":"+port)
@@ -152,13 +60,110 @@ func main() {
 		errCh = make(chan error)
 		updateCh = make(chan string)
 
-		go server.publishUpdates(table, updateCh, errCh)
+		// go server.publishUpdates(table, updateCh, errCh)
+		go server.subscribeUpdatesFS("/opt/proteus-mysql/"+table, table, updateCh, errCh)
 
-		err = subscribeUpdatesFS("/opt/proteus-mysql/"+table, updateCh, errCh)
-		if err != nil {
-			log.Fatal(err)
-		}
+		go func() {
+			for err := range errCh {
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
 	}
 
 	s.Serve(lis)
+}
+
+// SubscribeToUpdates ...
+func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_SubscribeToUpdatesServer) error {
+	request, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+
+	table := request.GetRequest().GetTable()
+
+	seqID := int64(0)
+	notificationCh := make(chan string)
+	s.activeConnections[table] = notificationCh
+
+	for updateMsg := range s.activeConnections[table] {
+		var update MySQLUpdate
+		if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
+			return err
+		}
+		attributes := make([]*pb.Attributes, len(update.Attributes))
+		for i, entry := range update.Attributes {
+			attributes[i] = &pb.Attributes{
+				Key:      entry.Key,
+				ValueNew: entry.ValueNew,
+			}
+		}
+		ts, err := strconv.ParseInt(update.Timestamp, 10, 64)
+		if err != nil {
+			return err
+		}
+		timestamp, err := ptypes.TimestampProto(time.Unix(ts, 0))
+		if err != nil {
+			return err
+		}
+
+		err = stream.Send(&pb.UpdateRecord{
+			SequenceId: seqID,
+			RecordID:   update.RecordID,
+			Table:      update.Table,
+			Attributes: attributes,
+			Timestamp:  timestamp,
+		},
+		)
+		if err != nil {
+			return err
+		}
+		seqID++
+	}
+
+	return nil
+}
+
+func (s *datastoreGRPCServer) subscribeUpdatesFS(logPath, table string, updateCh chan string, errCh chan error) {
+	_, err := os.Stat(logPath)
+	if os.IsNotExist(err) {
+		os.Mkdir(logPath, os.ModeDir)
+	} else if err != nil {
+		errCh <- err
+		return
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	err = watcher.Add(logPath)
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	for {
+		select {
+		case event := <-watcher.Events:
+			if event.Op.String() == "WRITE" {
+				data, err := ioutil.ReadFile(event.Name)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				if ch, found := s.activeConnections[table]; found {
+					ch <- string(data)
+				}
+			}
+		case err := <-watcher.Errors:
+			errCh <- err
+			return
+		}
+	}
+
 }

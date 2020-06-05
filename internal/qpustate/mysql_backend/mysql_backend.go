@@ -94,7 +94,7 @@ func (s MySQLStateBackend) Get(table, projection string, predicate map[string]*q
 }
 
 // Insert inserts a record in the state.
-func (s MySQLStateBackend) Insert(table string, row map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) error {
+func (s MySQLStateBackend) Insert(table string, row map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
 
 	insertStmtAttrs := "("
 	insertStmtAttrsValues := "("
@@ -104,7 +104,8 @@ func (s MySQLStateBackend) Insert(table string, row map[string]*qpu.Value, vc ma
 	for k, v := range row {
 		insertStmtAttrs += k + ", "
 		insertStmtAttrsValues += "?, "
-		insertValues[i] = v.GetInt()
+		// insertValues[i] = v.GetInt()
+		insertValues[i] = v
 		i++
 	}
 
@@ -135,7 +136,7 @@ func (s MySQLStateBackend) Insert(table string, row map[string]*qpu.Value, vc ma
 }
 
 // Update updates a state record.
-func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]*qpu.Value, vc map[string]*timestamp.Timestamp) error {
+func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
 
 	updateStmt := ""
 	whereStmt := ""
@@ -144,14 +145,16 @@ func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]
 
 	for k, v := range newValues {
 		updateStmt += k + " = ?, "
-		switch v.Val.(type) {
-		case *qpu.Value_Int:
-			updateValues[i] = v.GetInt()
-		case *qpu.Value_Flt:
-			updateValues[i] = v.GetFlt()
-		default:
-			updateValues[i] = v.GetStr()
-		}
+		updateValues[i] = v
+
+		// switch v.Val.(type) {
+		// case *qpu.Value_Int:
+		// 	updateValues[i] = v.GetInt()
+		// case *qpu.Value_Flt:
+		// 	updateValues[i] = v.GetFlt()
+		// default:
+		// 	updateValues[i] = v.GetStr()
+		// }
 		i++
 	}
 
@@ -168,13 +171,15 @@ func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]
 		i++
 	}
 
+	j := 0
 	for k, v := range predicate {
 		whereStmt += fmt.Sprintf("%s = ? ", k)
-		if len(predicate) > 1 && i < len(predicate)-1 {
+		if len(predicate) > 1 && j < len(predicate)-1 {
 			whereStmt += "AND "
 		}
-		updateValues[i] = v.GetInt()
+		updateValues[i] = v
 		i++
+		j++
 	}
 
 	// updateValues = append(updateValues, whereValues)

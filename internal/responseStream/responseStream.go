@@ -17,6 +17,7 @@ import (
 func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord) error, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	for {
 		respRecord, err := stream.Recv()
+		libqpu.Trace("StreamConsumer received", map[string]interface{}{"record": respRecord, "err": err})
 		if err == io.EOF {
 			return nil
 		} else if err != nil {

@@ -71,7 +71,7 @@ func NewDatastore(conf *libqpu.QPUConfig, schema libqpu.Schema) (MySQLDataStore,
 // SubscribeOps ...
 func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation, context.CancelFunc, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
-	errCh := make(chan error, 1)
+	errCh := make(chan error)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := ds.cli.SubscribeToUpdates(ctx)
@@ -138,7 +138,8 @@ func (ds MySQLDataStore) GetSnapshot(table string, columns []string) (<-chan lib
 			for i, col := range values {
 				if i == 0 {
 					recordID = string(col)
-				} else if col != nil {
+				}
+				if col != nil {
 					value, err := ds.schema.StrToValue(table, columns[i], string(col))
 					if err != nil {
 						errCh <- err

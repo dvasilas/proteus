@@ -71,7 +71,7 @@ func (s Schema) GetValue(attributes map[string]*qpu.Value, table, attrName strin
 		}
 		return val.GetFlt(), nil
 	default:
-		return nil, Error("unkown value type")
+		return nil, Error("unknown value type")
 	}
 }
 
