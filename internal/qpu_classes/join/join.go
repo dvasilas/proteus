@@ -92,7 +92,6 @@ func InitClass(qpu *libqpu.QPU) (*JoinQPU, error) {
 		stateDatabase,
 		stateTable,
 		fmt.Sprintf(
-			// vote_count int
 			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(20), ts TIMESTAMP, PRIMARY KEY (%s) )",
 			stateTable,
 			idAttributesColumns,
@@ -103,27 +102,8 @@ func InitClass(qpu *libqpu.QPU) (*JoinQPU, error) {
 		return &JoinQPU{}, err
 	}
 
-	// libqpu.Assert(len(qpu.AdjacentQPUs) == 2, "Join QPU should have two adjacent QPUs")
-
 	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
-		querySnapshot := queries.GetSnapshot(
-			qpu.Config.JoinConfig.Source[i].Table,
-			qpu.Config.JoinConfig.Source[i].Projection,
-			[]string{}, []string{})
-		responseStreamStories, err := qpugraph.SendQueryI(querySnapshot, qpu.AdjacentQPUs[i])
-		if err != nil {
-			return &JoinQPU{}, err
-		}
-		if err = responsestream.StreamConsumer(responseStreamStories, jqpu.processRecordInMem, nil, nil); err != nil {
-			return &JoinQPU{}, err
-		}
-	}
-	if err := jqpu.flushState(); err != nil {
-		return &JoinQPU{}, err
-	}
-
-	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
-		querySnapshot := queries.SubscribeToAllUpdates(
+		querySnapshot := queries.NewQuerySnapshotAndSubscribe(
 			qpu.Config.JoinConfig.Source[i].Table,
 			qpu.Config.JoinConfig.Source[i].Projection,
 			[]string{}, []string{})
@@ -132,7 +112,7 @@ func InitClass(qpu *libqpu.QPU) (*JoinQPU, error) {
 			return &JoinQPU{}, err
 		}
 		go func() {
-			if err = responsestream.StreamConsumer(responseStreamStories, jqpu.processRecord, nil, nil); err != nil {
+			if err = responsestream.StreamConsumer(responseStreamStories, jqpu.processRespRecord, nil, nil); err != nil {
 				panic(err)
 			}
 		}()
@@ -164,9 +144,37 @@ func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 
 // ---------------- Internal Functions --------------
 
-func (q JoinQPU) processRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
+func (q JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	respRecordType, err := respRecord.GetType()
+	if err != nil {
+		return err
+	}
+	if respRecordType == libqpu.EndOfStream {
+		return q.flushState()
+	}
 
+	if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
+		return err
+	}
+
+	if respRecord.GetLogOp().IsDelta() {
+		attributes := respRecord.GetAttributes()
+		joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
+		joinAttributeValue := attributes[joinAttribute].GetInt()
+
+		stateEntry := q.inMemState.entries[joinAttributeValue]
+		stateEntry.mutex.RLock()
+		_, err := q.updateState(joinAttributeValue, stateEntry.attributes, stateEntry.ts.GetVc())
+		stateEntry.mutex.RUnlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	attributes := respRecord.GetAttributes()
 	joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
 	joinAttributeValue := attributes[joinAttribute].GetInt()
@@ -187,30 +195,6 @@ func (q JoinQPU) processRecordInMem(respRecord libqpu.ResponseRecord, data inter
 	}
 
 	attributes[joinAttribute] = libqpu.ValueInt(joinAttributeValue)
-
-	return nil
-}
-
-func (q *JoinQPU) flushState() error {
-	for stateRecordID, entry := range q.inMemState.entries {
-		entry.mutex.RLock()
-		_, err := q.updateState(stateRecordID, entry.attributes, entry.ts.GetVc())
-		entry.mutex.RUnlock()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (q *JoinQPU) flushStateEntry(entryID int64) error {
-	stateEntry := q.inMemState.entries[entryID]
-	stateEntry.mutex.RLock()
-	_, err := q.updateState(entryID, stateEntry.attributes, stateEntry.ts.GetVc())
-	stateEntry.mutex.RUnlock()
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -247,19 +231,14 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 	return values, nil
 }
 
-func (q JoinQPU) processRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	libqpu.Trace("received record", map[string]interface{}{"record": respRecord})
-	if err := q.processRecordInMem(respRecord, data, recordCh); err != nil {
-		return err
+func (q *JoinQPU) flushState() error {
+	for stateRecordID, entry := range q.inMemState.entries {
+		entry.mutex.RLock()
+		_, err := q.updateState(stateRecordID, entry.attributes, entry.ts.GetVc())
+		entry.mutex.RUnlock()
+		if err != nil {
+			return err
+		}
 	}
-
-	attributes := respRecord.GetAttributes()
-	joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
-	joinAttributeValue := attributes[joinAttribute].GetInt()
-
-	if err := q.flushStateEntry(joinAttributeValue); err != nil {
-		return err
-	}
-
 	return nil
 }

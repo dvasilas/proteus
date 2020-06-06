@@ -21,18 +21,16 @@ func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.Respo
 		if err == io.EOF {
 			return nil
 		} else if err != nil {
+			libqpu.LogError(err)
 			return err
 		}
-		respRecordType, err := respRecord.GetType()
-		if err != nil {
-			return err
-		}
-		if respRecordType == libqpu.EndOfStream {
-			stream.Cancel()
-			return nil
-		}
+
+		// respRecordType, err := respRecord.GetType()
+		// if respRecordType == libqpu.EndOfStream {}
+
 		err = processLogOp(respRecord, data, recordCh)
 		if err != nil {
+			libqpu.LogError(err)
 			return err
 		}
 	}

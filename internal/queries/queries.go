@@ -8,8 +8,8 @@ import (
 	// "github.com/prometheus/common/log"
 )
 
-// SubscribeToAllUpdates ...
-func SubscribeToAllUpdates(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
+// NewQuerySubscribe ...
+func NewQuerySubscribe(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
 	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -41,8 +41,8 @@ func SubscribeToAllUpdates(table string, projection []string, isNull []string, i
 	}
 }
 
-// GetSnapshot ...
-func GetSnapshot(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
+// NewQuerySnapshot ...
+func NewQuerySnapshot(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
 	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -74,27 +74,78 @@ func GetSnapshot(table string, projection []string, isNull []string, isNotNull [
 	}
 }
 
-// IsSubscribeToAllQuery ...
-func IsSubscribeToAllQuery(query libqpu.InternalQuery) bool {
-	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_LATEST &&
-		!query.GetTsPredicate().GetLbound().GetIsClosed() &&
-		query.GetTsPredicate().GetUbound().GetType() == qpu.SnapshotTime_INF &&
-		!query.GetTsPredicate().GetUbound().GetIsClosed() {
-		return true
+// NewQuerySnapshotAndSubscribe ...
+func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
+	predicate := make([]*qpu.AttributePredicate, 0)
+	for _, attributeKey := range isNull {
+		predicate = append(predicate,
+			&qpu.AttributePredicate{
+				Attr: libqpu.Attribute(attributeKey, nil),
+				Type: qpu.AttributePredicate_ISNULL,
+			},
+		)
 	}
-	return false
+	for _, attributeKey := range isNotNull {
+		predicate = append(predicate,
+			&qpu.AttributePredicate{
+				Attr: libqpu.Attribute(attributeKey, nil),
+				Type: qpu.AttributePredicate_ISNOTNULL,
+			},
+		)
+	}
+
+	return libqpu.InternalQuery{
+		Q: libqpu.QueryInternal(
+			table,
+			libqpu.SnapshotTimePredicate(
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				libqpu.SnapshotTime(qpu.SnapshotTime_INF, nil, false),
+			),
+			predicate,
+			projection,
+		),
+	}
 }
 
-// IsGetSnapshotQuery ...
-func IsGetSnapshotQuery(query libqpu.InternalQuery) bool {
-	if query.GetTsPredicate().GetLbound().GetType() != qpu.SnapshotTime_LATEST &&
-		query.GetTsPredicate().GetLbound().GetIsClosed() &&
-		query.GetTsPredicate().GetUbound().GetType() != qpu.SnapshotTime_LATEST &&
-		query.GetTsPredicate().GetUbound().GetIsClosed() {
-		return false
+// QueryType ...
+func QueryType(query libqpu.InternalQuery) (bool, bool) {
+	var isSnapshot, isSubscribe bool
+	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_LATEST {
+		if query.GetTsPredicate().GetLbound().GetIsClosed() {
+			isSnapshot = true
+		} else {
+			isSnapshot = false
+		}
+		if query.GetTsPredicate().GetUbound().GetType() == qpu.SnapshotTime_INF {
+			isSubscribe = true
+		} else {
+			isSubscribe = false
+		}
 	}
-	return true
+	return isSnapshot, isSubscribe
 }
+
+// // IsSubscribeToAllQuery ...
+// func IsSubscribeToAllQuery(query libqpu.InternalQuery) bool {
+// 	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_LATEST &&
+// 		!query.GetTsPredicate().GetLbound().GetIsClosed() &&
+// 		query.GetTsPredicate().GetUbound().GetType() == qpu.SnapshotTime_INF &&
+// 		!query.GetTsPredicate().GetUbound().GetIsClosed() {
+// 		return true
+// 	}
+// 	return false
+// }
+
+// // IsGetSnapshotQuery ...
+// func IsGetSnapshotQuery(query libqpu.InternalQuery) bool {
+// 	if query.GetTsPredicate().GetLbound().GetType() != qpu.SnapshotTime_LATEST &&
+// 		query.GetTsPredicate().GetLbound().GetIsClosed() &&
+// 		query.GetTsPredicate().GetUbound().GetType() != qpu.SnapshotTime_LATEST &&
+// 		query.GetTsPredicate().GetUbound().GetIsClosed() {
+// 		return false
+// 	}
+// 	return true
+// }
 
 // SatisfiesPredicate ...
 func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (bool, error) {

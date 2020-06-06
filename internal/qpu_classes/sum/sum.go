@@ -105,34 +105,15 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 		return &SumQPU{}, err
 	}
 
-	querySnapshot := queries.GetSnapshot(
+	query := queries.NewQuerySnapshotAndSubscribe(
 		sqpu.sourceTable,
 		q.Config.SumConfig.Query.Projection,
 		q.Config.SumConfig.Query.IsNull,
 		q.Config.SumConfig.Query.IsNotNull,
 	)
-	querySubscribe := queries.SubscribeToAllUpdates(
-		sqpu.sourceTable,
-		q.Config.SumConfig.Query.Projection,
-		q.Config.SumConfig.Query.IsNull,
-		q.Config.SumConfig.Query.IsNotNull,
-	)
-	// sqpu.sourceTable, []string{"id", "story_id", "vote"}, []string{"comment_id"}, []string{})
+
 	for _, adjQPU := range q.AdjacentQPUs {
-		responseStream, err := qpugraph.SendQueryI(querySnapshot, adjQPU)
-		if err != nil {
-			return &SumQPU{}, err
-		}
-
-		if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecordInMem, nil, nil); err != nil {
-			return &SumQPU{}, err
-		}
-
-		if err = sqpu.flushState(); err != nil {
-			return &SumQPU{}, err
-		}
-
-		responseStream, err = qpugraph.SendQueryI(querySubscribe, adjQPU)
+		responseStream, err := qpugraph.SendQueryI(query, adjQPU)
 		if err != nil {
 			return &SumQPU{}, err
 		}
@@ -205,7 +186,6 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.
 
 // ProcessQuerySubscribe ...
 func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
-	// q.snapshotConsumer(query, stream)
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
@@ -218,6 +198,51 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu
 func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {}
 
 // ---------------- Internal Functions --------------
+
+func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	respRecordType, err := respRecord.GetType()
+	if err != nil {
+		return err
+	}
+	if respRecordType == libqpu.EndOfStream {
+		return q.flushState()
+	}
+
+	if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
+		return err
+	}
+
+	if respRecord.GetLogOp().IsDelta() {
+		recordID := make(map[string]*qpu.Value)
+
+		attributes := respRecord.GetAttributes()
+		var err error
+		for _, idAttr := range q.idAttributes {
+			recordID[idAttr] = attributes[idAttr]
+		}
+
+		sumValue := attributes[q.attributeToSum].GetInt()
+
+		attributesNew, err := q.updateState(recordID, sumValue, respRecord.GetLogOp().GetTimestamp().GetVc())
+		if err != nil {
+			return err
+		}
+
+		logOp := libqpu.LogOperationDelta(
+			respRecord.GetRecordID(),
+			stateTable,
+			respRecord.GetLogOp().GetTimestamp(),
+			nil,
+			attributesNew,
+		)
+
+		for _, ch := range q.subscribeQueries {
+			ch <- logOp
+		}
+	}
+
+	return nil
+}
 
 func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	attributes := respRecord.GetAttributes()
@@ -244,45 +269,6 @@ func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 			attributes: attributes,
 			ts:         respRecord.GetLogOp().GetTimestamp(),
 		}
-	}
-
-	return nil
-}
-
-func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	if recordCh != nil {
-		recordCh <- respRecord
-	}
-
-	if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
-		return err
-	}
-
-	recordID := make(map[string]*qpu.Value)
-
-	attributes := respRecord.GetAttributes()
-	var err error
-	for _, idAttr := range q.idAttributes {
-		recordID[idAttr] = attributes[idAttr]
-	}
-
-	sumValue := attributes[q.attributeToSum].GetInt()
-
-	attributesNew, err := q.updateState(recordID, sumValue, respRecord.GetLogOp().GetTimestamp().GetVc())
-	if err != nil {
-		return err
-	}
-
-	logOp := libqpu.LogOperationDelta(
-		respRecord.GetRecordID(),
-		stateTable,
-		respRecord.GetLogOp().GetTimestamp(),
-		nil,
-		attributesNew,
-	)
-
-	for _, ch := range q.subscribeQueries {
-		ch <- logOp
 	}
 
 	return nil
@@ -336,17 +322,5 @@ func (q *SumQPU) flushState() error {
 			return err
 		}
 	}
-	return nil
-}
-
-func (q *SumQPU) flushStateEntry(entryID string) error {
-	stateEntry := q.inMemState.entries[entryID]
-	stateEntry.mutex.RLock()
-	_, err := q.updateState(stateEntry.attributes, stateEntry.val, stateEntry.ts.GetVc())
-	stateEntry.mutex.RUnlock()
-	if err != nil {
-		return err
-	}
-	// }
 	return nil
 }

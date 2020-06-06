@@ -30,6 +30,7 @@ type APIProcessor struct {
 func NewProcessor(qpu *libqpu.QPU) (APIProcessor, error) {
 	qpuClass, err := getQPUClass(qpu)
 	if err != nil {
+		libqpu.LogError(err)
 		return APIProcessor{}, err
 	}
 
@@ -42,13 +43,11 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 	switch queryReq.QueryType() {
 	case libqpu.InternalQueryType:
 		internalQuery = queryReq.GetQueryI()
-
-		// return s.qpuClass.ProcessQuery(queryReq.GetQueryI(), stream, queryReq.GetMetadata(), queryReq.GetSync())
-	// for query requests with SQL queries, first parse SQL to get a libqpu.InternalQuery
 	case libqpu.SQLQueryType:
 		var err error
 		internalQuery, err = sqlparser.Parse(queryReq.GetSQLStr())
 		if err != nil {
+			libqpu.LogError(err)
 			return err
 		}
 	case libqpu.UnknownType:
@@ -58,52 +57,82 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 	}
 
 	libqpu.Trace("internalQuery received", map[string]interface{}{"internalQuery": internalQuery})
-
-	var respRecordType libqpu.ResponseRecordType
-	var errCh <-chan error
-	var logOpCh <-chan libqpu.LogOperation
+	var logOpSubscribeCh, logOpSnapshotCh <-chan libqpu.LogOperation
+	var errSubscribeCh, errSnapshotCh <-chan error
 	queryID := -1
+	snapshotStream := false
 
-	if queries.IsSubscribeToAllQuery(internalQuery) {
-		fmt.Println("IsSubscribeToAllQuery")
-		respRecordType = libqpu.Delta
-		queryID, logOpCh, errCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
-	} else if queries.IsGetSnapshotQuery(internalQuery) {
-		fmt.Println("IsGetSnapshotQuery")
-		respRecordType = libqpu.State
-		logOpCh, errCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
-	} else {
+	isSnapshot, isSubscribe := queries.QueryType(internalQuery)
+	if !isSubscribe && !isSnapshot {
 		fmt.Println("query type not recognized")
 		return libqpu.Error("invalid query for datastore_driver QPU")
+	}
+
+	if isSubscribe {
+		fmt.Println("IsSubscribeToAllQuery")
+		queryID, logOpSubscribeCh, errSubscribeCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+	}
+	if isSnapshot {
+		fmt.Println("IsGetSnapshotQuery")
+		snapshotStream = true
+		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
 	}
 
 	var seqID int64
 
 	for {
 		select {
-		case logOp, ok := <-logOpCh:
+		case logOp, ok := <-logOpSubscribeCh:
 			if !ok {
-				logOpCh = nil
+				logOpSubscribeCh = nil
 			} else {
 				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
 				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
 				if err != nil {
+					libqpu.LogError(err)
 					return err
 				}
 				// libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
-					if err := stream.Send(seqID, respRecordType, logOp); err != nil {
-						// fmt.Println("stream.Send err: ", err)
-						libqpu.Trace("stream.Send", map[string]interface{}{"err": err})
-						//return err
+					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
+						libqpu.LogError(err)
 						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
 					}
 					seqID++
 				}
 			}
-		case err, ok := <-errCh:
+		case logOp, ok := <-logOpSnapshotCh:
 			if !ok {
-				errCh = nil
+				logOpSnapshotCh = nil
+			} else {
+				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
+				if err != nil {
+					libqpu.LogError(err)
+					return err
+				}
+				// libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
+				if ok {
+					if err := stream.Send(seqID, libqpu.State, logOp); err != nil {
+						libqpu.LogError(err)
+						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
+					}
+					seqID++
+				}
+			}
+		case err, ok := <-errSubscribeCh:
+			if !ok {
+				errSubscribeCh = nil
+			} else {
+				libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
+				// 			if cancel != nil {
+				// 				cancel()
+				// 			}
+				return err
+			}
+		case err, ok := <-errSnapshotCh:
+			if !ok {
+				errSnapshotCh = nil
 			} else {
 				libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
 				// 			if cancel != nil {
@@ -112,12 +141,20 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				return err
 			}
 		}
-		if logOpCh == nil && errCh == nil {
-			return stream.Send(
+		if logOpSnapshotCh == nil && errSnapshotCh == nil && snapshotStream {
+			snapshotStream = false
+			err := stream.Send(
 				seqID,
 				libqpu.EndOfStream,
 				libqpu.LogOperation{},
 			)
+			if err != nil {
+				libqpu.LogError(err)
+				return err
+			}
+		}
+		if logOpSubscribeCh == nil && errSubscribeCh == nil && logOpSnapshotCh == nil && errSnapshotCh == nil {
+			return nil
 		}
 	}
 

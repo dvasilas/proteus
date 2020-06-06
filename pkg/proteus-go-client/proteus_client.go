@@ -85,7 +85,7 @@ func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan 
 
 // QueryInternal ...
 func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, metadata map[string]string, sync bool) (<-chan ResponseRecord, <-chan error, error) {
-	query := queries.GetSnapshot(table, []string{}, []string{}, []string{})
+	query := queries.NewQuerySnapshot(table, []string{}, []string{}, []string{})
 	responseStream, err := qpugraph.SendQueryI(query, c.client)
 	if err != nil {
 		return nil, nil, err

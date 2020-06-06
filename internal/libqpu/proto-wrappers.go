@@ -74,6 +74,10 @@ func (op LogOperation) GetTimestamp() *qpu.Vectorclock {
 	return op.Op.GetTimestamp()
 }
 
+func (op LogOperation) IsDelta() bool {
+	return op.Op.GetPayload().GetDelta().GetNew() != nil
+}
+
 // ---------------- RequestStream -------------------
 
 // ResponseStream ...

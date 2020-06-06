@@ -32,6 +32,10 @@ func Trace(msg string, fields map[string]interface{}) {
 	log.WithFields(logFields).Trace(msg)
 }
 
+func LogError(err error) {
+	log.Error(err)
+}
+
 // import (
 // 	"github.com/dvasilas/proteus/internal/proto/antidote"
 // 	"github.com/dvasilas/proteus/internal/proto/qpu"
