@@ -7,7 +7,6 @@ import (
 	"github.com/dvasilas/proteus/internal/apiclient"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
@@ -57,45 +56,55 @@ func (c *Client) Close() error {
 	return c.client.APIClient.CloseConnection()
 }
 
-func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
-	for {
-		streamRec, err := stream.Recv()
-		if err != nil {
-			errorCh <- err
-			close(responseCh)
-			close(errorCh)
-			return
-		}
-		if streamRec.GetType() == qpu_api.ResponseStreamRecord_HEARTBEAT {
-		} else if streamRec.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
-			close(responseCh)
-			close(errorCh)
-			return
-		} else {
-			responseCh <- ResponseRecord{
-				SequenceID: streamRec.GetSequenceId(),
-				ObjectID:   streamRec.GetLogOp().GetObjectId(),
-				Bucket:     streamRec.GetLogOp().GetBucket(),
-				State:      logOpToObjectState(streamRec),
-				Timestamp:  streamRec.GetLogOp().GetTimestamp().GetVc(),
-			}
-		}
-	}
-}
+// func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
+// 	for {
+// 		streamRec, err := stream.Recv()
+// 		if err != nil {
+// 			errorCh <- err
+// 			close(responseCh)
+// 			close(errorCh)
+// 			return
+// 		}
+// 		if streamRec.GetType() == qpu_api.ResponseStreamRecord_HEARTBEAT {
+// 		} else if streamRec.GetType() == qpu_api.ResponseStreamRecord_END_OF_STREAM {
+// 			close(responseCh)
+// 			close(errorCh)
+// 			return
+// 		} else {
+// 			responseCh <- ResponseRecord{
+// 				SequenceID: streamRec.GetSequenceId(),
+// 				ObjectID:   streamRec.GetLogOp().GetObjectId(),
+// 				Bucket:     streamRec.GetLogOp().GetBucket(),
+// 				State:      logOpToObjectState(streamRec),
+// 				Timestamp:  streamRec.GetLogOp().GetTimestamp().GetVc(),
+// 			}
+// 		}
+// 	}
+// }
 
 // QueryInternal ...
-func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, metadata map[string]string, sync bool) (<-chan ResponseRecord, <-chan error, error) {
-	query := queries.NewQuerySnapshot(table, []string{}, []string{}, []string{})
-	responseStream, err := qpugraph.SendQueryI(query, c.client)
+func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
+	query := queries.NewQuerySnapshot(table, []string{}, []string{}, []string{}, limit)
+	resp, err := qpugraph.SendQueryUnary(query, c.client)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	respCh := make(chan ResponseRecord)
-	errCh := make(chan error)
-	err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
+	// respCh := make(chan ResponseRecord)
+	// errCh := make(chan error)
+	// err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
 
-	return respCh, errCh, err
+	response := make([]ResponseRecord, len(resp))
+	for i, entry := range resp {
+		response[i] = ResponseRecord{
+			ObjectID:  entry.Op.GetObjectId(),
+			Bucket:    entry.Op.GetBucket(),
+			State:     logOpToObjectState(entry.Op),
+			Timestamp: entry.Op.GetTimestamp().GetVc(),
+		}
+	}
+
+	return response, err
 }
 
 func processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
@@ -125,14 +134,8 @@ func (c *Client) Query(query string) (<-chan ResponseRecord, <-chan error, error
 // 	return float64(dataTransferred.GetKBytesTranferred()), nil
 // }
 
-func logOpToObjectState(record *qpu_api.ResponseStreamRecord) map[string]string {
-	logOp := record.GetLogOp()
-	var attrs map[string]*qpu.Value
-	if record.GetType() == qpu_api.ResponseStreamRecord_STATE {
-		attrs = logOp.GetPayload().GetState().GetAttributes()
-	} else if record.GetType() == qpu_api.ResponseStreamRecord_UPDATEDELTA {
-		attrs = logOp.GetPayload().GetDelta().GetNew().GetAttributes()
-	}
+func logOpToObjectState(logOp *qpu.LogOperation) map[string]string {
+	attrs := logOp.GetPayload().GetState().GetAttributes()
 	state := make(map[string]string, 0)
 	for attrKey, attrVal := range attrs {
 		state[attrKey] = valueToString(attrVal)

@@ -37,12 +37,13 @@ func NewQuerySubscribe(table string, projection []string, isNull []string, isNot
 			),
 			predicate,
 			projection,
+			0,
 		),
 	}
 }
 
 // NewQuerySnapshot ...
-func NewQuerySnapshot(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
+func NewQuerySnapshot(table string, projection []string, isNull []string, isNotNull []string, limit int64) libqpu.InternalQuery {
 	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -70,6 +71,7 @@ func NewQuerySnapshot(table string, projection []string, isNull []string, isNotN
 			),
 			predicate,
 			projection,
+			limit,
 		),
 	}
 }
@@ -103,6 +105,7 @@ func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []st
 			),
 			predicate,
 			projection,
+			0,
 		),
 	}
 }

@@ -52,3 +52,16 @@ func SendQuerySQL(query string, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, 
 		libqpu.NewQueryRequestSQL(query, nil, false),
 	)
 }
+
+// SendQueryUnary ...
+func SendQueryUnary(query libqpu.InternalQuery, to *libqpu.AdjacentQPU) ([]libqpu.LogOperation, error) {
+	resp, err := to.APIClient.QueryUnary(
+		libqpu.NewQueryRequestI(query, nil, false),
+	)
+
+	response := make([]libqpu.LogOperation, len(resp.GetResults()))
+	for i, entry := range resp.GetResults() {
+		response[i] = libqpu.LogOperation{Op: entry}
+	}
+	return response, err
+}

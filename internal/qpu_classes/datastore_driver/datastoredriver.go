@@ -2,7 +2,6 @@ package datastoredriver
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -49,14 +48,14 @@ func InitClass(qpu *libqpu.QPU) (*DatastoreDriverQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
 
 	isNull, isNotNull := query.GetPredicateContains()
 	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }
 
 // ProcessQuerySubscribe ...
-func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 	id := rand.Int()
@@ -72,7 +71,6 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, s
 		}
 		go func() {
 			for {
-				fmt.Println(q.persistentQueries[query.GetTable()])
 				select {
 				case logOp, ok := <-logOpChFromStore:
 					if !ok {

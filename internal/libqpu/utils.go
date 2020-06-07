@@ -32,6 +32,7 @@ func Trace(msg string, fields map[string]interface{}) {
 	log.WithFields(logFields).Trace(msg)
 }
 
+// LogError ...
 func LogError(err error) {
 	log.Error(err)
 }

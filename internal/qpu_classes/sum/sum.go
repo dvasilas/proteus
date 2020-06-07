@@ -128,13 +128,14 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
 	stateCh, err := q.state.Scan(
 		stateTable+q.port,
 		append(q.idAttributes, q.stateSumAttribute),
+		query.GetLimit(),
 	)
 	if err != nil {
 		errCh <- err
@@ -185,7 +186,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.
 }
 
 // ProcessQuerySubscribe ...
-func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 

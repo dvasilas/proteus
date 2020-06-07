@@ -23,10 +23,18 @@ type QPU struct {
 	State        QPUState
 }
 
+// APIProcessor ...
+type APIProcessor interface {
+	Query(QueryRequest, RequestStream) error
+	QueryUnary(QueryRequest) ([]*LogOperation, error)
+	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
+	GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
+}
+
 // QPUClass ...
 type QPUClass interface {
-	ProcessQuerySnapshot(InternalQuery, RequestStream, map[string]string, bool) (<-chan LogOperation, <-chan error)
-	ProcessQuerySubscribe(InternalQuery, RequestStream, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
+	ProcessQuerySnapshot(InternalQuery, map[string]string, bool) (<-chan LogOperation, <-chan error)
+	ProcessQuerySubscribe(InternalQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
 }
 
@@ -35,11 +43,12 @@ type AdjacentQPU struct {
 	APIClient APIClient
 }
 
-// APIProcessor ...
-type APIProcessor interface {
-	Query(QueryRequest, RequestStream) error
-	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
-	GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
+// APIClient ...
+type APIClient interface {
+	Query(QueryRequest) (ResponseStream, error)
+	QueryUnary(QueryRequest) (*qpu_api.QueryResponse, error)
+	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
+	CloseConnection() error
 }
 
 // QPUState ...
@@ -48,15 +57,8 @@ type QPUState interface {
 	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp) error
 	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp) error
 	Get(string, string, map[string]*qpu.Value) (interface{}, error)
-	Scan(string, []string) (<-chan map[string]string, error)
+	Scan(string, []string, int64) (<-chan map[string]string, error)
 	Cleanup()
-}
-
-// APIClient ...
-type APIClient interface {
-	Query(QueryRequest) (ResponseStream, error)
-	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
-	CloseConnection() error
 }
 
 // QPUConfig specifies the configuration structure of a QPU

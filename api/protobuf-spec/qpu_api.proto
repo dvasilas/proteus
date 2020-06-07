@@ -5,6 +5,7 @@ option go_package = "github.com/dvasilas/proteus/internal/proto/qpu_api";
 import "api/protobuf-spec/qpu.proto";
 
 service QPUAPI {
+  rpc QueryUnary(QueryRequest) returns (QueryResponse) {}
   rpc Query(stream RequestStreamRecord) returns (stream ResponseStreamRecord) {}
   rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
   rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
@@ -17,6 +18,9 @@ message DataTransferResponse {
   float kBytesTranferred = 1;
 }
 
+message QueryResponse {
+  repeated qpu.LogOperation results = 1;
+}
 message RequestStreamRecord {
   oneof request {
     QueryRequest queryRequest = 1;
@@ -50,6 +54,7 @@ message Query {
     repeated string projection = 2;
     repeated qpu.AttributePredicate predicate = 3;
     qpu.SnapshotTimePredicate tsPredicate = 4;
+    int64 limit = 5;
   }
   message SQLQuery {
     string queryStr = 1;

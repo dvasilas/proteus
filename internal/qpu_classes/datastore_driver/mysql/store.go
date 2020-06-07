@@ -125,11 +125,10 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s %s", projectionStmt, table, whereStmt)
-	fmt.Println("query", query)
 
 	rows, err := ds.db.Query(query)
 	if err != nil {
-		fmt.Println("err", err)
+		libqpu.LogError(err)
 		errCh <- err
 		return logOpCh, errCh
 	}

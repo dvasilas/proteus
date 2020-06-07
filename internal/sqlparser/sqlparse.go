@@ -64,6 +64,7 @@ func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
 				),
 				[]*qpu.AttributePredicate{pred},
 				nil,
+				0,
 			),
 		},
 		nil

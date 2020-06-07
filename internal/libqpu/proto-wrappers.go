@@ -74,6 +74,7 @@ func (op LogOperation) GetTimestamp() *qpu.Vectorclock {
 	return op.Op.GetTimestamp()
 }
 
+// IsDelta ...
 func (op LogOperation) IsDelta() bool {
 	return op.Op.GetPayload().GetDelta().GetNew() != nil
 }
@@ -217,6 +218,8 @@ func (r ResponseRecord) GetRecordID() string {
 	return r.Rec.GetLogOp().GetObjectId()
 }
 
+// ---------------- QueryRequest -------------------
+
 // QueryType ...
 func (r QueryRequest) QueryType() QueryType {
 	switch r.Req.GetQuery().GetVal().(type) {
@@ -228,6 +231,28 @@ func (r QueryRequest) QueryType() QueryType {
 		return UnknownType
 	}
 }
+
+// GetQueryI ...
+func (r QueryRequest) GetQueryI() InternalQuery {
+	return InternalQuery{Q: r.Req.GetQuery().GetQueryI()}
+}
+
+// GetSQLStr ...
+func (r QueryRequest) GetSQLStr() string {
+	return r.Req.GetQuery().GetQuerySql().GetQueryStr()
+}
+
+// GetMetadata ...
+func (r QueryRequest) GetMetadata() map[string]string {
+	return r.Req.GetMetadata()
+}
+
+// GetSync ...
+func (r QueryRequest) GetSync() bool {
+	return r.Req.GetSync()
+}
+
+// ---------------- InternalQuery -------------------
 
 // InternalQuery ...
 type InternalQuery struct {
@@ -260,7 +285,6 @@ func (q InternalQuery) GetPredicateContains() ([]string, []string) {
 			isNotNull = append(isNotNull, pred.GetAttr().GetAttrKey())
 		}
 	}
-
 	return isNull, isNotNull
 }
 
@@ -269,24 +293,9 @@ func (q InternalQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
 	return q.Q.GetTsPredicate()
 }
 
-// GetQueryI ...
-func (r QueryRequest) GetQueryI() InternalQuery {
-	return InternalQuery{Q: r.Req.GetQuery().GetQueryI()}
-}
-
-// GetSQLStr ...
-func (r QueryRequest) GetSQLStr() string {
-	return r.Req.GetQuery().GetQuerySql().GetQueryStr()
-}
-
-// GetMetadata ...
-func (r QueryRequest) GetMetadata() map[string]string {
-	return r.Req.GetMetadata()
-}
-
-// GetSync ...
-func (r QueryRequest) GetSync() bool {
-	return r.Req.GetSync()
+// GetLimit ...
+func (q InternalQuery) GetLimit() int64 {
+	return q.Q.GetLimit()
 }
 
 // QueryType ...
@@ -370,12 +379,13 @@ func Query(queryI *qpu_api.QueryInternalQuery) *qpu_api.Query {
 }
 
 // QueryInternal ...
-func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string) *qpu_api.QueryInternalQuery {
+func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpu_api.QueryInternalQuery {
 	return &qpu_api.QueryInternalQuery{
 		Table:       table,
 		Projection:  projection,
 		Predicate:   predicate,
 		TsPredicate: ts,
+		Limit:       limit,
 	}
 }
 

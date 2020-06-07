@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -67,6 +68,20 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 	default:
 		return libqpu.Error("Query expects RequestStream_Request")
 	}
+}
+
+// QueryUnary ...
+func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qpu_api.QueryResponse, error) {
+	resp, err := s.api.QueryUnary(
+		libqpu.QueryRequest{Req: req},
+	)
+	results := make([]*qpu.LogOperation, len(resp))
+	for i, entry := range resp {
+		results[i] = entry.Op
+	}
+	return &qpu_api.QueryResponse{
+		Results: results,
+	}, err
 }
 
 // GetConfig implements the QPU's low level GetConfig API.

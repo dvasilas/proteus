@@ -74,15 +74,22 @@ func (c QPUAPIClient) QuerySQL(query string, metadata map[string]string, sync bo
 	}, err
 }
 
+// QueryUnary ...
+func (c QPUAPIClient) QueryUnary(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) {
+	ctx := context.TODO()
+	resp, err := c.cli.QueryUnary(ctx, req.Req)
+	return resp, err
+}
+
 // GetConfig implements the QPU's API GetConfig method.
-func (c *QPUAPIClient) GetConfig() (*qpu_api.ConfigResponse, error) {
+func (c QPUAPIClient) GetConfig() (*qpu_api.ConfigResponse, error) {
 	ctx := context.TODO()
 	resp, err := c.cli.GetConfig(ctx, libqpu.ConfigRequest())
 	return resp, err
 }
 
 // GetDataTransfer implements the QPU's API GetDataTransfer method.
-func (c *QPUAPIClient) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
+func (c QPUAPIClient) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
 	ctx := context.TODO()
 	resp, err := c.cli.GetDataTransfer(ctx, &qpu_api.GetDataRequest{})
 	return resp, err

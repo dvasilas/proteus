@@ -2,7 +2,6 @@ package apiprocessor
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -64,18 +63,15 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 
 	isSnapshot, isSubscribe := queries.QueryType(internalQuery)
 	if !isSubscribe && !isSnapshot {
-		fmt.Println("query type not recognized")
-		return libqpu.Error("invalid query for datastore_driver QPU")
+		return libqpu.Error("invalid query")
 	}
 
 	if isSubscribe {
-		fmt.Println("IsSubscribeToAllQuery")
-		queryID, logOpSubscribeCh, errSubscribeCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+		queryID, logOpSubscribeCh, errSubscribeCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, queryReq.GetMetadata(), queryReq.GetSync())
 	}
 	if isSnapshot {
-		fmt.Println("IsGetSnapshotQuery")
 		snapshotStream = true
-		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, queryReq.GetMetadata(), queryReq.GetSync())
 	}
 
 	var seqID int64
@@ -160,6 +156,36 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 
 	// libqpu.QPUClass.ProcessQuery provides the actual query processing functionality
 	// return s.qpuClass.ProcessQuery(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
+}
+
+// QueryUnary ...
+func (s APIProcessor) QueryUnary(req libqpu.QueryRequest) ([]*libqpu.LogOperation, error) {
+	result := make([]*libqpu.LogOperation, 0)
+	logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync())
+	for {
+		select {
+		case logOp, ok := <-logOpCh:
+			if !ok {
+				logOpCh = nil
+			} else {
+				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				result = append(result, &logOp)
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else {
+				libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
+				// 			if cancel != nil {
+				// 				cancel()
+				// 			}
+				return nil, err
+			}
+		}
+		if logOpCh == nil && errCh == nil {
+			return result, nil
+		}
+	}
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.

@@ -2,7 +2,9 @@ package joinqpu
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 
@@ -10,6 +12,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
 	//
@@ -121,19 +124,71 @@ func InitClass(qpu *libqpu.QPU) (*JoinQPU, error) {
 	return jqpu, nil
 }
 
-// ProcessQuery ...
-func (q *JoinQPU) ProcessQuery(libqpu.InternalQuery, libqpu.RequestStream, map[string]string, bool) error {
-	return nil
-}
-
 // ProcessQuerySnapshot ...
-func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
-	// q.opConsumer(query, stream)
-	return nil, nil
+func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+	libqpu.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
+
+	logOpCh := make(chan libqpu.LogOperation)
+	errCh := make(chan error)
+
+	projection := make([]string, len(q.schema[query.GetTable()]))
+	i := 0
+	for attr := range q.schema[query.GetTable()] {
+		projection[i] = attr
+		i++
+	}
+
+	stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit())
+	if err != nil {
+		errCh <- err
+		return logOpCh, errCh
+	}
+
+	go func() {
+		for record := range stateCh {
+			recordID := record[joinAttributeKey]
+
+			vectorClockKey := record["ts_key"]
+			vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
+			if err != nil {
+				libqpu.LogError(err)
+				errCh <- err
+				break
+			}
+			timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
+			if err != nil {
+				libqpu.LogError(err)
+				errCh <- err
+				break
+			}
+
+			delete(record, "unix_timestamp(ts)")
+			delete(record, "ts_key")
+
+			attributes, err := q.schema.StrToAttributes(stateTable, record)
+			if err != nil {
+				libqpu.LogError(err)
+				errCh <- err
+				break
+			}
+
+			logOpCh <- libqpu.LogOperationState(
+				recordID,
+				stateTable,
+				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
+				attributes,
+			)
+
+		}
+		close(logOpCh)
+		close(errCh)
+	}()
+
+	return logOpCh, errCh
 }
 
 // ProcessQuerySubscribe ...
-func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, stream libqpu.RequestStream, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	// q.snapshotConsumer(query, stream)
 	return -1, nil, nil
 }

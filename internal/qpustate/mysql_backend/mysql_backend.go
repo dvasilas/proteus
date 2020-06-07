@@ -3,6 +3,7 @@ package mysqlbackend
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -199,7 +200,7 @@ func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]
 // Scan retrieves all state records.
 // It returns a channel that can be used to iteratively return the retrieved records.
 // The channel returns records of type map[<attributeName>]<string_value>.
-func (s MySQLStateBackend) Scan(table string, columns []string) (<-chan map[string]string, error) {
+func (s MySQLStateBackend) Scan(table string, columns []string, limit int64) (<-chan map[string]string, error) {
 	projection := ""
 
 	columns = append(columns, "ts_key")
@@ -212,7 +213,12 @@ func (s MySQLStateBackend) Scan(table string, columns []string) (<-chan map[stri
 		}
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s", projection, table)
+	limitStmt := ""
+	if limit > 0 {
+		limitStmt = "LIMIT " + strconv.Itoa(int(limit))
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s %s", projection, table, limitStmt)
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
