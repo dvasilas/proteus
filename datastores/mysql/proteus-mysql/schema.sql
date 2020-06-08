@@ -45,26 +45,26 @@ CREATE TABLE IF NOT EXISTS `votes` (
 ) ENGINE=InnoDB;
 
 CREATE OR REPLACE VIEW `stories_votecount`
-  AS SELECT `story_id`, SUM(`vote`) `vote_count`, `ts`
+  AS SELECT `story_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
   FROM `votes`
   WHERE `comment_id` IS NULL
   GROUP BY `story_id`;
 
 
 CREATE OR REPLACE VIEW `comments_votecount`
-  AS SELECT `story_id`, `comment_id`, SUM(`vote`) `vote_count`, `ts`
+  AS SELECT `story_id`, `comment_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
   FROM `votes`
   WHERE `comment_id` IS NOT NULL
   GROUP BY `story_id`, `comment_id`;
 
 CREATE OR REPLACE VIEW `stories_with_votecount`
-  AS SELECT `story_id`, `user_id`, `title`, `description`, `short_id`, `vote_count`, `stories`.`ts`
+  AS SELECT `story_id`, `user_id`, `title`, `description`, `short_id`, `vote_count`, `stories_votecount`.`ts`
   FROM `stories`
   JOIN `stories_votecount`
   ON `stories`.`id` = `stories_votecount`.`story_id`;
 
 CREATE OR REPLACE VIEW `comments_with_votecount`
-  AS SELECT `id`, `comments`.`story_id`, `user_id`, `comment`, `vote_count`, `comments`.`ts`
+  AS SELECT `id`, `comments`.`story_id`, `user_id`, `comment`, `vote_count`, `comments_votecount`.`ts`
   FROM `comments`
   JOIN `comments_votecount`
   ON `comments`.`id` = `comments_votecount`.`comment_id`;

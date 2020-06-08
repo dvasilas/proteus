@@ -29,6 +29,7 @@ type JoinQPU struct {
 	schema         libqpu.Schema
 	joinAttributes map[string]string
 	inMemState     *inMemState
+	endOfStreamCnt int
 }
 
 type stateEntry struct {
@@ -199,13 +200,18 @@ func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 
 // ---------------- Internal Functions --------------
 
-func (q JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	respRecordType, err := respRecord.GetType()
 	if err != nil {
 		return err
 	}
 	if respRecordType == libqpu.EndOfStream {
-		return q.flushState()
+		q.endOfStreamCnt++
+		fmt.Println("q.endOfStreamCnt: ", q.endOfStreamCnt, len(q.joinAttributes))
+		if q.endOfStreamCnt == len(q.joinAttributes) {
+			return q.flushState()
+		}
+		return nil
 	}
 
 	if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
@@ -255,6 +261,7 @@ func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 }
 
 func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
+	fmt.Println("________updateState________")
 	for _, joinAttribute := range q.joinAttributes {
 		delete(values, joinAttribute)
 	}
@@ -287,6 +294,7 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 }
 
 func (q *JoinQPU) flushState() error {
+	fmt.Println("________flushState________")
 	for stateRecordID, entry := range q.inMemState.entries {
 		entry.mutex.RLock()
 		_, err := q.updateState(stateRecordID, entry.attributes, entry.ts.GetVc())

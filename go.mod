@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/AntidoteDB/antidote-go-client v0.0.0-20190606082231-75786c0ac196
+	github.com/BurntSushi/toml v0.3.1
 	github.com/aws/aws-sdk-go v1.20.11
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-sql-driver/mysql v1.5.0

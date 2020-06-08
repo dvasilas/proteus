@@ -14,6 +14,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/grpc"
+
+	//
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // MySQLDataStore ...

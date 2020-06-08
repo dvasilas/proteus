@@ -9,6 +9,9 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
+
+	//
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // This package provides an implementation of the libqpu.QPUState interface
@@ -48,7 +51,9 @@ func (s MySQLStateBackend) Init(database, table, createTable string) error {
 		return err
 	}
 
+	fmt.Println("INIT USE")
 	if _, err := s.db.Exec("USE " + database); err != nil {
+		fmt.Println("USE ....", err)
 		return err
 	}
 
@@ -148,14 +153,6 @@ func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]
 		updateStmt += k + " = ?, "
 		updateValues[i] = v
 
-		// switch v.Val.(type) {
-		// case *qpu.Value_Int:
-		// 	updateValues[i] = v.GetInt()
-		// case *qpu.Value_Flt:
-		// 	updateValues[i] = v.GetFlt()
-		// default:
-		// 	updateValues[i] = v.GetStr()
-		// }
 		i++
 	}
 

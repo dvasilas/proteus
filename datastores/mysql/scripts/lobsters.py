@@ -164,30 +164,30 @@ class DB(object):
             )
 
     def comments(self):
-        for (comment_id, story_id, user_id, comment) in self.cursor:
+        for (comment_id, story_id, user_id, comment, ts) in self.cursor:
             print(
-                "comment_id: {}, story_id: {}, user_id: {}, comment: {}".format(
-                    comment_id, story_id, user_id, comment
+                "comment_id: {}, story_id: {}, user_id: {}, comment: {}, ts: {}".format(
+                    comment_id, story_id, user_id, comment, ts
                 )
             )
 
     def votes(self):
-        for (vote_id, user_id, story_id, comment_id, vote) in self.cursor:
+        for (vote_id, user_id, story_id, comment_id, vote, ts) in self.cursor:
             print(
-                "vote_id: {}, user_id: {}, story_id: {}, comment_id: {}, vote: {}".format(
-                    vote_id, user_id, story_id, comment_id, vote
+                "vote_id: {}, user_id: {}, story_id: {}, comment_id: {}, vote: {}, ts: {}".format(
+                    vote_id, user_id, story_id, comment_id, vote, ts
                 )
             )
 
     def stories_votecount(self):
-        for (story_id, vote_count) in self.cursor:
-            print("story_id: {}, vote_count: {}".format(story_id, vote_count))
+        for (story_id, vote_count, ts) in self.cursor:
+            print("story_id: {}, vote_count: {}, ts: {}".format(story_id, vote_count, ts))
 
     def comments_votecount(self):
-        for (story_id, comment_id, vote_count) in self.cursor:
+        for (story_id, comment_id, vote_count, ts) in self.cursor:
             print(
-                "story_id: {}, comment_id: {}, vote_count: {}".format(
-                    story_id, comment_id, vote_count
+                "story_id: {}, comment_id: {}, vote_count: {}, ts: {}".format(
+                    story_id, comment_id, vote_count, ts
                 )
             )
 
@@ -199,18 +199,19 @@ class DB(object):
             description,
             short_id,
             vote_count,
+            ts,
         ) in self.cursor:
             print(
-                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}, vote_count: {}".format(
-                    story_id, user_id, title, description, short_id, vote_count
+                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}, vote_count: {}, ts: {}".format(
+                    story_id, user_id, title, description, short_id, vote_count, ts
                 )
             )
 
     def comments_with_votecount(self):
-        for (comment_id, story_id, user_id, comment, vote_count) in self.cursor:
+        for (comment_id, story_id, user_id, comment, vote_count, ts) in self.cursor:
             print(
-                "comment_id: {}, story_id: {}, user_id: {}, comment: {}, vote_count: {}".format(
-                    comment_id, story_id, user_id, comment, vote_count
+                "comment_id: {}, story_id: {}, user_id: {}, comment: {}, vote_count: {}, ts: {}".format(
+                    comment_id, story_id, user_id, comment, vote_count, ts
                 )
             )
 
