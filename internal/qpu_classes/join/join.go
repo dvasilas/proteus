@@ -173,6 +173,10 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 				break
 			}
 
+			if _, found := attributes["vote_sum"]; !found {
+				attributes["vote_sum"] = libqpu.ValueInt(0)
+			}
+
 			logOpCh <- libqpu.LogOperationState(
 				recordID,
 				stateTable,
@@ -207,7 +211,6 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 	}
 	if respRecordType == libqpu.EndOfStream {
 		q.endOfStreamCnt++
-		fmt.Println("q.endOfStreamCnt: ", q.endOfStreamCnt, len(q.joinAttributes))
 		if q.endOfStreamCnt == len(q.joinAttributes) {
 			return q.flushState()
 		}
@@ -261,7 +264,6 @@ func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 }
 
 func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
-	fmt.Println("________updateState________")
 	for _, joinAttribute := range q.joinAttributes {
 		delete(values, joinAttribute)
 	}
@@ -294,7 +296,6 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 }
 
 func (q *JoinQPU) flushState() error {
-	fmt.Println("________flushState________")
 	for stateRecordID, entry := range q.inMemState.entries {
 		entry.mutex.RLock()
 		_, err := q.updateState(stateRecordID, entry.attributes, entry.ts.GetVc())

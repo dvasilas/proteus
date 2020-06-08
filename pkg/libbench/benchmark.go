@@ -2,7 +2,10 @@ package libbench
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 )
@@ -17,7 +20,7 @@ type Benchmark struct {
 	config benchmarkConfig
 	qe     queryEngine
 	ds     datastore
-	state  benchmarkState
+	state  *benchmarkState
 }
 
 type benchmarkState struct {
@@ -34,7 +37,9 @@ type queryEngine interface {
 }
 
 // NewBenchmark ...
-func NewBenchmark(configFile, system string) (*Benchmark, error) {
+func NewBenchmark(configFile, system string, preload bool) (*Benchmark, error) {
+	rand.Seed(time.Now().UnixNano())
+
 	conf, err := getConfig(configFile)
 	if err != nil {
 		return nil, err
@@ -58,15 +63,37 @@ func NewBenchmark(configFile, system string) (*Benchmark, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	state := benchmarkState{}
+	if !preload {
+		state.userRecords = conf.Preload.RecordCount.Users
+		state.storyRecords = conf.Preload.RecordCount.Stories
+		state.commentRecords = conf.Preload.RecordCount.Comments
+	}
+
 	return &Benchmark{
 		config: conf,
 		ds:     ds,
 		qe:     qe,
-		state:  benchmarkState{},
+		state:  &state,
 	}, nil
 }
 
-// GetHomepage ...
-func (b *Benchmark) GetHomepage() error {
-	return b.qe.getHomepage()
+// Run ...
+func (b *Benchmark) Run() error {
+	for i := 0; i < 100; i++ {
+		f := rand.Float32()
+		fmt.Println(f)
+
+		if f < 0.1 {
+			if err := b.upVoteStory(b.selectUser(), b.selectStory()); err != nil {
+				return err
+			}
+		} else {
+			b.qe.getHomepage()
+		}
+	}
+
+	return nil
+	//
 }

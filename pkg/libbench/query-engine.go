@@ -27,7 +27,7 @@ func newProteusQueryEngine() (proteusQueryEngine, error) {
 }
 
 func (qe proteusQueryEngine) getHomepage() error {
-	return qe.doQuery("stateTableJoin", nil, nil, 0, nil, false)
+	return qe.doQuery("stateTableJoin", nil, nil, 5, nil, false)
 }
 
 func (qe proteusQueryEngine) doQuery(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, md map[string]string, sync bool) error {

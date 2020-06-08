@@ -3,17 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"text/tabwriter"
-	"time"
 
 	"github.com/dvasilas/proteus/pkg/libbench"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 
 	log.SetLevel(log.TraceLevel)
 
@@ -32,19 +29,24 @@ func main() {
 		w.Flush()
 	}
 
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		flag.Usage()
 		return
 	}
 
 	flag.Parse()
 
-	if system == "noArg" || configFile == "noArg" {
+	if configFile == "noArg" {
 		flag.Usage()
 		return
 	}
 
-	bench, err := libbench.NewBenchmark(configFile, system)
+	if !*preload && configFile == "noArg" {
+		flag.Usage()
+		return
+	}
+
+	bench, err := libbench.NewBenchmark(configFile, system, *preload)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,7 +59,7 @@ func main() {
 		return
 	}
 
-	err = bench.GetHomepage()
+	err = bench.Run()
 	if err != nil {
 		log.Fatal(err)
 	}

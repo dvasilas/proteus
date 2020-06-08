@@ -22,22 +22,30 @@ import (
 // MySQLStateBackend implements the libqpu.QPUState interface using MySQL as a
 // backend store.
 type MySQLStateBackend struct {
-	db *sql.DB
+	db              *sql.DB
+	accessKeyID     string
+	secretAccessKey string
+	endpoint        string
 }
 
 // NewStateBackend initiated a connection with the MySQL specified in the QPU's
 // configuration, and creates an instance of libqpu.QPUState.
-func NewStateBackend(conf *libqpu.QPUConfig) (MySQLStateBackend, error) {
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
-		conf.StateBackend.Credentials.AccessKeyID,
-		conf.StateBackend.Credentials.SecretAccessKey,
-		conf.StateBackend.Endpoint,
-	)
-	db, err := sql.Open("mysql", connStr)
-	if err != nil {
-		return MySQLStateBackend{}, err
-	}
-	return MySQLStateBackend{db: db}, nil
+func NewStateBackend(conf *libqpu.QPUConfig) (*MySQLStateBackend, error) {
+	// connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
+	// 	conf.StateBackend.Credentials.AccessKeyID,
+	// 	conf.StateBackend.Credentials.SecretAccessKey,
+	// 	conf.StateBackend.Endpoint,
+	// )
+	// db, err := sql.Open("mysql", connStr)
+	// if err != nil {
+	// 	return MySQLStateBackend{}, err
+	// }
+	// return MySQLStateBackend{db: db}, nil
+	return &MySQLStateBackend{
+		accessKeyID:     conf.StateBackend.Credentials.AccessKeyID,
+		secretAccessKey: conf.StateBackend.Credentials.SecretAccessKey,
+		endpoint:        conf.StateBackend.Endpoint,
+	}, nil
 }
 
 // Init performs the necessary initializations for using the MySQL instance as
@@ -46,31 +54,54 @@ func NewStateBackend(conf *libqpu.QPUConfig) (MySQLStateBackend, error) {
 // - it creates a database if it does not exist, selects it (USE)
 // - and creates the table to be used for storing the state (it drops the table
 //   if it already exists)
-func (s MySQLStateBackend) Init(database, table, createTable string) error {
-	if _, err := s.db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
+func (s *MySQLStateBackend) Init(database, table, createTable string) error {
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
+		s.accessKeyID,
+		s.secretAccessKey,
+		s.endpoint,
+	)
+	db, err := sql.Open("mysql", connStr)
+	if err != nil {
 		return err
 	}
 
-	fmt.Println("INIT USE")
-	if _, err := s.db.Exec("USE " + database); err != nil {
-		fmt.Println("USE ....", err)
+	if _, err := db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
 		return err
 	}
 
-	if _, err := s.db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+	if _, err := db.Exec("USE " + database); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
 		return err
 	}
 
 	libqpu.Trace("creating table", map[string]interface{}{"stmt": createTable})
-	if _, err := s.db.Exec(createTable); err != nil {
+	if _, err := db.Exec(createTable); err != nil {
 		return err
 	}
+
+	db.Close()
+
+	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s",
+		s.accessKeyID,
+		s.secretAccessKey,
+		s.endpoint,
+		database,
+	)
+	db, err = sql.Open("mysql", connStr)
+	if err != nil {
+		return err
+	}
+
+	s.db = db
 
 	return nil
 }
 
 // Get retrieves a state record, and returns the values specified by 'projection'
-func (s MySQLStateBackend) Get(table, projection string, predicate map[string]*qpu.Value) (interface{}, error) {
+func (s *MySQLStateBackend) Get(table, projection string, predicate map[string]*qpu.Value) (interface{}, error) {
 
 	whereStmt := ""
 	whereValues := make([]interface{}, len(predicate))
@@ -100,7 +131,7 @@ func (s MySQLStateBackend) Get(table, projection string, predicate map[string]*q
 }
 
 // Insert inserts a record in the state.
-func (s MySQLStateBackend) Insert(table string, row map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
+func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
 
 	insertStmtAttrs := "("
 	insertStmtAttrsValues := "("
@@ -142,7 +173,7 @@ func (s MySQLStateBackend) Insert(table string, row map[string]interface{}, vc m
 }
 
 // Update updates a state record.
-func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
+func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
 
 	updateStmt := ""
 	whereStmt := ""
@@ -197,7 +228,7 @@ func (s MySQLStateBackend) Update(table string, predicate, newValues map[string]
 // Scan retrieves all state records.
 // It returns a channel that can be used to iteratively return the retrieved records.
 // The channel returns records of type map[<attributeName>]<string_value>.
-func (s MySQLStateBackend) Scan(table string, columns []string, limit int64) (<-chan map[string]string, error) {
+func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64) (<-chan map[string]string, error) {
 	projection := ""
 
 	columns = append(columns, "ts_key")
@@ -246,6 +277,8 @@ func (s MySQLStateBackend) Scan(table string, columns []string, limit int64) (<-
 }
 
 // Cleanup closes the connection to the MySQL instance
-func (s MySQLStateBackend) Cleanup() {
-	s.db.Close()
+func (s *MySQLStateBackend) Cleanup() {
+	if s.db != nil {
+		s.db.Close()
+	}
 }
