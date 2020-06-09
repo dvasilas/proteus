@@ -7,7 +7,12 @@ import (
 )
 
 type benchmarkConfig struct {
-	Preload struct {
+	doPreload      bool
+	measuredSystem string
+	OpCount        int
+	Runtime        int
+	Warmup         int
+	Preload        struct {
 		RecordCount struct {
 			Users    int
 			Stories  int

@@ -15,8 +15,10 @@ func main() {
 	log.SetLevel(log.TraceLevel)
 
 	var configFile, system string
+	var threads int
 	flag.StringVar(&configFile, "c", "noArg", "configuration file")
 	flag.StringVar(&system, "s", "noArg", "system to be used as the query engine")
+	flag.IntVar(&threads, "t", 1, "number of client threads to be used")
 	preload := flag.Bool("p", false, "preload")
 
 	flag.Usage = func() {
@@ -41,7 +43,7 @@ func main() {
 		return
 	}
 
-	if !*preload && configFile == "noArg" {
+	if !(*preload) && system == "noArg" {
 		flag.Usage()
 		return
 	}
@@ -59,9 +61,11 @@ func main() {
 		return
 	}
 
-	err = bench.Run()
+	err = bench.Run(threads)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	bench.PrintMeasurements()
 
 }

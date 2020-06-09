@@ -3,9 +3,7 @@ package libbench
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu"
 	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 
@@ -26,40 +24,13 @@ func newProteusQueryEngine() (proteusQueryEngine, error) {
 	}, nil
 }
 
-func (qe proteusQueryEngine) getHomepage() error {
-	return qe.doQuery("stateTableJoin", nil, nil, 5, nil, false)
-}
-
-func (qe proteusQueryEngine) doQuery(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, md map[string]string, sync bool) error {
-	resp, err := qe.proteusClient.QueryInternal(table, predicate, ts, limit, md, sync)
+func (qe proteusQueryEngine) query(table string) (interface{}, error) {
+	resp, err := qe.proteusClient.QueryInternal(table, nil, nil, 5, nil, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, entry := range resp {
-		err = qe.processResponseRecord(entry)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (qe proteusQueryEngine) processResponseRecord(respRecord proteusclient.ResponseRecord) error {
-	for i, attributeKey := range qe.projection {
-		if val, found := respRecord.State[attributeKey]; found {
-			fmt.Printf("%s: %s", attributeKey, val)
-			if i < len(qe.projection)-1 {
-				fmt.Printf(", ")
-			}
-		} else {
-			log.Fatal("attribute not found")
-		}
-	}
-	fmt.Printf(" \n")
-
-	return nil
+	return resp, nil
 }
 
 type mySQLQueryEngine struct {
@@ -72,7 +43,7 @@ func newMySQLQueryEngine(ds *datastore) (mySQLQueryEngine, error) {
 	}, nil
 }
 
-func (qe mySQLQueryEngine) getHomepage() error {
+func (qe mySQLQueryEngine) query(table string) (interface{}, error) {
 	projection := []string{"title", "description", "short_id", "user_id", "vote_count", "unix_timestamp(ts)"}
 
 	projectionStmt := ""
@@ -89,17 +60,19 @@ func (qe mySQLQueryEngine) getHomepage() error {
 		"LIMIT 2")
 	rows, err := qe.ds.db.Query(query)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	values := make([]sql.RawBytes, len(projection))
 	scanArgs := make([]interface{}, len(projection))
+	result := make([]map[string]string, 0)
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		row := make(map[string]string)
 		for i, col := range values {
@@ -107,7 +80,8 @@ func (qe mySQLQueryEngine) getHomepage() error {
 				row[projection[i]] = string(col)
 			}
 		}
-		fmt.Println(row)
+		result = append(result, row)
 	}
-	return nil
+
+	return result, nil
 }

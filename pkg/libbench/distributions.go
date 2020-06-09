@@ -2,18 +2,26 @@ package libbench
 
 import "math/rand"
 
-func (b *Benchmark) selectUser() int {
-	b.state.userMutex.RLock()
-	userID := rand.Intn(b.state.userRecords-1) + 1
-	b.state.userMutex.RUnlock()
+func (op *operations) selectUser() int {
+	op.state.userMutex.RLock()
+	userID := rand.Intn(op.state.userRecords-1) + 1
+	op.state.userMutex.RUnlock()
 
 	return userID
 }
 
-func (b *Benchmark) selectStory() int {
-	b.state.storyMutex.RLock()
-	storyID := rand.Intn(b.state.storyRecords-1) + 1
-	b.state.storyMutex.RUnlock()
+func (op *operations) selectStory() int {
+	op.state.storyMutex.RLock()
+	storyID := rand.Intn(op.state.storyRecords-1) + 1
+	op.state.storyMutex.RUnlock()
 
 	return storyID
+}
+
+func (op *operations) selectComment() int {
+	op.state.commentMutex.RLock()
+	commentID := rand.Intn(op.state.commentRecords-1) + 1
+	op.state.commentMutex.RUnlock()
+
+	return commentID
 }

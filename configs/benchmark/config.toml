@@ -1,3 +1,6 @@
+"opCount" = 1000
+"runtime" = 5
+"warmup" = 2
 [Preload.RecordCount]
 "users" = 5
 "stories" = 5
