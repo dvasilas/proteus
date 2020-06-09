@@ -44,7 +44,7 @@ type benchmarkState struct {
 }
 
 type queryEngine interface {
-	query(table string) (interface{}, error)
+	query(limit int) (interface{}, error)
 }
 
 // NewBenchmark ...
@@ -99,7 +99,7 @@ func (b Benchmark) runWorkload(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	opCnt := 0
-	warmupPeriod, warmupTimeout := true, time.After(time.Duration(b.config.Warmup)*time.Second)
+	warmupPeriod, warmupTimeout := b.config.DoWarmup, time.After(time.Duration(b.config.Warmup)*time.Second)
 	for timeIsUp, timeout := true, time.After(time.Duration(b.config.Runtime)*time.Second); timeIsUp; {
 
 		select {
@@ -109,9 +109,23 @@ func (b Benchmark) runWorkload(wg *sync.WaitGroup) {
 			warmupPeriod = false
 		default:
 		}
-		err := b.measurements.getHomepage(!warmupPeriod)
-		if err != nil {
-			log.Fatal(err)
+		r := rand.Float64()
+		if r < b.config.Operations.WriteRatio {
+			vote := rand.Float64()
+			if vote < b.config.Operations.DownVoteRatio {
+				if err := b.measurements.downVoteStory(0); err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				if err := b.measurements.upVoteStory(0); err != nil {
+					log.Fatal(err)
+				}
+			}
+		} else {
+			err := b.measurements.getHomepage(!warmupPeriod)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 		opCnt++
 		if opCnt == b.config.OpCount {

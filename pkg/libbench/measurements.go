@@ -74,9 +74,11 @@ func (m *measurements) upVoteStory(storyID int) error {
 	return err
 }
 
-func (m *measurements) downVoteStory() error {
+func (m *measurements) downVoteStory(storyID int) error {
 	userID := m.ops.selectUser()
-	storyID := m.ops.selectStory()
+	if storyID == 0 {
+		storyID = m.ops.selectStory()
+	}
 
 	err := m.ops.downVoteStory(userID, storyID)
 

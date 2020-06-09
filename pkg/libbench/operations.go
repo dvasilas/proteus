@@ -31,8 +31,10 @@ func newOperations(conf *benchmarkConfig) (*operations, error) {
 	if !conf.doPreload {
 		if conf.measuredSystem == "proteus" {
 			qe, err = newProteusQueryEngine()
-		} else if conf.measuredSystem == "mysql" {
-			qe, err = newMySQLQueryEngine(&ds)
+		} else if conf.measuredSystem == "mysql_plain" {
+			qe, err = newMySQLPlainQE(&ds)
+		} else if conf.measuredSystem == "mysql_views" {
+			qe, err = neMySQLWithViewsQE(&ds)
 		} else {
 			return nil, errors.New("invalid 'system' argument")
 		}
@@ -72,29 +74,52 @@ func (st *benchmarkState) addComment() {
 }
 
 func (op *operations) getHomepage() (homepage, error) {
-	resp, err := op.qe.query("stateTableJoin")
+	resp, err := op.qe.query(op.config.Operations.Homepage.StoriesLimit)
 	if err != nil {
 		return homepage{}, err
 	}
 
-	var response []proteusclient.ResponseRecord
-	response = resp.([]proteusclient.ResponseRecord)
-	stories := make([]story, len(response))
-	for i, entry := range response {
-		stories[i] = story{
-			title:       entry.State["title"],
-			description: entry.State["description"],
-			shortID:     entry.State["short_id"],
-		}
+	var hp homepage
 
-		val, err := strconv.ParseInt(entry.State["vote_sum"], 10, 64)
-		if err != nil {
-			return homepage{}, err
+	switch op.config.measuredSystem {
+	case "proteus":
+		response := resp.([]proteusclient.ResponseRecord)
+		stories := make([]story, len(response))
+		for i, entry := range response {
+			stories[i] = story{
+				title:       entry.State["title"],
+				description: entry.State["description"],
+				shortID:     entry.State["short_id"],
+			}
+
+			val, err := strconv.ParseInt(entry.State["vote_sum"], 10, 64)
+			if err != nil {
+				return homepage{}, err
+			}
+			stories[i].voteCount = val
 		}
-		stories[i].voteCount = val
+		hp.stories = stories
+	default:
+	case "mysql_plain":
+		response := resp.([]map[string]string)
+		stories := make([]story, len(response))
+		for i, entry := range response {
+			stories[i] = story{
+				title:       entry["title"],
+				description: entry["description"],
+				shortID:     entry["short_id"],
+			}
+
+			val, err := strconv.ParseInt(entry["vote_count"], 10, 64)
+			if err != nil {
+				return homepage{}, err
+			}
+			stories[i].voteCount = val
+		}
+		hp.stories = stories
 	}
 
-	return homepage{stories: stories}, nil
+	return hp, nil
 }
 
 func (op *operations) addUser() error {

@@ -12,7 +12,7 @@ import (
 
 func main() {
 
-	log.SetLevel(log.TraceLevel)
+	// log.SetLevel(log.TraceLevel)
 
 	var configFile, system string
 	var threads int

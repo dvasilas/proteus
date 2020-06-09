@@ -1,6 +1,16 @@
-"opCount" = 1000
+"opCount" = 100
 "runtime" = 5
+"doWarmup" = false
 "warmup" = 2
+"printResuls" = false
+
+[Operations]
+"writeRatio" = 0.1
+"downVoteRatio" = 0.2
+
+[Operations.Homepage]
+"storiesLimit" = 5
+
 [Preload.RecordCount]
 "users" = 5
 "stories" = 5

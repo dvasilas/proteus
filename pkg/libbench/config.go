@@ -11,8 +11,16 @@ type benchmarkConfig struct {
 	measuredSystem string
 	OpCount        int
 	Runtime        int
+	DoWarmup       bool
 	Warmup         int
-	Preload        struct {
+	Operations     struct {
+		Homepage struct {
+			StoriesLimit int
+		}
+		WriteRatio    float64
+		DownVoteRatio float64
+	}
+	Preload struct {
 		RecordCount struct {
 			Users    int
 			Stories  int
