@@ -1,17 +1,16 @@
 version: '3'
 services:
   datastore:
-    image: dvasilas/proteus-lobsters:latest
+    image: dvasilas/proteus-lobsters:5ab5c800
     networks:
       - proteus_net
     environment:
-    - REMOTE_MANAGEMENT_DISABLE=1
-    - S3BACKEND=mem
+    - MYSQL_ROOT_PASSWORD=verySecretPwd
     deploy:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.dc0_node1 == true ]
+        constraints: [ node.labels.datastore == true ]
 
 networks:
   proteus_net:

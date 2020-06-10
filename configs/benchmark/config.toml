@@ -5,11 +5,10 @@
 "secretAccessKey"  = "verySecretPwd"
 
 [Benchmark]
-"opCount" = 1000000
+"opCount" = 5
 "runtime" = 5
-"doWarmup" = true
+"doWarmup" = false
 "warmup" = 2
-"printResuls" = true
 "threadCount" = 1
 
 [Operations]

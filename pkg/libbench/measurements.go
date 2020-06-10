@@ -30,7 +30,6 @@ func (m *measurements) getHomepage(measure bool) error {
 		m.tachymeter.AddTime(time.Since(st))
 	}
 
-	// printHomepage(homepage)
 	return err
 }
 

@@ -41,24 +41,16 @@ type mySQLWithViewsQE struct {
 
 // ------------------ MySQL (with MVs) ---------------
 
-func neMySQLWithViewsQE(ds *datastore) (mySQLWithViewsQE, error) {
+func newMySQLWithViewsQE(ds *datastore) (mySQLWithViewsQE, error) {
 	return mySQLWithViewsQE{
 		ds: ds,
 	}, nil
 }
 
 func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
-	projection := []string{"title", "description", "short_id", "user_id", "vote_count", "unix_timestamp(ts)"}
+	projection := []string{"title", "description", "short_id", "vote_count"}
 
-	projectionStmt := ""
-	for i, attr := range projection {
-		projectionStmt += attr
-		if i < len(projection)-1 {
-			projectionStmt += ", "
-		}
-	}
-
-	query := fmt.Sprintf("SELECT title, description, short_id, user_id, vote_count"+
+	query := fmt.Sprintf("SELECT title, description, short_id, vote_count "+
 		"FROM stories_with_votecount "+
 		"LIMIT %d",
 		limit)

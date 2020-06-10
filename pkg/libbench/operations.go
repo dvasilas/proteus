@@ -33,8 +33,8 @@ func newOperations(conf *benchmarkConfig) (*operations, error) {
 			qe, err = newProteusQueryEngine()
 		} else if conf.Benchmark.measuredSystem == "mysql_plain" {
 			qe, err = newMySQLPlainQE(&ds)
-		} else if conf.Benchmark.measuredSystem == "mysql_views" {
-			qe, err = neMySQLWithViewsQE(&ds)
+		} else if conf.Benchmark.measuredSystem == "mysql_mv" {
+			qe, err = newMySQLWithViewsQE(&ds)
 		} else {
 			return nil, errors.New("invalid 'system' argument")
 		}
@@ -99,8 +99,24 @@ func (op *operations) getHomepage() (homepage, error) {
 			stories[i].voteCount = val
 		}
 		hp.stories = stories
-	default:
 	case "mysql_plain":
+		response := resp.([]map[string]string)
+		stories := make([]story, len(response))
+		for i, entry := range response {
+			stories[i] = story{
+				title:       entry["title"],
+				description: entry["description"],
+				shortID:     entry["short_id"],
+			}
+
+			val, err := strconv.ParseInt(entry["vote_count"], 10, 64)
+			if err != nil {
+				return homepage{}, err
+			}
+			stories[i].voteCount = val
+		}
+		hp.stories = stories
+	case "mysql_mv":
 		response := resp.([]map[string]string)
 		stories := make([]story, len(response))
 		for i, entry := range response {
