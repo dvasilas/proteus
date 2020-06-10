@@ -18,7 +18,7 @@ func main() {
 	var threads int
 	flag.StringVar(&configFile, "c", "noArg", "configuration file")
 	flag.StringVar(&system, "s", "noArg", "system to be used as the query engine")
-	flag.IntVar(&threads, "t", 1, "number of client threads to be used")
+	flag.IntVar(&threads, "t", 0, "number of client threads to be used")
 	preload := flag.Bool("p", false, "preload")
 
 	flag.Usage = func() {
@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 
-	bench, err := libbench.NewBenchmark(configFile, system, *preload)
+	bench, err := libbench.NewBenchmark(configFile, system, *preload, threads)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func main() {
 		return
 	}
 
-	err = bench.Run(threads)
+	err = bench.Run()
 	if err != nil {
 		log.Fatal(err)
 	}

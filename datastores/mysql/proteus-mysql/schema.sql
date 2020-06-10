@@ -50,9 +50,6 @@ CREATE OR REPLACE VIEW `stories_votecount`
   WHERE `comment_id` IS NULL
   GROUP BY `story_id`;
 
-
--- select v.story_id, sum(v.vote) as vote_count from votes v where v.comment_id IS NULL group by v.story_id;
-
 CREATE OR REPLACE VIEW `comments_votecount`
   AS SELECT `story_id`, `comment_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
   FROM `votes`

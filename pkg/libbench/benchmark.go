@@ -2,19 +2,13 @@ package libbench
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/jamiealquiza/tachymeter"
+	log "github.com/sirupsen/logrus"
 )
-
-const credentialsAccessKeyID = "user"
-const credentialsSecretAccessKey = "123456"
-const datastoreEndpoint = "127.0.0.1:3307"
-const datastoreDB = "proteus_lobsters_db"
 
 // Benchmark ...
 type Benchmark struct {
@@ -48,17 +42,20 @@ type queryEngine interface {
 }
 
 // NewBenchmark ...
-func NewBenchmark(configFile, system string, preload bool) (Benchmark, error) {
+func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Benchmark, error) {
 	rand.Seed(time.Now().UnixNano())
 
 	conf, err := getConfig(configFile)
 	if err != nil {
 		return Benchmark{}, err
 	}
-	conf.doPreload = preload
-	conf.measuredSystem = system
+	conf.Benchmark.doPreload = preload
+	conf.Benchmark.measuredSystem = system
+	if threadCnt > 0 {
+		conf.Benchmark.ThreadCount = threadCnt
+	}
 
-	libqpu.Trace("config", map[string]interface{}{"conf": conf})
+	log.WithFields(log.Fields{"conf": conf}).Info("configuration")
 
 	measurements, err := newMeasurements(&conf)
 	if err != nil {
@@ -78,12 +75,12 @@ func (b Benchmark) PrintMeasurements() {
 }
 
 // Run ...
-func (b Benchmark) Run(threadCount int) error {
+func (b Benchmark) Run() error {
 	var wg sync.WaitGroup
 
 	wallTimeStart := time.Now()
 
-	for i := 0; i < threadCount; i++ {
+	for i := 0; i < b.config.Benchmark.ThreadCount; i++ {
 		wg.Add(1)
 		go b.runWorkload(&wg)
 	}
@@ -99,8 +96,8 @@ func (b Benchmark) runWorkload(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	opCnt := 0
-	warmupPeriod, warmupTimeout := b.config.DoWarmup, time.After(time.Duration(b.config.Warmup)*time.Second)
-	for timeIsUp, timeout := true, time.After(time.Duration(b.config.Runtime)*time.Second); timeIsUp; {
+	warmupPeriod, warmupTimeout := b.config.Benchmark.DoWarmup, time.After(time.Duration(b.config.Benchmark.Warmup)*time.Second)
+	for timeIsUp, timeout := true, time.After(time.Duration(b.config.Benchmark.Runtime)*time.Second); timeIsUp; {
 
 		select {
 		case <-timeout:
@@ -128,7 +125,7 @@ func (b Benchmark) runWorkload(wg *sync.WaitGroup) {
 			}
 		}
 		opCnt++
-		if opCnt == b.config.OpCount {
+		if opCnt == b.config.Benchmark.OpCount {
 			break
 		}
 	}

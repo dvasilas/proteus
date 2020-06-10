@@ -1,8 +1,16 @@
-"opCount" = 100
+[Connection]
+"endpoint" = "127.0.0.1:3309"
+"database" = "proteus_lobsters_db"
+"accessKeyID" = "user"
+"secretAccessKey"  = "verySecretPwd"
+
+[Benchmark]
+"opCount" = 1000000
 "runtime" = 5
-"doWarmup" = false
+"doWarmup" = true
 "warmup" = 2
-"printResuls" = false
+"printResuls" = true
+"threadCount" = 1
 
 [Operations]
 "writeRatio" = 0.1

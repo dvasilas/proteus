@@ -7,13 +7,23 @@ import (
 )
 
 type benchmarkConfig struct {
-	doPreload      bool
-	measuredSystem string
-	OpCount        int
-	Runtime        int
-	DoWarmup       bool
-	Warmup         int
-	Operations     struct {
+	Connection struct {
+		Endpoint        string
+		Database        string
+		AccessKeyID     string
+		SecretAccessKey string
+	}
+	Benchmark struct {
+		doPreload      bool
+		measuredSystem string
+		OpCount        int
+		Runtime        int
+		DoWarmup       bool
+		Warmup         int
+		ThreadCount    int
+	}
+
+	Operations struct {
 		Homepage struct {
 			StoriesLimit int
 		}

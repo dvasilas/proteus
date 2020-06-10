@@ -1,0 +1,18 @@
+version: '3'
+services:
+  datastore:
+    image: dvasilas/proteus-lobsters:latest
+    networks:
+      - proteus_net
+    environment:
+    - REMOTE_MANAGEMENT_DISABLE=1
+    - S3BACKEND=mem
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints: [ node.labels.dc0_node1 == true ]
+
+networks:
+  proteus_net:
+    external: true

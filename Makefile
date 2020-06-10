@@ -7,6 +7,10 @@ TESTPKGS := $(shell env GO111MODULE=on go list -f \
 
 DOCKER_NET := proteus-local-dev-net1
 
+REPO_DATASTORE := dvasilas/proteus-lobsters
+TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
+IMG_DATASTORE := ${REPO_DATASTORE}:${TAG}
+
 $(PROTOC_CMD):
 ifeq ($(UNAME), Darwin)
 	https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-osx-x86_64.zip
@@ -20,16 +24,23 @@ endif
 export GO111MODULE=on
 
 .PHONY: qpu
-## build: build the qpu application
+## qpu: build the qpu application
 qpu:
 	@echo "Building..."
 	@go build -o ${BIN_DIR}/qpu cmd/qpu/main.go
 
 .PHONY: query
-## build: build the qpu application
+## query: build the qpu application
 query:
 	@echo "Building..."
 	@go build -o ${BIN_DIR}/query cmd/query/main.go
+
+.PHONY: bench
+## query: build the qpu application
+bench:
+	@echo "Building..."
+	@go build -o ${BIN_DIR}/benchmark cmd/benchmark/main.go
+
 
 .PHONY: fmt
 ## fmt: runs gofmt on all source files
@@ -76,6 +87,16 @@ proto: $(PROTOC_CMD)
 	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
+
+
+.PHONY: image-push
+## image-push: Pushes iamges to docker hub
+image-push:
+	docker tag lobsters/plain ${IMG_DATASTORE}
+	docker push ${IMG_DATASTORE}
+
+docker push dvasilas/proteus-lobsters:tagname
+
 
 .PHONY: clean
 ## clean: cleans the binary

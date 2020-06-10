@@ -22,18 +22,18 @@ type story struct {
 }
 
 func newOperations(conf *benchmarkConfig) (*operations, error) {
-	ds, err := newDatastore(datastoreEndpoint, datastoreDB, credentialsAccessKeyID, credentialsSecretAccessKey)
+	ds, err := newDatastore(conf.Connection.Endpoint, conf.Connection.Database, conf.Connection.AccessKeyID, conf.Connection.SecretAccessKey)
 	if err != nil {
 		return nil, err
 	}
 
 	var qe queryEngine
-	if !conf.doPreload {
-		if conf.measuredSystem == "proteus" {
+	if !conf.Benchmark.doPreload {
+		if conf.Benchmark.measuredSystem == "proteus" {
 			qe, err = newProteusQueryEngine()
-		} else if conf.measuredSystem == "mysql_plain" {
+		} else if conf.Benchmark.measuredSystem == "mysql_plain" {
 			qe, err = newMySQLPlainQE(&ds)
-		} else if conf.measuredSystem == "mysql_views" {
+		} else if conf.Benchmark.measuredSystem == "mysql_views" {
 			qe, err = neMySQLWithViewsQE(&ds)
 		} else {
 			return nil, errors.New("invalid 'system' argument")
@@ -41,7 +41,7 @@ func newOperations(conf *benchmarkConfig) (*operations, error) {
 	}
 
 	state := benchmarkState{}
-	if !conf.doPreload {
+	if !conf.Benchmark.doPreload {
 		state.userRecords = conf.Preload.RecordCount.Users
 		state.storyRecords = conf.Preload.RecordCount.Stories
 		state.commentRecords = conf.Preload.RecordCount.Comments
@@ -81,7 +81,7 @@ func (op *operations) getHomepage() (homepage, error) {
 
 	var hp homepage
 
-	switch op.config.measuredSystem {
+	switch op.config.Benchmark.measuredSystem {
 	case "proteus":
 		response := resp.([]proteusclient.ResponseRecord)
 		stories := make([]story, len(response))

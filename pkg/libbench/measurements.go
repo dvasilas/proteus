@@ -13,7 +13,7 @@ func newMeasurements(conf *benchmarkConfig) (*measurements, error) {
 		return nil, err
 	}
 
-	t := tachymeter.New(&tachymeter.Config{Size: conf.OpCount})
+	t := tachymeter.New(&tachymeter.Config{Size: conf.Benchmark.OpCount})
 
 	return &measurements{
 		ops:        ops,
