@@ -11,6 +11,7 @@ REPO_DATASTORE := dvasilas/proteus-lobsters
 TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
 IMG_DATASTORE_PLAIN := ${REPO_DATASTORE}:plain_${TAG}
 IMG_DATASTORE_MV := ${REPO_DATASTORE}:mv_${TAG}
+IMG_DATASTORE_TRIGGER := ${REPO_DATASTORE}:trigger_${TAG}
 
 $(PROTOC_CMD):
 ifeq ($(UNAME), Darwin)
@@ -95,8 +96,10 @@ proto: $(PROTOC_CMD)
 image-push:
 	docker tag lobsters/plain ${IMG_DATASTORE_PLAIN}
 	docker tag lobsters/mv ${IMG_DATASTORE_MV}
+	docker tag lobsters/proteus ${IMG_DATASTORE_TRIGGER}
 	docker push ${IMG_DATASTORE_PLAIN}
 	docker push ${IMG_DATASTORE_MV}
+	docker push ${IMG_DATASTORE_TRIGGER}
 
 docker push dvasilas/proteus-lobsters:tagname
 

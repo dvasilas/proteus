@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	mysql "github.com/dvasilas/proteus-mysql-notifications/proto"
-	pb "github.com/dvasilas/proteus-mysql-notifications/proto"
+	mysql "github.com/dvasilas/proteus-lobsters/proto"
+	pb "github.com/dvasilas/proteus-lobsters/proto"
 	"github.com/fsnotify/fsnotify"
 	ptypes "github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
@@ -61,7 +61,7 @@ func main() {
 		updateCh = make(chan string)
 
 		// go server.publishUpdates(table, updateCh, errCh)
-		go server.subscribeUpdatesFS("/opt/proteus-mysql/"+table, table, updateCh, errCh)
+		go server.subscribeUpdatesFS("/opt/lobsters/"+table, table, updateCh, errCh)
 
 		go func() {
 			for err := range errCh {

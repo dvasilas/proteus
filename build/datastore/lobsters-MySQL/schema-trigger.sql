@@ -44,30 +44,6 @@ CREATE TABLE IF NOT EXISTS `votes` (
   CONSTRAINT `votes_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB;
 
-CREATE OR REPLACE VIEW `stories_votecount`
-  AS SELECT `story_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
-  FROM `votes`
-  WHERE `comment_id` IS NULL
-  GROUP BY `story_id`;
-
-CREATE OR REPLACE VIEW `comments_votecount`
-  AS SELECT `story_id`, `comment_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
-  FROM `votes`
-  WHERE `comment_id` IS NOT NULL
-  GROUP BY `story_id`, `comment_id`;
-
-CREATE OR REPLACE VIEW `stories_with_votecount`
-  AS SELECT `story_id`, `user_id`, `title`, `description`, `short_id`, `vote_count`, `stories_votecount`.`ts`
-  FROM `stories`
-  JOIN `stories_votecount`
-  ON `stories`.`id` = `stories_votecount`.`story_id`;
-
-CREATE OR REPLACE VIEW `comments_with_votecount`
-  AS SELECT `id`, `comments`.`story_id`, `user_id`, `comment`, `vote_count`, `comments_votecount`.`ts`
-  FROM `comments`
-  JOIN `comments_votecount`
-  ON `comments`.`id` = `comments_votecount`.`comment_id`;
-
 DROP FUNCTION IF EXISTS sys_exec;
 CREATE FUNCTION sys_exec RETURNS INT SONAME 'lib_sys_exec.so';
 DELIMITER $
@@ -79,10 +55,10 @@ BEGIN
   DECLARE cmd CHAR(255);
   DECLARE result int(10);
       IF NEW.comment_id IS NULL THEN
-          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'votes ', New.id, ' ', unix_timestamp(New.ts), ' story_id:', New.story_id, ' vote:', New.vote);
+          SET cmd = CONCAT('python /opt/lobsters/proteus-lobsters/trigger.py ', 'votes ', New.id, ' ', unix_timestamp(New.ts), ' story_id:', New.story_id, ' vote:', New.vote);
           SET result = sys_exec(cmd);
       ELSE
-          SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'votes ', New.id, ' ', unix_timestamp(New.ts), ' story_id:', New.story_id, ' comment_id:', New.comment_id, ' vote:', New.vote);
+          SET cmd = CONCAT('python /opt/lobsters/proteus-lobsters/trigger.py ', 'votes ', New.id, ' ', unix_timestamp(New.ts), ' story_id:', New.story_id, ' comment_id:', New.comment_id, ' vote:', New.vote);
           SET result = sys_exec(cmd);
       END IF;
 END;
@@ -93,7 +69,7 @@ FOR EACH ROW
 BEGIN
   DECLARE cmd CHAR(255);
   DECLARE result int(10);
-      SET cmd = CONCAT('python /opt/proteus-mysql/trigger.py ', 'stories ', New.id, ' ', unix_timestamp(New.ts), ' id:', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
+      SET cmd = CONCAT('python /opt/lobsters/proteus-lobsters/trigger.py ', 'stories ', New.id, ' ', unix_timestamp(New.ts), ' id:', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
       SET result = sys_exec(cmd);
 END;
 $

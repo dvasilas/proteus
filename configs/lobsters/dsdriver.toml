@@ -5,12 +5,12 @@ port = "50150"
 type = "mysql"
 # endpoint = "http://cloudserver-0:8000"
 # logStreamEndpoint = "cloudserver-0:50000"
-endpoint = "127.0.0.1:3307"
+endpoint = "127.0.0.1:3309"
 logStreamEndpoint = "127.0.0.1:50000"
 DBName = "proteus_lobsters_db"
 [DatastoreConfig.Credentials]
 accessKeyID = "user"
-secretAccessKey = "123456"
+secretAccessKey = "verySecretPwd"
 
 [[Schema]]
 table = "votes"
