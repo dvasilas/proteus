@@ -94,7 +94,7 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 		stateTable+sqpu.port,
 		fmt.Sprintf(
 			// vote_count int
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(20), ts TIMESTAMP, UNIQUE KEY %s )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts TIMESTAMP, UNIQUE KEY %s )",
 			stateTable+sqpu.port,
 			idAttributesColumns,
 			sqpu.stateSumAttribute,

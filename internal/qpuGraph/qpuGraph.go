@@ -27,12 +27,13 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 	for i, conn := range qpu.Config.Connections {
 
 		for {
-			conn, _ := net.DialTimeout("tcp", conn.Address, time.Duration(time.Second))
-			if conn != nil {
-				conn.Close()
+			c, _ := net.DialTimeout("tcp", conn.Address, time.Duration(time.Second))
+			if c != nil {
+				c.Close()
 				break
 			}
 			time.Sleep(2 * time.Second)
+			libqpu.Trace("retying connecting to", map[string]interface{}{"conn": conn.Address})
 		}
 
 		qpuapiclient, err := apiclient.NewClient(conn.Address)
@@ -42,6 +43,8 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 		adjQPUs[i] = &libqpu.AdjacentQPU{
 			APIClient: qpuapiclient,
 		}
+
+		libqpu.Trace("connection established", map[string]interface{}{"conn": conn.Address})
 	}
 	qpu.AdjacentQPUs = adjQPUs
 

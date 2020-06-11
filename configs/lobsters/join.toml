@@ -2,18 +2,20 @@ qpuType = "join"
 port = "50350"
 
 [[connections]]
-address = "127.0.0.1:50150"
+address = "docker.for.mac.localhost:50150"
+# address = "127.0.0.1:50150"
 local = "local"
 [[connections]]
-address = "127.0.0.1:50250"
+address = "docker.for.mac.localhost:50250"
+# address = "127.0.0.1:50250"
 local = "local"
 
 [StateBackend]
-endpoint = "127.0.0.1:3308"
+endpoint = "127.0.0.1:3306"
 
 [StateBackend.Credentials]
 accessKeyID = "root"
-secretAccessKey = "123456"
+secretAccessKey = "verySecrectQPUPwd"
 
 # assumptions
 # - the first attribute in 'Projection' is the one to use for the join and is treated as libqpu.INT

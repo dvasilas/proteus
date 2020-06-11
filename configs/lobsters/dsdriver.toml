@@ -3,10 +3,10 @@ port = "50150"
 
 [DatastoreConfig]
 type = "mysql"
-# endpoint = "http://cloudserver-0:8000"
-# logStreamEndpoint = "cloudserver-0:50000"
-endpoint = "127.0.0.1:3309"
-logStreamEndpoint = "127.0.0.1:50000"
+# endpoint = "127.0.0.1:3306"
+endpoint = "docker.for.mac.localhost:3309"
+# logStreamEndpoint = "127.0.0.1:50000"
+logStreamEndpoint = "docker.for.mac.localhost:50000"
 DBName = "proteus_lobsters_db"
 [DatastoreConfig.Credentials]
 accessKeyID = "user"

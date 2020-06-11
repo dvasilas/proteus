@@ -1,19 +1,22 @@
-FROM golang
+FROM golang as stage0
+ARG MYSQL_PASSWORD
+RUN set -xe && \
+    apt-get update -y && apt-get install -y mariadb-server netcat && \
+    /usr/bin/install -m 755 -o mysql -g root -d /var/run/mysqld && \
+    /usr/bin/mysql_install_db -u mysql
 
+FROM stage0 as stage1
 ENV GO111MODULE=on
-
 WORKDIR /
-
 COPY go.mod .
 COPY go.sum .
-
 RUN go mod download
 
 WORKDIR /app/proteus/
 COPY . .
 
-COPY ./configs /etc
-
 RUN make qpu
 
-ENTRYPOINT ["/app/proteus/bin/qpu"]
+COPY build/proteus/localdev/ /
+
+ENTRYPOINT ["/start-mysql.sh"]
