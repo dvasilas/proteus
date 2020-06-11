@@ -35,6 +35,7 @@ type SumQPU struct {
 	sourceTable       string
 	inMemState        *inMemState
 	port              string
+	catchUpDoneCh     chan int
 }
 
 type subscribeQuery struct {
@@ -57,7 +58,7 @@ type stateEntry struct {
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(q *libqpu.QPU) (*SumQPU, error) {
+func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 	sqpu := &SumQPU{
 		state:             q.State,
 		schema:            q.Schema,
@@ -68,6 +69,7 @@ func InitClass(q *libqpu.QPU) (*SumQPU, error) {
 		sourceTable:       q.Config.SumConfig.SourceTable,
 		inMemState:        &inMemState{entries: make(map[string]*stateEntry)},
 		port:              q.Config.Port,
+		catchUpDoneCh:     catchUpDoneCh,
 	}
 
 	sqpu.schema[stateTable] = make(map[string]libqpu.DatastoreAttributeType)
@@ -203,7 +205,14 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 		return err
 	}
 	if respRecordType == libqpu.EndOfStream {
-		return q.flushState()
+		err := q.flushState()
+		if err != nil {
+			return err
+		}
+		go func() {
+			q.catchUpDoneCh <- 0
+		}()
+		return nil
 	}
 
 	if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {

@@ -16,8 +16,9 @@ import (
 
 // Service represents a QPU service
 type Service struct {
-	qpu       *libqpu.QPU
-	rpcServer *grpcserver.Server
+	qpu         *libqpu.QPU
+	rpcServer   *grpcserver.Server
+	catchUpDone chan int
 }
 
 // NewQPUService is responsible for initializing all QPU components and
@@ -46,7 +47,8 @@ func NewQPUService(configFile string) (libqpu.QPUService, error) {
 	}
 	qpu.State = state
 
-	apiProcessor, err := apiprocessor.NewProcessor(qpu)
+	catchUpDoneCh := make(chan int)
+	apiProcessor, err := apiprocessor.NewProcessor(qpu, catchUpDoneCh)
 	if err != nil {
 		return nil, err
 	}
@@ -57,14 +59,18 @@ func NewQPUService(configFile string) (libqpu.QPUService, error) {
 	}
 
 	return Service{
-		qpu:       qpu,
-		rpcServer: rpcServer,
+		qpu:         qpu,
+		rpcServer:   rpcServer,
+		catchUpDone: catchUpDoneCh,
 	}, nil
 }
 
 // Start starts the QPU's rpcServer.
 // After this point the QPU can receive requests.
 func (s Service) Start() error {
+	<-s.catchUpDone
+	close(s.catchUpDone)
+
 	return s.rpcServer.Serve()
 }
 

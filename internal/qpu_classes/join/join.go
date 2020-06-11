@@ -30,6 +30,7 @@ type JoinQPU struct {
 	joinAttributes map[string]string
 	inMemState     *inMemState
 	endOfStreamCnt int
+	catchUpDoneCh  chan int
 }
 
 type stateEntry struct {
@@ -45,12 +46,13 @@ type inMemState struct {
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(qpu *libqpu.QPU) (*JoinQPU, error) {
+func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 	jqpu := &JoinQPU{
 		state:          qpu.State,
 		schema:         qpu.Schema,
 		joinAttributes: make(map[string]string),
 		inMemState:     &inMemState{entries: make(map[int64]*stateEntry)},
+		catchUpDoneCh:  catchUpDoneCh,
 	}
 
 	jqpu.schema[stateTable] = make(map[string]libqpu.DatastoreAttributeType)
@@ -212,7 +214,14 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 	if respRecordType == libqpu.EndOfStream {
 		q.endOfStreamCnt++
 		if q.endOfStreamCnt == len(q.joinAttributes) {
-			return q.flushState()
+			err := q.flushState()
+			if err != nil {
+				return err
+			}
+			go func() {
+				q.catchUpDoneCh <- 0
+			}()
+			return nil
 		}
 		return nil
 	}

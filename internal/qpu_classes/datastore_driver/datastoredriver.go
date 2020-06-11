@@ -28,7 +28,7 @@ type dataStore interface {
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(qpu *libqpu.QPU) (*DatastoreDriverQPU, error) {
+func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, error) {
 	var ds dataStore
 	var err error
 	switch qpu.Config.DatastoreConfig.Type {
@@ -40,6 +40,10 @@ func InitClass(qpu *libqpu.QPU) (*DatastoreDriverQPU, error) {
 	default:
 		return &DatastoreDriverQPU{}, libqpu.Error("unknown datastore type")
 	}
+
+	go func() {
+		catchUpDoneCh <- 0
+	}()
 
 	return &DatastoreDriverQPU{
 		datastore:         ds,

@@ -26,8 +26,8 @@ type APIProcessor struct {
 
 // NewProcessor creates an instance of APIProcessor.
 // It initiates the libqpu.QPUClass corresponding to the QPU's class.
-func NewProcessor(qpu *libqpu.QPU) (APIProcessor, error) {
-	qpuClass, err := getQPUClass(qpu)
+func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (APIProcessor, error) {
+	qpuClass, err := getQPUClass(qpu, catchUpDoneCh)
 	if err != nil {
 		libqpu.LogError(err)
 		return APIProcessor{}, err
@@ -200,14 +200,14 @@ func (s APIProcessor) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRe
 
 // ---------------- Internal Functions --------------
 
-func getQPUClass(qpu *libqpu.QPU) (libqpu.QPUClass, error) {
+func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, error) {
 	switch qpu.Config.QpuType {
 	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
-		return datastoredriver.InitClass(qpu)
+		return datastoredriver.InitClass(qpu, catchUpDoneCh)
 	case qpu_api.ConfigResponse_SUM:
-		return sumqpu.InitClass(qpu)
+		return sumqpu.InitClass(qpu, catchUpDoneCh)
 	case qpu_api.ConfigResponse_JOIN:
-		return joinqpu.InitClass(qpu)
+		return joinqpu.InitClass(qpu, catchUpDoneCh)
 	default:
 		return nil, libqpu.Error("Unknown QPU class")
 	}
