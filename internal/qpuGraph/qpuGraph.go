@@ -1,6 +1,9 @@
 package qpugraph
 
 import (
+	"net"
+	"time"
+
 	"github.com/dvasilas/proteus/internal/apiclient"
 	"github.com/dvasilas/proteus/internal/libqpu"
 )
@@ -22,6 +25,16 @@ import (
 func ConnectToGraph(qpu *libqpu.QPU) error {
 	adjQPUs := make([]*libqpu.AdjacentQPU, len(qpu.Config.Connections))
 	for i, conn := range qpu.Config.Connections {
+
+		for {
+			conn, _ := net.DialTimeout("tcp", conn.Address, time.Duration(time.Second))
+			if conn != nil {
+				conn.Close()
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+
 		qpuapiclient, err := apiclient.NewClient(conn.Address)
 		if err != nil {
 			return err
