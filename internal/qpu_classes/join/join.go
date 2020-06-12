@@ -15,7 +15,6 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
-	//
 	_ "github.com/go-sql-driver/mysql"
 )
 

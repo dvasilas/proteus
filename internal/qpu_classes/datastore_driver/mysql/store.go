@@ -143,6 +143,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 	}
 
 	go func() {
+		defer rows.Close()
 		for rows.Next() {
 			err = rows.Scan(scanArgs...)
 			if err != nil {

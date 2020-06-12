@@ -16,7 +16,7 @@ type benchmarkConfig struct {
 	Benchmark struct {
 		doPreload      bool
 		measuredSystem string
-		OpCount        int
+		OpCount        int64
 		Runtime        int
 		DoWarmup       bool
 		Warmup         int

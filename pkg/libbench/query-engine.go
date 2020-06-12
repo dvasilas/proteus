@@ -65,6 +65,7 @@ func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
+	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -119,6 +120,7 @@ func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
+	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {

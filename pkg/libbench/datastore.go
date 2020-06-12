@@ -6,7 +6,6 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 
-	//
 	_ "github.com/go-sql-driver/mysql"
 )
 

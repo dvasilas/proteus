@@ -10,7 +10,6 @@ import (
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 
-	//
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -258,6 +257,7 @@ func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64) (<
 	}
 	resultCh := make(chan map[string]string)
 	go func() {
+		defer rows.Close()
 		for rows.Next() {
 			err = rows.Scan(scanArgs...)
 			if err != nil {
