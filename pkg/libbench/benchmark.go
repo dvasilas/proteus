@@ -1,6 +1,7 @@
 package libbench
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -66,7 +67,18 @@ func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Bench
 
 // PrintMeasurements ...
 func (b Benchmark) PrintMeasurements() {
+	b.config.print()
+	metrics := b.measurements.CalculateMetrics()
 
+	fmt.Printf("Runtime: %.3f\n", metrics.Runtime)
+	for opType, metrics := range metrics.PerOpMetrics {
+		fmt.Printf("[%s] Operation count: %d\n", opType, metrics.OpCount)
+		fmt.Printf("[%s] Throughput: %.5f\n", opType, metrics.Throughput)
+		fmt.Printf("[%s] p50(ms): %.5f\n", opType, metrics.P50)
+		fmt.Printf("[%s] p90(ms): %.5f\n", opType, metrics.P90)
+		fmt.Printf("[%s] p95(ms): %.5f\n", opType, metrics.P95)
+		fmt.Printf("[%s] p99(ms): %.5f\n", opType, metrics.P99)
+	}
 }
 
 // Run ...
@@ -83,8 +95,6 @@ func (b Benchmark) Run() error {
 	}
 
 	wg.Wait()
-
-	b.measurements.CalculateMetrics()
 
 	return nil
 }

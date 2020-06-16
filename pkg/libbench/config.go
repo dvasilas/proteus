@@ -1,6 +1,7 @@
 package libbench
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"github.com/BurntSushi/toml"
@@ -53,4 +54,16 @@ func readConfigFile(configFile string, conf *benchmarkConfig) error {
 	}
 	toml.Unmarshal(configData, conf)
 	return nil
+}
+
+func (c *benchmarkConfig) print() {
+	fmt.Printf("Target system: %s\n", c.Benchmark.measuredSystem)
+	fmt.Printf("Benchmark duration(s): %d\n", c.Benchmark.Runtime)
+	fmt.Printf("Warmup(s): %d\n", c.Benchmark.Warmup)
+	fmt.Printf("Benchmark threads: %d\n", c.Benchmark.ThreadCount)
+	fmt.Printf("[workload] Q/W ratio(%%): %f\n", 1-c.Operations.WriteRatio)
+	fmt.Printf("[workload] U/D vote ratio(%%): %f\n", 1-c.Operations.DownVoteRatio)
+	fmt.Printf("[preload] Users: %d\n", c.Preload.RecordCount.Users)
+	fmt.Printf("[preload] Stories: %d\n", c.Preload.RecordCount.Stories)
+	fmt.Printf("[preload] Comments: %d\n", c.Preload.RecordCount.Comments)
 }

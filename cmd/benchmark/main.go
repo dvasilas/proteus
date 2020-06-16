@@ -67,5 +67,4 @@ func main() {
 	}
 
 	bench.PrintMeasurements()
-
 }

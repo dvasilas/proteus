@@ -1,7 +1,6 @@
 package perf
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -31,10 +30,20 @@ type Perf struct {
 	runTime         time.Duration
 }
 
+// OpMetrics ...
+type OpMetrics struct {
+	OpCount    int64
+	Throughput float64
+	P50        float64
+	P90        float64
+	P95        float64
+	P99        float64
+}
+
 // Metrics ...
 type Metrics struct {
-	// measurements           durations
-	// aggregatedMeasurements durations
+	Runtime      float64
+	PerOpMetrics map[string]OpMetrics
 }
 
 // New ...
@@ -87,34 +96,25 @@ func (p *Perf) CalculateMetrics() Metrics {
 		sort.Sort(durations(threadMeasurements))
 	}
 
-	// fmt.Println()
-	// fmt.Println("aggregatedMeasurements ", aggregatedMeasurements)
-	// fmt.Println()
-
-	fmt.Printf("Runtime: %.3f\n", runTime.Seconds())
-
-	for opType, threadMeasurements := range aggregatedMeasurements {
-		fmt.Printf("[%s] Operation count: %d\n", opType, aggregatedOpCount[opType])
-		fmt.Printf("[%s] Throughput: %.5f\n", opType, float64(aggregatedOpCount[opType])/float64(runTime.Seconds()))
-		fmt.Printf("[%s] p50(ms): %.5f\n", opType, durationToMillis(threadMeasurements[threadMeasurements.Len()/2]))
-		fmt.Printf("[%s] p90(ms): %.5f\n", opType, durationToMillis(threadMeasurements.percentile(0.9)))
-		fmt.Printf("[%s] p95(ms): %.5f\n", opType, durationToMillis(threadMeasurements.percentile(0.95)))
-		fmt.Printf("[%s] p99(ms): %.5f\n", opType, durationToMillis(threadMeasurements.percentile(0.99)))
+	m := Metrics{
+		PerOpMetrics: make(map[string]OpMetrics),
 	}
 
-	// 	m.aggregatedMeasurements = make([]time.Duration, 0)
-	// 	var totalOpCount int64
-	// 	for _, thread := range m.measurements {
-	// 		totalOpCount += thread.size
-	// 		m.aggregatedMeasurements = append(m.aggregatedMeasurements, thread.durations[:thread.size]...)
-	// 	}
+	m.Runtime = runTime.Seconds()
 
-	// fmt.Printf("p50(ms): %.5f\n", durationToMillis(m.aggregatedMeasurements[m.aggregatedMeasurements.Len()/2]))
-	// 	fmt.Printf("p90(ms): %.5f\n", durationToMillis(m.aggregatedMeasurements.percentile(0.9)))
-	// 	fmt.Printf("p95(ms): %.5f\n", durationToMillis(m.aggregatedMeasurements.percentile(0.95)))
-	// 	fmt.Printf("p99(ms): %.5f\n", durationToMillis(m.aggregatedMeasurements.percentile(0.99)))
+	for opType, threadMeasurements := range aggregatedMeasurements {
+		opMetrics := OpMetrics{
+			OpCount:    aggregatedOpCount[opType],
+			Throughput: float64(aggregatedOpCount[opType]) / float64(runTime.Seconds()),
+			P50:        durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
+			P90:        durationToMillis(threadMeasurements.percentile(0.9)),
+			P95:        durationToMillis(threadMeasurements.percentile(0.95)),
+			P99:        durationToMillis(threadMeasurements.percentile(0.99)),
+		}
+		m.PerOpMetrics[opType] = opMetrics
+	}
 
-	return Metrics{}
+	return m
 }
 
 func calcExperimentStart(measurements map[string][]time.Duration) time.Duration {
