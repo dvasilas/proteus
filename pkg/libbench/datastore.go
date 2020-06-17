@@ -57,6 +57,7 @@ func (ds datastore) insert(table string, row map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer stmtInsert.Close()
 
 	_, err = stmtInsert.Exec(insertValues...)
 
