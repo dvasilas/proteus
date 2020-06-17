@@ -33,9 +33,10 @@ type benchmarkConfig struct {
 	}
 	Preload struct {
 		RecordCount struct {
-			Users    int
-			Stories  int
-			Comments int
+			Users      int
+			Stories    int
+			Comments   int
+			StoryVotes int
 		}
 	}
 }
@@ -66,4 +67,5 @@ func (c *benchmarkConfig) print() {
 	fmt.Printf("[preload] Users: %d\n", c.Preload.RecordCount.Users)
 	fmt.Printf("[preload] Stories: %d\n", c.Preload.RecordCount.Stories)
 	fmt.Printf("[preload] Comments: %d\n", c.Preload.RecordCount.Comments)
+	fmt.Printf("[preload] Votes-stories: %d\n", c.Preload.RecordCount.StoryVotes)
 }

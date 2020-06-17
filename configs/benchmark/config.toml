@@ -6,9 +6,9 @@
 
 [Benchmark]
 "opCount" = 1000000
-"runtime" = 10
+"runtime" = 300
 "doWarmup" = true
-"warmup" = 2
+"warmup" = 60
 "threadCount" = 1
 
 [Operations]
@@ -20,5 +20,6 @@
 
 [Preload.RecordCount]
 "users" = 100
-"stories" = 1000
-"comments" = 2000
+"stories" = 10
+"comments" = 100
+"StoryVotes" = 10000

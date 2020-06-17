@@ -122,6 +122,19 @@ func (w workload) preload() error {
 		}
 	}
 
+	for i := 1; i <= w.config.Preload.RecordCount.StoryVotes; i++ {
+		vote := rand.Float64()
+		if vote < w.config.Operations.DownVoteRatio {
+			if _, err := w.downVoteStory(0); err != nil {
+				return err
+			}
+		} else {
+			if _, err := w.upVoteStory(0); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
