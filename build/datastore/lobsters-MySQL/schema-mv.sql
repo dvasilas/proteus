@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS `stories` (
   `title` varchar(150) NOT NULL DEFAULT '',
   `description` mediumtext NOT NULL,
   `short_id` varchar(6) NOT NULL DEFAULT '',
+  `vote_count` bigint DEFAULT 0,
   `ts` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `short_id` (`short_id`),
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `comments` (
   `story_id` bigint unsigned NOT NULL,
   `user_id` bigint unsigned NOT NULL,
   `comment` mediumtext NOT NULL,
+  `vote_count` bigint DEFAULT 0,
   `ts` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `comments_story_id_fk` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`),
@@ -44,26 +46,22 @@ CREATE TABLE IF NOT EXISTS `votes` (
   CONSTRAINT `votes_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB;
 
-CREATE OR REPLACE VIEW `stories_votecount`
-  AS SELECT `story_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
-  FROM `votes`
-  WHERE `comment_id` IS NULL
-  GROUP BY `story_id`;
-
-CREATE OR REPLACE VIEW `comments_votecount`
-  AS SELECT `story_id`, `comment_id`, SUM(`vote`) `vote_count`, MAX(`ts`) `ts`
-  FROM `votes`
-  WHERE `comment_id` IS NOT NULL
-  GROUP BY `story_id`, `comment_id`;
-
-CREATE OR REPLACE VIEW `stories_with_votecount`
-  AS SELECT `story_id`, `user_id`, `title`, `description`, `short_id`, `vote_count`, `stories_votecount`.`ts`
-  FROM `stories`
-  JOIN `stories_votecount`
-  ON `stories`.`id` = `stories_votecount`.`story_id`;
-
-CREATE OR REPLACE VIEW `comments_with_votecount`
-  AS SELECT `id`, `comments`.`story_id`, `user_id`, `comment`, `vote_count`, `comments_votecount`.`ts`
-  FROM `comments`
-  JOIN `comments_votecount`
-  ON `comments`.`id` = `comments_votecount`.`comment_id`;
+delimiter #
+DROP TRIGGER IF EXISTS `stories_votecount`;
+CREATE TRIGGER `stories_votecount`
+AFTER INSERT ON `votes`
+FOR EACH ROW
+BEGIN
+  DECLARE oldVC integer;
+  DECLARE newVC integer;
+  IF NEW.comment_id IS NULL THEN
+    SET oldVC = (SELECT `vote_count` from `stories` where `id` = NEW.story_id);
+    SET newVC = oldVC + NEW.vote;
+    UPDATE `stories` SET `vote_count` = newVC  where `id` = NEW.story_id;
+  ELSE
+    SET oldVC = (SELECT `vote_count` from `comments` where `id` = NEW.comment_id);
+    SET newVC = oldVC + NEW.vote;
+    UPDATE `comments` SET `vote_count` = newVC  where `id` = NEW.comment_id;
+  END IF;
+END#
+delimiter ;
