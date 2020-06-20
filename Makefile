@@ -105,8 +105,12 @@ image-push:
 	#docker push ${IMG_DATASTORE_TRIGGER}
 	docker push ${IMG_QPU}
 
-docker push dvasilas/proteus-lobsters:tagname
-
+.PHONY: sync
+## sync:
+sync:
+	ssh proteus-worker1 'sudo mkdir -p /mount/
+	scp build/datastore/lobsters-MySQL/docker-entrypoint-init/* proteus-worker1:
+	ssh proteus-worker1 'sudo mv *.sql /mount/'
 
 .PHONY: clean
 ## clean: cleans the binary
