@@ -1,25 +1,25 @@
 [Connection]
 "endpoint" = "127.0.0.1:3307"
 "database" = "proteus_lobsters_db"
-"accessKeyID" = "user"
+"accessKeyID" = "root"
 "secretAccessKey"  = "verySecretPwd"
 
 [Benchmark]
-"opCount" = 1000000
-"runtime" = 300
+"opCount" = 100000
+"runtime" = 30
 "doWarmup" = true
-"warmup" = 60
+"warmup" = 15
 "threadCount" = 1
 
 [Operations]
-"writeRatio" = 0.1
+"writeRatio" = 0.0
 "downVoteRatio" = 0.2
 
 [Operations.Homepage]
 "storiesLimit" = 5
 
 [Preload.RecordCount]
-"users" = 100
-"stories" = 10
-"comments" = 100
-"StoryVotes" = 10000
+"users" = 10
+"stories" = 100
+"comments" = 10
+"StoryVotes" = 10

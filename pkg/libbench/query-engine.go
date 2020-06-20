@@ -51,7 +51,8 @@ func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
 	projection := []string{"title", "description", "short_id", "vote_count"}
 
 	query := fmt.Sprintf("SELECT title, description, short_id, vote_count "+
-		"FROM stories_with_votecount "+
+		"FROM stories "+
+		"ORDER BY vote_count DESC "+
 		"LIMIT %d",
 		limit)
 	rows, err := qe.ds.db.Query(query)
@@ -100,12 +101,13 @@ func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
 
 	query := fmt.Sprintf("SELECT story_id, s.title, s.description, s.short_id, vote_count "+
 		"FROM stories s "+
-		"LEFT JOIN ( "+
+		"JOIN ( "+
 		"SELECT v.story_id, SUM(v.vote) as vote_count "+
 		"FROM votes v "+
 		"WHERE v.comment_id IS NULL "+
 		"GROUP BY v.story_id) "+
 		"vc ON s.id = vc.story_id "+
+		"ORDER BY vote_count DESC "+
 		"LIMIT %d",
 		limit)
 
