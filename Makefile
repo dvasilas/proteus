@@ -108,7 +108,7 @@ image-push:
 .PHONY: sync
 ## sync:
 sync:
-	ssh proteus-worker1 'sudo mkdir -p /mount/
+	ssh proteus-worker1 'sudo mkdir -p /mount/'
 	scp build/datastore/lobsters-MySQL/docker-entrypoint-init/* proteus-worker1:
 	ssh proteus-worker1 'sudo mv *.sql /mount/'
 

@@ -7,24 +7,34 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/pkg/perf"
+	"golang.org/x/sync/semaphore"
 )
 
 type workload struct {
 	config       *benchmarkConfig
 	ops          *operations
 	measurements *perf.Perf
+	storySemPhs  []*semaphore.Weighted
 }
 
 func newWorkload(conf *benchmarkConfig) (*workload, error) {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	ops, err := newOperations(conf)
 	if err != nil {
 		return nil, err
+	}
+
+	storySemPhs := make([]*semaphore.Weighted, conf.Preload.RecordCount.Stories)
+	for i := range storySemPhs {
+		storySemPhs[i] = semaphore.NewWeighted(1)
 	}
 
 	return &workload{
 		config:       conf,
 		ops:          ops,
 		measurements: perf.New(),
+		storySemPhs:  storySemPhs,
 	}, nil
 }
 
@@ -176,50 +186,63 @@ func (w *workload) addComment() error {
 }
 
 func (w *workload) upVoteStory(storyID int) (time.Duration, error) {
-	st := time.Now()
-
 	userID := w.ops.selectUser()
 	if storyID == 0 {
+
+		window := 5
 		storyID = w.ops.selectStory()
+		for !w.storySemPhs[storyID].TryAcquire(1) {
+			storyID = w.ops.selectStory()
+			window *= 2
+			waitFor := time.Duration(rand.Intn(window))
+			time.Sleep(time.Duration(waitFor) * time.Millisecond)
+		}
+		defer w.storySemPhs[storyID].Release(1)
 	}
 
+	st := time.Now()
 	err := w.ops.upVoteStory(userID, storyID)
 
 	return time.Since(st), err
 }
 
 func (w *workload) downVoteStory(storyID int) (time.Duration, error) {
-	st := time.Now()
-
 	userID := w.ops.selectUser()
 	if storyID == 0 {
+		window := 5
 		storyID = w.ops.selectStory()
+		for !w.storySemPhs[storyID].TryAcquire(1) {
+			storyID = w.ops.selectStory()
+			window *= 2
+			waitFor := time.Duration(rand.Intn(window))
+			time.Sleep(time.Duration(waitFor) * time.Millisecond)
+		}
+		defer w.storySemPhs[storyID].Release(1)
 	}
 
+	st := time.Now()
 	err := w.ops.downVoteStory(userID, storyID)
 
 	return time.Since(st), err
 }
 
 func (w *workload) upVoteComment(commentID int) (time.Duration, error) {
-	st := time.Now()
-
 	userID := w.ops.selectUser()
 	if commentID == 0 {
 		commentID = w.ops.selectStory()
 	}
 
+	st := time.Now()
 	err := w.ops.upVoteComment(userID, commentID)
 
 	return time.Since(st), err
 }
 
 func (w *workload) downVoteComment() (time.Duration, error) {
-	st := time.Now()
-
 	userID := w.ops.selectUser()
 	commentID := w.ops.selectStory()
 
+	st := time.Now()
 	err := w.ops.downVoteComment(userID, commentID)
 
 	return time.Since(st), err
