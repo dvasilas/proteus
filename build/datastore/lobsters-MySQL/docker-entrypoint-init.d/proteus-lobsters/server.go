@@ -61,7 +61,7 @@ func main() {
 		updateCh = make(chan string)
 
 		// go server.publishUpdates(table, updateCh, errCh)
-		go server.subscribeUpdatesFS("/opt/lobsters/"+table, table, updateCh, errCh)
+		go server.subscribeUpdatesFS("/opt/proteus-lobsters/"+table, table, updateCh, errCh)
 
 		go func() {
 			for err := range errCh {

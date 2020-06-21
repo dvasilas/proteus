@@ -19,6 +19,6 @@ for arg in sys.argv[4:]:
 
 updateFile = "".join(random.choice(string.ascii_lowercase) for i in range(32))
 
-with open("/opt/lobsters/{}/{}".format(table, updateFile), "w") as f:
+with open("/opt/proteus-lobsters/{}/{}".format(table, updateFile), "w") as f:
     json.dump(data, f)
     f.close()

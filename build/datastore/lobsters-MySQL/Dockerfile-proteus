@@ -1,61 +1,20 @@
-FROM centos:centos7 AS stage0
-WORKDIR /opt/
-RUN set -xe && \
-  yum install wget -y && yum -y clean all && \
-  wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.20-linux-x86_64-minimal.tar.xz && \
-  tar xvf mysql-8.0.20-linux-x86_64-minimal.tar.xz && \
-  rm mysql-8.0.20-linux-x86_64-minimal.tar.xz && \
-  wget https://dl.google.com/go/go1.14.2.linux-amd64.tar.gz && \
-  tar -xzf go1.14.2.linux-amd64.tar.gz && \
-  rm go1.14.2.linux-amd64.tar.gz
-
-FROM centos:centos7 AS stage1
-COPY --from=stage0 /opt/ /opt/
+FROM mysql AS stage0
 WORKDIR /usr/local/
 RUN set -xe && \
-    yum install git gcc libaio numactl-libs openssl -y && yum -y clean all && \
-    groupadd mysql && \
-    useradd -r -g mysql -s /bin/false mysql && \
-    chown -R mysql:mysql /opt/mysql-8.0.20-linux-x86_64-minimal && \
-    ln -s /opt/mysql-8.0.20-linux-x86_64-minimal mysql && \
-    ln -s /opt/go go && \
-    mkdir mysql-files && \
-    chown mysql:mysql mysql-files && \
-    chmod 750 mysql-files
+    apt-get update -y && \
+    apt-get install -y build-essential libmysqlclient-dev wget python && \
+    wget https://dl.google.com/go/go1.14.2.linux-amd64.tar.gz && \
+    tar -xzf go1.14.2.linux-amd64.tar.gz && \
+    rm go1.14.2.linux-amd64.tar.gz && \
+    ln -s /opt/go go
 
-FROM stage1 AS stage2
-WORKDIR /usr/local/mysql/
-COPY build/datastore/lobsters-MySQL/ /opt/lobsters/
-ARG MYSQL_PASSWORD
+FROM stage0 as stage1
+COPY build/datastore/lobsters-MySQL/docker-entrypoint-init.d/proteus-lobsters/ /opt/proteus-lobsters/
+WORKDIR /opt/proteus-lobsters/
 RUN set -xe && \
-    bin/mysqld --initialize --user=mysql &> log && \
-    export OLDPASS=$(cat log | grep password | awk '{print $NF}') && \
-    bin/mysql_ssl_rsa_setup && \
-    support-files/mysql.server start && \
-    cp /opt/lobsters/cred.cnf /tmp/cred1.cnf && \
-    echo "" >> /tmp/cred1.cnf && echo "" >> /opt/lobsters/cred.cnf && \
-    echo "password=$OLDPASS" >> /tmp/cred1.cnf && \
-    echo "password=$MYSQL_PASSWORD" >> /opt/lobsters/cred.cnf && \
-    echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';" > /tmp/changepass.sql && \
-    echo "CREATE USER 'user'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';" > /tmp/adduser.sql && \
-    echo "GRANT ALL ON *.* TO 'user'@'%';" >> /tmp/adduser.sql && \
-    echo "flush privileges;" >> /tmp/adduser.sql && \
-    cat /tmp/adduser.sql && \
-    cat /opt/lobsters/cred.cnf && \
-    cat /tmp/cred1.cnf && \
-    bin/mysql --defaults-extra-file=/tmp/cred1.cnf --connect-expired-password < /tmp/changepass.sql && \
-    bin/mysql --defaults-extra-file=/opt/lobsters/cred.cnf < /tmp/adduser.sql && \
-    cd /opt/lobsters/proteus-lobsters/ && \
+    /usr/local/bin/docker-entrypoint.sh && \
     make && \
-    cp lib_sys_exec.so /usr/local/mysql/lib/plugin/ && \
-    mkdir /opt/lobsters/votes && chown -R mysql:mysql /opt/lobsters/votes && \
-    mkdir /opt/lobsters/stories && chown -R mysql:mysql /opt/lobsters/stories && \
-    /usr/local/mysql/bin/mysql --defaults-extra-file=/opt/lobsters/cred.cnf  < /opt/lobsters/schema-trigger.sql && \
-    /usr/local/mysql/support-files/mysql.server stop
-
-FROM stage2 AS stage3
-WORKDIR /opt/lobsters/proteus-lobsters/
-RUN set -xe && \
-    /usr/local/go/bin/go build server.go
-
-CMD ["/opt/lobsters/start-trigger.sh"]
+    cp lib_sys_exec.so /usr/lib/mysql/plugin/ && \
+    /usr/local/go/bin/go build server.go && \
+    mkdir /opt/proteus-lobsters/votes && chown -R mysql:mysql /opt/proteus-lobsters/votes && \
+    mkdir /opt/proteus-lobsters/stories && chown -R mysql:mysql /opt/proteus-lobsters/stories
