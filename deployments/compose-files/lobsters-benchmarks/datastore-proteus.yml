@@ -1,14 +1,15 @@
 version: '3'
 services:
-  datastore-mv:
-    image: mysql:latest
+  datastore-proteus:
+    image: datastore/dev
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      # - /mount/schema-mv.sql:/docker-entrypoint-initdb.d/schema-mv.sql
-      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init/schema-mv.sql:/docker-entrypoint-initdb.d/schema-mv.sql
+      # - /mount/setup.sh:/docker-entrypoint-initdb.d/setup.sh
+      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup.sh:/docker-entrypoint-initdb.d/setup.sh
     ports:
       - 3307:3306
+      - 50000:50000
     deploy:
       restart_policy:
         condition: none
