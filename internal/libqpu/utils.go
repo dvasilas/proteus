@@ -16,10 +16,10 @@ func Assert(cond bool, msg string) {
 
 // Error logs the given error message and the stack trace,
 // and returns an error.
-func Error(msg string) error {
-	log.Error(msg)
+func Error(err error) error {
+	log.Error(err)
 	debug.PrintStack()
-	return errors.New(msg)
+	return err
 }
 
 // Trace is a wrapper for printing trace messaging
@@ -30,11 +30,6 @@ func Trace(msg string, fields map[string]interface{}) {
 		logFields[k] = v
 	}
 	log.WithFields(logFields).Trace(msg)
-}
-
-// LogError ...
-func LogError(err error) {
-	log.Error(err)
 }
 
 // import (

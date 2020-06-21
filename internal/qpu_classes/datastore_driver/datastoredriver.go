@@ -2,6 +2,7 @@ package datastoredriver
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -38,7 +39,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 			return &DatastoreDriverQPU{}, err
 		}
 	default:
-		return &DatastoreDriverQPU{}, libqpu.Error("unknown datastore type")
+		return &DatastoreDriverQPU{}, libqpu.Error(errors.New("unknown datastore type"))
 	}
 
 	go func() {

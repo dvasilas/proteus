@@ -2,6 +2,7 @@ package apiprocessor
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -29,7 +30,7 @@ type APIProcessor struct {
 func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (APIProcessor, error) {
 	qpuClass, err := getQPUClass(qpu, catchUpDoneCh)
 	if err != nil {
-		libqpu.LogError(err)
+		libqpu.Error(err)
 		return APIProcessor{}, err
 	}
 
@@ -46,13 +47,13 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 		var err error
 		internalQuery, err = sqlparser.Parse(queryReq.GetSQLStr())
 		if err != nil {
-			libqpu.LogError(err)
+			libqpu.Error(err)
 			return err
 		}
 	case libqpu.UnknownType:
-		return libqpu.Error("UnknownType")
+		return libqpu.Error(errors.New("UnknownType"))
 	default:
-		return libqpu.Error("default")
+		return libqpu.Error(errors.New("default"))
 	}
 
 	libqpu.Trace("internalQuery received", map[string]interface{}{"internalQuery": internalQuery})
@@ -63,7 +64,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 
 	isSnapshot, isSubscribe := queries.QueryType(internalQuery)
 	if !isSubscribe && !isSnapshot {
-		return libqpu.Error("invalid query")
+		return libqpu.Error(errors.New("invalid query"))
 	}
 
 	if isSubscribe {
@@ -85,13 +86,13 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
 				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
 				if err != nil {
-					libqpu.LogError(err)
+					libqpu.Error(err)
 					return err
 				}
 				// libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
 					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
-						libqpu.LogError(err)
+						libqpu.Error(err)
 						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
 					}
 					seqID++
@@ -104,13 +105,13 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
 				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
 				if err != nil {
-					libqpu.LogError(err)
+					libqpu.Error(err)
 					return err
 				}
 				// libqpu.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
 					if err := stream.Send(seqID, libqpu.State, logOp); err != nil {
-						libqpu.LogError(err)
+						libqpu.Error(err)
 						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
 					}
 					seqID++
@@ -145,7 +146,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				libqpu.LogOperation{},
 			)
 			if err != nil {
-				libqpu.LogError(err)
+				libqpu.Error(err)
 				return err
 			}
 		}
@@ -190,12 +191,12 @@ func (s APIProcessor) QueryUnary(req libqpu.QueryRequest) ([]*libqpu.LogOperatio
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
 func (s APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
-	return nil, libqpu.Error("not implemented")
+	return nil, libqpu.Error(errors.New("not implemented"))
 }
 
 // GetDataTransfer is responsible for the top-level processing of invocation of the GetDataTransfer API.
 func (s APIProcessor) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
-	return nil, libqpu.Error("not implemented")
+	return nil, libqpu.Error(errors.New("not implemented"))
 }
 
 // ---------------- Internal Functions --------------
@@ -209,6 +210,6 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 	case qpu_api.ConfigResponse_JOIN:
 		return joinqpu.InitClass(qpu, catchUpDoneCh)
 	default:
-		return nil, libqpu.Error("Unknown QPU class")
+		return nil, libqpu.Error(errors.New("Unknown QPU class"))
 	}
 }

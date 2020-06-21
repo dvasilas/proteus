@@ -1,6 +1,7 @@
 package libqpu
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -44,34 +45,34 @@ func HasAttribute(attributes map[string]*qpu.Value, attrName string) bool {
 func (s Schema) GetValue(attributes map[string]*qpu.Value, table, attrName string) (interface{}, error) {
 	val, found := attributes[attrName]
 	if !found {
-		return nil, Error("attribute not in attributes map")
+		return nil, Error(errors.New("attribute not in attributes map"))
 	}
 	tbl, found := s[table]
 	if !found {
-		return nil, Error("unknown table: not in schema")
+		return nil, Error(errors.New("unknown table: not in schema"))
 	}
 	attrType, found := tbl[attrName]
 	if !found {
-		return nil, Error("unknown attribute: not in schema")
+		return nil, Error(errors.New("unknown attribute: not in schema"))
 	}
 	switch val.GetVal().(type) {
 	case *qpu.Value_Str:
 		if attrType != STR {
-			return nil, Error("attribute value type mismatch")
+			return nil, Error(errors.New("attribute value type mismatch"))
 		}
 		return val.GetStr(), nil
 	case *qpu.Value_Int:
 		if attrType != INT {
-			return nil, Error("attribute value type mismatch")
+			return nil, Error(errors.New("attribute value type mismatch"))
 		}
 		return val.GetInt(), nil
 	case *qpu.Value_Flt:
 		if attrType != FLT {
-			return nil, Error("attribute value type mismatch")
+			return nil, Error(errors.New("attribute value type mismatch"))
 		}
 		return val.GetFlt(), nil
 	default:
-		return nil, Error("unknown value type")
+		return nil, Error(errors.New("unknown value type"))
 	}
 }
 
@@ -93,6 +94,6 @@ func (s Schema) StrToValue(table, attributeKey, valueStr string) (*qpu.Value, er
 		}
 		return ValueFlt(val), nil
 	default:
-		return ValueStr(valueStr), Error("schema: attribute type conversion not implemented")
+		return ValueStr(valueStr), Error(errors.New("schema: attribute type conversion not implemented"))
 	}
 }

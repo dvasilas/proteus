@@ -1,6 +1,7 @@
 package joinqpu
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -40,6 +41,7 @@ type stateEntry struct {
 
 type inMemState struct {
 	entries map[int64]*stateEntry
+	mutex   sync.RWMutex
 }
 
 // ---------------- API Functions -------------------
@@ -88,7 +90,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 			case libqpu.STR:
 				idAttributesColumns += " TEXT, "
 			default:
-				return &JoinQPU{}, libqpu.Error("unknown attribute type")
+				return &JoinQPU{}, libqpu.Error(errors.New("unknown attribute type"))
 			}
 		}
 	}
@@ -153,13 +155,13 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 			vectorClockKey := record["ts_key"]
 			vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
 			if err != nil {
-				libqpu.LogError(err)
+				libqpu.Error(err)
 				errCh <- err
 				break
 			}
 			timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
 			if err != nil {
-				libqpu.LogError(err)
+				libqpu.Error(err)
 				errCh <- err
 				break
 			}
@@ -169,7 +171,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 
 			attributes, err := q.schema.StrToAttributes(stateTable, record)
 			if err != nil {
-				libqpu.LogError(err)
+				libqpu.Error(err)
 				errCh <- err
 				break
 			}
@@ -253,17 +255,22 @@ func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 
 	delete(attributes, joinAttribute)
 
+	q.inMemState.mutex.RLock()
 	if entry, found := q.inMemState.entries[joinAttributeValue]; found {
+		q.inMemState.mutex.RUnlock()
 		entry.mutex.Lock()
 		for attr, val := range attributes {
 			entry.attributes[attr] = val
 		}
 		entry.mutex.Unlock()
 	} else {
+		q.inMemState.mutex.RUnlock()
+		q.inMemState.mutex.Lock()
 		q.inMemState.entries[joinAttributeValue] = &stateEntry{
 			attributes: attributes,
 			ts:         respRecord.GetLogOp().GetTimestamp(),
 		}
+		q.inMemState.mutex.Unlock()
 	}
 
 	attributes[joinAttribute] = libqpu.ValueInt(joinAttributeValue)

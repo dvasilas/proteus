@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -160,7 +161,7 @@ func getQpuType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	case "join":
 		config.QpuType = qpu_api.ConfigResponse_JOIN
 	default:
-		return libqpu.Error("unknown QPU type")
+		return libqpu.Error(errors.New("unknown QPU type"))
 	}
 	return nil
 }
@@ -174,7 +175,7 @@ func getConnections(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		} else if conn.Local == "remote" {
 			isLocal = false
 		} else {
-			return libqpu.Error("connection should be either 'local' or 'remote'")
+			return libqpu.Error(errors.New("connection should be either 'local' or 'remote'"))
 		}
 		connections = append(connections, libqpu.QPUConnection{
 			Address: conn.Address,
@@ -199,7 +200,7 @@ func getSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
 			case "float":
 				qpu.Schema[table.Table][attribute.Key] = libqpu.FLT
 			default:
-				return libqpu.Error(fmt.Sprintf("invalid attribute type %s in schema", attribute.Type))
+				return libqpu.Error(fmt.Errorf("invalid attribute type %s in schema", attribute.Type))
 			}
 		}
 	}
@@ -219,7 +220,7 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 	case "mysql":
 		config.DatastoreConfig.Type = libqpu.MYSQL
 	default:
-		return libqpu.Error("unknown datastore type")
+		return libqpu.Error(errors.New("unknown datastore type"))
 	}
 	config.DatastoreConfig.DBName = inputConf.DatastoreConfig.DBName
 	config.DatastoreConfig.Endpoint = inputConf.DatastoreConfig.Endpoint

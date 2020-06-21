@@ -2,6 +2,7 @@ package libqpu
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -118,7 +119,7 @@ func (s RequestStream) Send(seqID int64, recordType ResponseRecordType, logOp Lo
 	case State:
 		recType = qpu_api.ResponseStreamRecord_STATE
 	default:
-		return Error("Unknown StreamRecordType")
+		return Error(errors.New("Unknown StreamRecordType"))
 	}
 
 	return s.Stream.Send(
@@ -209,7 +210,7 @@ func (r ResponseRecord) GetType() (ResponseRecordType, error) {
 	case qpu_api.ResponseStreamRecord_END_OF_STREAM:
 		return EndOfStream, nil
 	default:
-		return 0, Error("unknown ResponseStreamRecord type")
+		return 0, Error(errors.New("unknown ResponseStreamRecord type"))
 	}
 }
 

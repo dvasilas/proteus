@@ -159,7 +159,7 @@ func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (
 	for _, pred := range query.GetPredicate() {
 		attributes := logOp.GetAttributes()
 		if attributes == nil {
-			return false, libqpu.Error("logOperation state not accessible")
+			return false, libqpu.Error(errors.New("logOperation state not accessible"))
 		}
 		_, found := attributes[pred.GetAttr().GetAttrKey()]
 		switch pred.GetType() {

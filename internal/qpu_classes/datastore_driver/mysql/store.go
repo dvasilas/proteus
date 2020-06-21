@@ -3,6 +3,7 @@ package mysqldriver
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -131,7 +132,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 
 	rows, err := ds.db.Query(query)
 	if err != nil {
-		libqpu.LogError(err)
+		libqpu.Error(err)
 		errCh <- err
 		return logOpCh, errCh
 	}
@@ -200,7 +201,7 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 	for {
 		op, err := stream.Recv()
 		if err == io.EOF {
-			errCh <- libqpu.Error("opConsumer received EOF")
+			errCh <- libqpu.Error(errors.New("opConsumer received EOF"))
 			break
 		}
 		if err != nil {

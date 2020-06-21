@@ -1,6 +1,7 @@
 package sqlparser
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -19,7 +20,7 @@ func Parse(query string) (libqpu.InternalQuery, error) {
 	case *sqlparser.Select:
 		return parseSelect(stmt)
 	default:
-		return libqpu.InternalQuery{}, libqpu.Error("only select queries are supported")
+		return libqpu.InternalQuery{}, libqpu.Error(errors.New("only select queries are supported"))
 	}
 }
 
@@ -36,15 +37,15 @@ func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
 	var selectOp, selectAttr, selectVal expr
 	var ok bool
 	if selectOp, ok = q.popExpr(); !ok {
-		return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
+		return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
 	}
 	switch selectOp.(operator) {
 	case "=":
 		if selectVal, ok = q.popExpr(); !ok {
-			return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
+			return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
 		}
 		if selectAttr, ok = q.popExpr(); !ok {
-			return libqpu.InternalQuery{}, libqpu.Error("incorrect parsed query stack")
+			return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
 		}
 		pred = libqpu.AttributePredicate(
 			libqpu.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, nil),
@@ -52,7 +53,7 @@ func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
 			selectVal.(value).qpuValue,
 		)
 	default:
-		return libqpu.InternalQuery{}, libqpu.Error("only = is supported for now")
+		return libqpu.InternalQuery{}, libqpu.Error(errors.New("only = is supported for now"))
 	}
 
 	return libqpu.InternalQuery{
@@ -100,7 +101,7 @@ func (q *parsedQuery) parseSelect(node sqlparser.SQLNode) error {
 		case *sqlparser.Limit:
 			return false, nil
 		default:
-			return false, libqpu.Error("should not have reached here")
+			return false, libqpu.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 
@@ -117,7 +118,7 @@ func (q *parsedQuery) parseExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.SQLVal:
 			return false, q.parseSQLVal(node)
 		default:
-			return false, libqpu.Error("parseExpr: not supported")
+			return false, libqpu.Error(errors.New("parseExpr: not supported"))
 		}
 	}, node)
 
@@ -139,7 +140,7 @@ func (q *parsedQuery) parseSelectExprs(node sqlparser.SQLNode) error {
 			}
 			return false, q.parseStarExpr(node)
 		default:
-			return false, libqpu.Error("only SELECT '*' is supported for now")
+			return false, libqpu.Error(errors.New("only SELECT '*' is supported for now"))
 		}
 	}, node)
 
@@ -158,11 +159,11 @@ func (q *parsedQuery) parseTableExprs(node sqlparser.SQLNode) error {
 		case *sqlparser.AliasedTableExpr:
 			return false, q.parseAliasedTableExpr(node)
 		case *sqlparser.ParenTableExpr:
-			return false, libqpu.Error("ParenTableExpr: not supported")
+			return false, libqpu.Error(errors.New("ParenTableExpr: not supported"))
 		case *sqlparser.JoinTableExpr:
-			return false, libqpu.Error("JoinTableExpr: not supported")
+			return false, libqpu.Error(errors.New("JoinTableExpr: not supported"))
 		default:
-			return false, libqpu.Error("should not have reached here")
+			return false, libqpu.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 
@@ -219,7 +220,7 @@ func (q *parsedQuery) parseSQLVal(node sqlparser.SQLNode) error {
 				qpuValue: libqpu.ValueFlt(val),
 			})
 	default:
-		return libqpu.Error("parseExpr: not supported")
+		return libqpu.Error(errors.New("parseExpr: not supported"))
 	}
 }
 
@@ -240,7 +241,7 @@ func (q *parsedQuery) parseAliasedTableExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.IndexHints:
 			return false, nil
 		default:
-			return false, libqpu.Error("should not have reached here")
+			return false, libqpu.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 
@@ -259,7 +260,7 @@ func (q *parsedQuery) parseStarExpr(node sqlparser.SQLNode) error {
 		case sqlparser.TableName:
 			return false, nil
 		default:
-			return false, libqpu.Error("parseStarExpr: not supported")
+			return false, libqpu.Error(errors.New("parseStarExpr: not supported"))
 		}
 	}, node)
 

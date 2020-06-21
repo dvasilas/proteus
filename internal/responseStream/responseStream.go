@@ -21,7 +21,7 @@ func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.Respo
 		if err == io.EOF {
 			return nil
 		} else if err != nil {
-			libqpu.LogError(err)
+			libqpu.Error(err)
 			return err
 		}
 
@@ -30,7 +30,7 @@ func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.Respo
 
 		err = processLogOp(respRecord, data, recordCh)
 		if err != nil {
-			libqpu.LogError(err)
+			libqpu.Error(err)
 			return err
 		}
 	}
