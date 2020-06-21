@@ -3,6 +3,8 @@ package libbench
 import (
 	"database/sql"
 	"fmt"
+	"net"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 
@@ -20,6 +22,16 @@ func newDatastore(endpoint, datastoreDB, accessKeyID, secretAccessKey string) (d
 		endpoint,
 		datastoreDB,
 	)
+
+	for {
+		c, _ := net.DialTimeout("tcp", endpoint, time.Duration(time.Second))
+		if c != nil {
+			c.Close()
+			break
+		}
+		time.Sleep(1 * time.Second)
+		fmt.Println("retying connecting to ", endpoint)
+	}
 
 	db, err := sql.Open("mysql", connStr)
 	if err != nil {
