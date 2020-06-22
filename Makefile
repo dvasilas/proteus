@@ -10,9 +10,7 @@ DOCKER_NET := proteus-local-dev-net1
 REPO_DATASTORE := dvasilas/proteus-lobsters
 REPO_PROTEUS := dvasilas/proteus
 TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
-IMG_DATASTORE_PLAIN := ${REPO_DATASTORE}:plain_${TAG}
-IMG_DATASTORE_MV := ${REPO_DATASTORE}:mv_${TAG}
-IMG_DATASTORE_TRIGGER := ${REPO_DATASTORE}:trigger_${TAG}
+IMG_DATASTORE_PROTEUS := ${REPO_DATASTORE}:${TAG}
 IMG_QPU := ${REPO_PROTEUS}:${TAG}
 
 $(PROTOC_CMD):
@@ -92,17 +90,18 @@ proto: $(PROTOC_CMD)
 	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
 
+.PHONY: image-build
+## image-build:
+image-build:
+	docker build -f build/proteus/localdev/Dockerfile-qpu -t qpu/dev .
+	docker build -f build/datastore/lobsters-MySQL/Dockerfile-proteus -t datastore/proteus .
 
 .PHONY: image-push
 ## image-push: Pushes iamges to docker hub
 image-push:
-	docker tag lobsters/plain ${IMG_DATASTORE_PLAIN}
-	docker tag lobsters/mv ${IMG_DATASTORE_MV}
-	docker tag lobsters/proteus ${IMG_DATASTORE_TRIGGER}
+	docker tag datastore/proteus ${IMG_DATASTORE_PROTEUS}
 	docker tag qpu/dev ${IMG_QPU}
-	#docker push ${IMG_DATASTORE_PLAIN}
-	#docker push ${IMG_DATASTORE_MV}
-	#docker push ${IMG_DATASTORE_TRIGGER}
+	docker push ${IMG_DATASTORE_PROTEUS}
 	docker push ${IMG_QPU}
 
 .PHONY: sync
