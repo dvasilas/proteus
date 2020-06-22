@@ -1,6 +1,6 @@
 version: '3'
 services:
-  datastore.proteus:
+  datastore-proteus:
     image: dvasilas/proteus-lobsters:${TAG_DATASTORE}
     networks:
       - proteus_net
