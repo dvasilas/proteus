@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS `stories` (
   `vote_count` bigint DEFAULT 0,
   `ts` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `short_id` (`short_id`),
   CONSTRAINT `stories_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB;
 
