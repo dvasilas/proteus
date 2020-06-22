@@ -2,7 +2,10 @@ package libbench
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"net"
+	"time"
 
 	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
@@ -15,9 +18,27 @@ type proteusQueryEngine struct {
 // --------------------- Proteus --------------------
 
 func newProteusQueryEngine() (proteusQueryEngine, error) {
+	address := "127.0.0.1:50350"
+	for {
+		c, _ := net.DialTimeout("tcp", address, time.Duration(time.Second))
+		if c != nil {
+			c.Close()
+			break
+		}
+		time.Sleep(2 * time.Second)
+		fmt.Println("retying connecting to: ", address)
+	}
+
 	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50350})
 	if err != nil {
 		return proteusQueryEngine{}, err
+	}
+
+	err = errors.New("not tried yet")
+	for err != nil {
+		_, err = c.QueryInternal("stateTableJoin", nil, nil, int64(1), nil, false)
+		time.Sleep(2 * time.Second)
+		fmt.Println("retying a test query")
 	}
 
 	return proteusQueryEngine{
