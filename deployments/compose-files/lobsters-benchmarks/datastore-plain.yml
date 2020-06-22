@@ -5,8 +5,8 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      # - /mount/schema-plain.sql:/docker-entrypoint-initdb.d/schema-plain.sql
-      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init/schema-plain.sql:/docker-entrypoint-initdb.d/schema-plain.sql
+      - /mount/schema-plain.sql:/docker-entrypoint-initdb.d/schema-plain.sql
+      # - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init/schema-plain.sql:/docker-entrypoint-initdb.d/schema-plain.sql
     ports:
       - 3307:3306
     deploy:

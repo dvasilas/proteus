@@ -1,50 +1,55 @@
 version: '3'
 services:
   dsdriver:
-    image: qpu/dev
-    # networks:
-      # - proteus_net
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - proteus_net
+      - qpu_graph
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /Users/dimvas/go/src/github.com/dvasilas/proteus/configs:/configs
-    command: /configs/lobsters/dsdriver.toml trace
+      - /mount/configs:/configs
+      # - ${PWD}/configs:/configs
+    command: /configs/lobsters/dsdriver.toml error
     deploy:
       restart_policy:
         condition: none
       placement:
         constraints: [ node.labels.queryengine == true ]
   sum:
-    image: qpu/dev
-    # networks:
-      # - proteus_net
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - qpu_graph
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /Users/dimvas/go/src/github.com/dvasilas/proteus/configs:/configs
-    command: /configs/lobsters/sum-stories.toml trace
+      - /mount/configs:/configs
+      # - ${PWD}/proteus/configs:/configs
+    command: /configs/lobsters/sum-stories.toml error
     deploy:
       restart_policy:
         condition: none
       placement:
         constraints: [ node.labels.queryengine == true ]
   join:
-    image: qpu/dev
-    # networks:
-      # - proteus_net
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - qpu_graph
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /Users/dimvas/go/src/github.com/dvasilas/proteus/configs:/configs
+      - /mount/configs:/configs
+      - ${PWD}/configs:/configs
     ports:
       - 50350:50350
-    command: /configs/lobsters/join.toml trace
+    command: /configs/lobsters/join.toml error
     deploy:
       restart_policy:
         condition: none
       placement:
         constraints: [ node.labels.queryengine == true ]
 
-# networks:
-#   proteus_net:
-#     external: true
+networks:
+  qpu_graph:
+  proteus_net:
+    external: true

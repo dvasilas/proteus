@@ -1,12 +1,14 @@
 version: '3'
 services:
-  datastore-proteus:
-    image: datastore/dev
+  datastore.proteus:
+    image: dvasilas/proteus-lobsters:${TAG_DATASTORE}
+    networks:
+      - proteus_net
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      # - /mount/setup.sh:/docker-entrypoint-initdb.d/setup.sh
-      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup.sh:/docker-entrypoint-initdb.d/setup.sh
+      - /mount/setup.sh:/docker-entrypoint-initdb.d/setup.sh
+      # - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup.sh:/docker-entrypoint-initdb.d/setup.sh
     ports:
       - 3307:3306
       - 50000:50000
@@ -15,3 +17,7 @@ services:
         condition: none
       placement:
         constraints: [ node.labels.datastore == true ]
+
+networks:
+  proteus_net:
+    external: true

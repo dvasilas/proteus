@@ -3,13 +3,13 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -46,7 +46,7 @@ func (s *Server) Serve() error {
 		return err
 	}
 
-	log.Info("gRPC server started")
+	fmt.Println("QPU service starting")
 	return s.grpcServer.Serve(lis)
 }
 
