@@ -2,8 +2,8 @@ qpuType = "sum"
 port = "50250"
 
 [[connections]]
-# address = "dsdriver:50150"
-address = "docker.for.mac.localhost:50150"
+address = "dsdriver:50150"
+# address = "docker.for.mac.localhost:50150"
 # address = "127.0.0.1:50150"
 local = "local"
 
