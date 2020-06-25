@@ -39,7 +39,7 @@ services:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
       - /mount/configs:/configs
-      - ${PWD}/configs:/configs
+      #- ${PWD}/configs:/configs
     ports:
       - 50350:50350
     command: /configs/lobsters/join.toml error
