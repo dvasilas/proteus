@@ -1,22 +1,22 @@
 package proteusclient
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/dvasilas/proteus/internal/apiclient"
+	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/queries"
-	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // Client represents a connection to Proteus.
 type Client struct {
-	// client apiclient.QPUAPIClient
-	client *libqpu.AdjacentQPU
+	conn *grpcutils.GrpcClientConn
+	cli  qpu_api.QPUAPIClient
 }
 
 // Host represents a QPU server.
@@ -38,22 +38,21 @@ type ResponseRecord struct {
 type Vectorclock map[string]*tspb.Timestamp
 
 // NewClient creates a new Proteus client connected to the given QPU server.
-func NewClient(host Host) (*Client, error) {
-	proteusClient, err := apiclient.NewClient(host.Name + ":" + strconv.Itoa(host.Port))
+func NewClient(host Host, tracing bool) (*Client, error) {
+	grpcConn, err := grpcutils.NewClientConn(host.Name+":"+strconv.Itoa(host.Port), tracing)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		client: &libqpu.AdjacentQPU{
-			APIClient: proteusClient,
-		},
+		cli:  qpu_api.NewQPUAPIClient(grpcConn.Conn),
+		conn: grpcConn,
 	}, nil
 }
 
 // Close closes the connection to Proteus.
 func (c *Client) Close() error {
-	return c.client.APIClient.CloseConnection()
+	return c.conn.Close()
 }
 
 // func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
@@ -82,20 +81,31 @@ func (c *Client) Close() error {
 // 	}
 // }
 
+func (c *Client) query(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) {
+	ctx := context.TODO()
+	resp, err := c.cli.QueryUnary(ctx, req.Req)
+	return resp, err
+}
+
 // QueryInternal ...
 func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
 	query := queries.NewQuerySnapshot(table, []string{}, []string{}, []string{}, limit)
-	resp, err := qpugraph.SendQueryUnary(query, c.client)
+	resp, err := c.query(libqpu.NewQueryRequestI(query, nil, false))
 	if err != nil {
 		return nil, err
+	}
+
+	logOps := make([]libqpu.LogOperation, len(resp.GetResults()))
+	for i, entry := range resp.GetResults() {
+		logOps[i] = libqpu.LogOperation{Op: entry}
 	}
 
 	// respCh := make(chan ResponseRecord)
 	// errCh := make(chan error)
 	// err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
 
-	response := make([]ResponseRecord, len(resp))
-	for i, entry := range resp {
+	response := make([]ResponseRecord, len(logOps))
+	for i, entry := range logOps {
 		response[i] = ResponseRecord{
 			ObjectID:  entry.Op.GetObjectId(),
 			Bucket:    entry.Op.GetBucket(),
@@ -109,20 +119,6 @@ func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate
 
 func processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	return nil
-}
-
-// Query ...
-func (c *Client) Query(query string) (<-chan ResponseRecord, <-chan error, error) {
-	responseStream, err := qpugraph.SendQuerySQL(query, c.client)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	respCh := make(chan ResponseRecord)
-	errCh := make(chan error)
-	err = responsestream.StreamConsumer(responseStream, processRespRecord, respCh, nil)
-
-	return respCh, errCh, err
 }
 
 // GetDataTransfer ...

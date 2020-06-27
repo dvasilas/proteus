@@ -11,6 +11,7 @@ import (
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
+	"github.com/opentracing/opentracing-go"
 )
 
 // This package is responsible for implementing the libqpu.APIProcessor.
@@ -72,7 +73,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 	}
 	if isSnapshot {
 		snapshotStream = true
-		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, queryReq.GetMetadata(), queryReq.GetSync())
+		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, queryReq.GetMetadata(), queryReq.GetSync(), nil)
 	}
 
 	var seqID int64
@@ -160,9 +161,9 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 }
 
 // QueryUnary ...
-func (s APIProcessor) QueryUnary(req libqpu.QueryRequest) ([]*libqpu.LogOperation, error) {
+func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) ([]*libqpu.LogOperation, error) {
 	result := make([]*libqpu.LogOperation, 0)
-	logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync())
+	logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)
 	for {
 		select {
 		case logOp, ok := <-logOpCh:

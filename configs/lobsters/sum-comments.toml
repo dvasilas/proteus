@@ -1,5 +1,6 @@
 qpuType = "sum"
 port = "50251"
+tracing = false
 
 [[connections]]
 # address = "dsdriver:50150"

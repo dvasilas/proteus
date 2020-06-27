@@ -17,7 +17,7 @@ type proteusQueryEngine struct {
 
 // --------------------- Proteus --------------------
 
-func newProteusQueryEngine() (proteusQueryEngine, error) {
+func newProteusQueryEngine(tracing bool) (proteusQueryEngine, error) {
 	address := "127.0.0.1:50350"
 	for {
 		c, _ := net.DialTimeout("tcp", address, time.Duration(time.Second))
@@ -29,7 +29,7 @@ func newProteusQueryEngine() (proteusQueryEngine, error) {
 		fmt.Println("retying connecting to: ", address)
 	}
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50350})
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50350}, tracing)
 	if err != nil {
 		return proteusQueryEngine{}, err
 	}
@@ -38,7 +38,7 @@ func newProteusQueryEngine() (proteusQueryEngine, error) {
 	for err != nil {
 		_, err = c.QueryInternal("stateTableJoin", nil, nil, int64(1), nil, false)
 		time.Sleep(2 * time.Second)
-		fmt.Println("retying a test query")
+		fmt.Println("retying a test query", err)
 	}
 
 	return proteusQueryEngine{

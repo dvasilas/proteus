@@ -9,6 +9,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/opentracing/opentracing-go"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -227,29 +228,43 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 // Scan retrieves all state records.
 // It returns a channel that can be used to iteratively return the retrieved records.
 // The channel returns records of type map[<attributeName>]<string_value>.
-func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64) (<-chan map[string]string, error) {
-	projection := ""
+func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64, parentSpan opentracing.Span) (<-chan map[string]string, error) {
+	var tracer opentracing.Tracer
+	tracer = nil
+	if parentSpan != nil {
+		tracer = opentracing.GlobalTracer()
+	}
 
+	projection := ""
 	columns = append(columns, "ts_key")
 	columns = append(columns, "unix_timestamp(ts)")
-
 	for i, col := range columns {
 		projection += col
 		if i < len(columns)-1 {
 			projection += ", "
 		}
 	}
-
 	limitStmt := ""
 	if limit > 0 {
 		limitStmt = "LIMIT " + strconv.Itoa(int(limit))
 	}
-
 	query := fmt.Sprintf("SELECT %s FROM %s %s", projection, table, limitStmt)
+
+	var dbQuerySp opentracing.Span
+	dbQuerySp = nil
+	if tracer != nil {
+		dbQuerySp = tracer.StartSpan("db_query", opentracing.ChildOf(parentSpan.Context()))
+	}
+
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
+
+	if dbQuerySp != nil {
+		dbQuerySp.Finish()
+	}
+
 	values := make([]sql.RawBytes, len(columns))
 	scanArgs := make([]interface{}, len(columns))
 	for i := range values {

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strconv"
@@ -40,7 +39,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: connection[0], Port: int(port)})
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: connection[0], Port: int(port)}, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,30 +47,30 @@ func main() {
 }
 
 func doQuery(c *proteusclient.Client, query string) {
-	respCh, errCh, err := c.Query(query)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for {
-		select {
-		case err, ok := <-errCh:
-			if !ok {
-				errCh = nil
-			} else if err == io.EOF {
-			} else {
-				log.Fatal(err)
-			}
-		case resp, ok := <-respCh:
-			if !ok {
-				respCh = nil
-			} else {
-				processResponseRecord(resp)
-			}
-		}
-		if errCh == nil && respCh == nil {
-			break
-		}
-	}
+	// respCh, errCh, err := c.Query(query)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// for {
+	// 	select {
+	// 	case err, ok := <-errCh:
+	// 		if !ok {
+	// 			errCh = nil
+	// 		} else if err == io.EOF {
+	// 		} else {
+	// 			log.Fatal(err)
+	// 		}
+	// 	case resp, ok := <-respCh:
+	// 		if !ok {
+	// 			respCh = nil
+	// 		} else {
+	// 			processResponseRecord(resp)
+	// 		}
+	// 	}
+	// 	if errCh == nil && respCh == nil {
+	// 		break
+	// 	}
+	// }
 }
 
 func processResponseRecord(respRecord proteusclient.ResponseRecord) {

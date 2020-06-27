@@ -1,14 +1,15 @@
 qpuType = "datastore_driver"
 port = "50150"
+tracing = false
 
 [DatastoreConfig]
 type = "mysql"
-endpoint = "datastore-proteus:3306"
-# endpoint = "127.0.0.1:3307"
+# endpoint = "datastore-proteus:3306"
+endpoint = "127.0.0.1:3307"
 # endpoint = "docker.for.mac.localhost:3307"
-# logStreamEndpoint = "127.0.0.1:50000"
+logStreamEndpoint = "127.0.0.1:50000"
 # logStreamEndpoint = "docker.for.mac.localhost:50000"
-logStreamEndpoint = "datastore-proteus:50000"
+# logStreamEndpoint = "datastore-proteus:50000"
 DBName = "proteus_lobsters_db"
 [DatastoreConfig.Credentials]
 accessKeyID = "root"

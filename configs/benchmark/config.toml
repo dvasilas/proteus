@@ -1,25 +1,27 @@
+tracing = true
+
 [Connection]
-"endpoint" = "127.0.0.1:3307"
-"database" = "proteus_lobsters_db"
-"accessKeyID" = "root"
-"secretAccessKey"  = "verySecretPwd"
+endpoint = "127.0.0.1:3307"
+database = "proteus_lobsters_db"
+accessKeyID = "root"
+secretAccessKey  = "verySecretPwd"
 
 [Benchmark]
-"opCount" = 100000
-"runtime" = 30
-"doWarmup" = true
-"warmup" = 15
-"threadCount" = 1
+opCount = 1000000
+runtime = 300
+doWarmup = true
+warmup = 60
+threadCount = 1
 
 [Operations]
-"writeRatio" = 0.2
-"downVoteRatio" = 0.2
+writeRatio = 0.1
+downVoteRatio = 0.2
 
 [Operations.Homepage]
-"storiesLimit" = 5
+storiesLimit = 5
 
 [Preload.RecordCount]
-"users" = 10
-"stories" = 100
-"comments" = 10
-"StoryVotes" = 10
+users = 10
+stories = 1000
+comments = 100
+StoryVotes = 10000

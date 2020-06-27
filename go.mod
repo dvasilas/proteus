@@ -5,20 +5,26 @@ go 1.14
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/golang/protobuf v1.3.2
-	github.com/jamiealquiza/tachymeter v2.0.0+incompatible
+	github.com/golang/protobuf v1.4.2
+	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
+	github.com/opentracing/opentracing-go v1.1.0
+	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/pelletier/go-toml v1.4.0
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/prometheus/client_golang v1.7.1 // indirect
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
+	github.com/uber/jaeger-client-go v2.24.0+incompatible
+	github.com/uber/jaeger-lib v2.2.0+incompatible
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
-	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
+	go.uber.org/atomic v1.6.0 // indirect
+	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	golang.org/x/text v0.3.2 // indirect
-	google.golang.org/genproto v0.0.0-20190627203621-eb59cef1c072 // indirect
-	google.golang.org/grpc v1.21.1
+	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
+	google.golang.org/api v0.28.0 // indirect
+	google.golang.org/grpc v1.28.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )

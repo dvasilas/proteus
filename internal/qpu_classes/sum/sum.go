@@ -14,6 +14,7 @@ import (
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/opentracing/opentracing-go"
 )
 
 // assumptions
@@ -127,7 +128,7 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
@@ -135,6 +136,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]
 		stateTable+q.port,
 		append(q.idAttributes, q.stateSumAttribute),
 		query.GetLimit(),
+		nil,
 	)
 	if err != nil {
 		errCh <- err

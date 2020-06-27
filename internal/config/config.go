@@ -16,6 +16,7 @@ import (
 type inputQPUConfig struct {
 	QpuType     string
 	Port        string
+	Tracing     bool
 	Connections []struct {
 		Address string
 		Local   string
@@ -119,6 +120,9 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	if err := getStateConfig(inputConfig, config); err != nil {
 		return err
 	}
+
+	// Tracing
+	config.Tracing = inputConfig.Tracing
 
 	// DatastoreConfiguration
 	if config.QpuType == qpu_api.ConfigResponse_DATASTORE_DRIVER {

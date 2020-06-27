@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
@@ -16,6 +17,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
+	//
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -129,8 +131,13 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	libqpu.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
+	var tracer opentracing.Tracer
+	tracer = nil
+	if parentSpan != nil {
+		tracer = opentracing.GlobalTracer()
+	}
 
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
@@ -142,13 +149,29 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 		i++
 	}
 
-	stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit())
+	var stateScanSp opentracing.Span
+	stateScanSp = nil
+	if tracer != nil {
+		stateScanSp = tracer.StartSpan("state_scan", opentracing.ChildOf(parentSpan.Context()))
+	}
+
+	stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit(), stateScanSp)
 	if err != nil {
 		errCh <- err
 		return logOpCh, errCh
 	}
 
+	if stateScanSp != nil {
+		stateScanSp.Finish()
+	}
+
 	go func() {
+		var stateScanProcSp opentracing.Span
+		stateScanProcSp = nil
+		if tracer != nil {
+			stateScanProcSp = tracer.StartSpan("state_scan_process", opentracing.ChildOf(parentSpan.Context()))
+			defer stateScanProcSp.Finish()
+		}
 		for record := range stateCh {
 			recordID := record[joinAttributeKey]
 

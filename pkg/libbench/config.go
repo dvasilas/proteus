@@ -39,6 +39,7 @@ type benchmarkConfig struct {
 			StoryVotes int
 		}
 	}
+	Tracing bool
 }
 
 func getConfig(configFile string) (benchmarkConfig, error) {

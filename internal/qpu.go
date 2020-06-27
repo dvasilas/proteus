@@ -3,10 +3,10 @@ package qpu
 import (
 	"github.com/dvasilas/proteus/internal/apiprocessor"
 	"github.com/dvasilas/proteus/internal/config"
-	grpcserver "github.com/dvasilas/proteus/internal/grpc_server"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	mysqlbackend "github.com/dvasilas/proteus/internal/qpustate/mysql_backend"
+	rpcserver "github.com/dvasilas/proteus/internal/rpc_server"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,7 +17,7 @@ import (
 // Service represents a QPU service
 type Service struct {
 	qpu         *libqpu.QPU
-	rpcServer   *grpcserver.Server
+	rpcServer   *rpcserver.Server
 	catchUpDone chan int
 }
 
@@ -53,7 +53,7 @@ func NewQPUService(configFile string) (libqpu.QPUService, error) {
 		return nil, err
 	}
 
-	rpcServer, err := grpcserver.NewServer(qpu.Config.Port, apiProcessor)
+	rpcServer, err := rpcserver.NewServer(qpu.Config.Port, qpu.Config.Tracing, apiProcessor)
 	if err != nil {
 		return nil, err
 	}

@@ -30,7 +30,7 @@ func newOperations(conf *benchmarkConfig) (*operations, error) {
 	var qe queryEngine
 	if !conf.Benchmark.doPreload {
 		if conf.Benchmark.measuredSystem == "proteus" {
-			qe, err = newProteusQueryEngine()
+			qe, err = newProteusQueryEngine(conf.Tracing)
 		} else if conf.Benchmark.measuredSystem == "mysql_plain" {
 			qe, err = newMySQLPlainQE(&ds)
 		} else if conf.Benchmark.measuredSystem == "mysql_mv" {

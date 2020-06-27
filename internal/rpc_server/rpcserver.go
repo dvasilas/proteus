@@ -1,4 +1,4 @@
-package grpcserver
+package rpcserver
 
 import (
 	"context"
@@ -7,10 +7,11 @@ import (
 	"io"
 	"net"
 
+	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	"google.golang.org/grpc"
+	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -20,20 +21,28 @@ import (
 // Server represents the QPU's API server.
 type Server struct {
 	port       string
-	grpcServer *grpc.Server
+	tracing    bool
+	grpcServer grpcutils.GrpcServer
 	api        libqpu.APIProcessor
 }
 
 // NewServer initializes a grpc server.
-func NewServer(port string, api libqpu.APIProcessor) (*Server, error) {
+func NewServer(port string, tracing bool, api libqpu.APIProcessor) (*Server, error) {
+
+	grpcServer, err := grpcutils.NewServer(tracing)
+	if err != nil {
+		return nil, err
+	}
+
 	server := Server{
 		port:       port,
-		grpcServer: grpc.NewServer(),
+		tracing:    tracing,
+		grpcServer: grpcServer,
 		api:        api,
 	}
 
-	qpu_api.RegisterQPUAPIServer(server.grpcServer, &server)
-	reflection.Register(server.grpcServer)
+	qpu_api.RegisterQPUAPIServer(grpcServer.Server, &server)
+	reflection.Register(grpcServer.Server)
 
 	return &server, nil
 }
@@ -47,7 +56,7 @@ func (s *Server) Serve() error {
 	}
 
 	fmt.Println("QPU service starting")
-	return s.grpcServer.Serve(lis)
+	return s.grpcServer.Server.Serve(lis)
 }
 
 // Query implements the QPU's low level Query API.
@@ -73,13 +82,25 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qpu_api.QueryResponse, error) {
+	var tracer opentracing.Tracer
+	var querySp opentracing.Span
+	tracer = nil
+
+	if s.tracing {
+		tracer = opentracing.GlobalTracer()
+		querySp = tracer.StartSpan("query")
+		defer querySp.Finish()
+	}
+
 	resp, err := s.api.QueryUnary(
 		libqpu.QueryRequest{Req: req},
+		querySp,
 	)
 	results := make([]*qpu.LogOperation, len(resp))
 	for i, entry := range resp {
 		results[i] = entry.Op
 	}
+
 	return &qpu_api.QueryResponse{
 		Results: results,
 	}, err

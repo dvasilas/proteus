@@ -7,6 +7,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
+	"github.com/opentracing/opentracing-go"
 )
 
 // DatastoreDriverQPU ...
@@ -53,8 +54,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 }
 
 // ProcessQuerySnapshot ...
-func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool) (<-chan libqpu.LogOperation, <-chan error) {
-
+func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	isNull, isNotNull := query.GetPredicateContains()
 	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }
