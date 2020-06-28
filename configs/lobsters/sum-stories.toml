@@ -9,7 +9,6 @@ address = "dsdriver:50150"
 local = "local"
 
 [StateBackend]
-# endpoint = "127.0.0.1:3306"
 endpoint = "127.0.0.1:3306"
 
 [StateBackend.Credentials]

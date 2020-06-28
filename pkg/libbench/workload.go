@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/pkg/perf"
@@ -139,21 +140,32 @@ func (w workload) preload() error {
 
 	fmt.Printf("Created %d comments\n", w.config.Preload.RecordCount.Comments)
 
-	for i := 1; i <= w.config.Preload.RecordCount.StoryVotes; i++ {
-		vote := rand.Float64()
-		if vote < w.config.Operations.DownVoteRatio {
-			if _, err := w.downVoteStory(0); err != nil {
-				return err
+	preadloadThreads := 10
+	var wg sync.WaitGroup
+
+	for t := 1; t <= preadloadThreads; t++ {
+		wg.Add(1)
+		go func(voteCount int) {
+			defer wg.Done()
+			for i := 1; i <= voteCount; i++ {
+				vote := rand.Float64()
+				if vote < w.config.Operations.DownVoteRatio {
+					if _, err := w.downVoteStory(0); err != nil {
+						panic(err)
+					}
+				} else {
+					if _, err := w.upVoteStory(0); err != nil {
+						panic(err)
+					}
+				}
+				if i%100 == 0 {
+					fmt.Printf("Created %d votes\n", i)
+				}
 			}
-		} else {
-			if _, err := w.upVoteStory(0); err != nil {
-				return err
-			}
-		}
-		if i%1000 == 0 {
-			fmt.Printf("Created %d votes\n", i)
-		}
+		}(w.config.Preload.RecordCount.StoryVotes / preadloadThreads)
 	}
+
+	wg.Wait()
 
 	fmt.Printf("Created %d votes\n", w.config.Preload.RecordCount.StoryVotes)
 	fmt.Println("Preloading done")
