@@ -1,6 +1,6 @@
 qpuType = "join"
 port = "50350"
-tracing = true
+tracing = false
 
 [[connections]]
 # address = "docker.for.mac.localhost:50150"

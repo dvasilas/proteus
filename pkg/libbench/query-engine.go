@@ -56,11 +56,15 @@ func (qe proteusQueryEngine) query(limit int) (interface{}, error) {
 	return resp, nil
 }
 
-type mySQLWithViewsQE struct {
-	ds *datastore
+func (qe proteusQueryEngine) close() {
+	qe.proteusClient.Close()
 }
 
 // ------------------ MySQL (with MVs) ---------------
+
+type mySQLWithViewsQE struct {
+	ds *datastore
+}
 
 func newMySQLWithViewsQE(ds *datastore) (mySQLWithViewsQE, error) {
 	return mySQLWithViewsQE{
@@ -105,11 +109,15 @@ func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
 	return result, nil
 }
 
-type mySQLPlainQE struct {
-	ds *datastore
+func (qe mySQLWithViewsQE) close() {
+	qe.ds.db.Close()
 }
 
 // ------------------ MySQL (no MVs) -----------------
+
+type mySQLPlainQE struct {
+	ds *datastore
+}
 
 func newMySQLPlainQE(ds *datastore) (mySQLPlainQE, error) {
 	return mySQLPlainQE{
@@ -159,4 +167,8 @@ func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
 	}
 
 	return result, nil
+}
+
+func (qe mySQLPlainQE) close() {
+	qe.ds.db.Close()
 }

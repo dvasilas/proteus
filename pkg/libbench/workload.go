@@ -257,3 +257,7 @@ func printHomepage(hp homepage) error {
 
 	return nil
 }
+
+func (w workload) close() {
+	w.ops.close()
+}

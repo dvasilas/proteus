@@ -231,6 +231,10 @@ func (op *operations) downVoteComment(userID, commentID int) error {
 		})
 }
 
+func (op *operations) close() {
+	op.qe.close()
+}
+
 func randString(length int) string {
 	str := make([]rune, length)
 	for i := range str {

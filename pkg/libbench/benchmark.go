@@ -35,6 +35,7 @@ type benchmarkState struct {
 
 type queryEngine interface {
 	query(limit int) (interface{}, error)
+	close()
 }
 
 // NewBenchmark ...
@@ -95,6 +96,8 @@ func (b Benchmark) Run() error {
 	}
 
 	wg.Wait()
+
+	b.workload.close()
 
 	return nil
 }

@@ -3,6 +3,7 @@ package grpcutils
 import (
 	"io"
 
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/tracer"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
@@ -19,6 +20,7 @@ type GrpcServer struct {
 // GrpcClientConn ...
 type GrpcClientConn struct {
 	Conn   *grpc.ClientConn
+	Cli    qpu_api.QPUAPIClient
 	closer io.Closer
 }
 
@@ -84,6 +86,7 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 		}
 
 		clientConn.Conn = c
+		clientConn.Cli = qpu_api.NewQPUAPIClient(c)
 		clientConn.closer = closer
 
 		return &clientConn, nil
@@ -95,6 +98,7 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 	}
 
 	clientConn.Conn = c
+	clientConn.Cli = qpu_api.NewQPUAPIClient(c)
 	clientConn.closer = nil
 
 	return &clientConn, nil

@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"strconv"
 
-	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/queries"
+	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // Client represents a connection to Proteus.
 type Client struct {
-	conn *grpcutils.GrpcClientConn
-	cli  qpu_api.QPUAPIClient
+	pool *connpool.ConnectionPool
+	// conn *grpcutils.GrpcClientConn
+	// cli  qpu_api.QPUAPIClient
 }
 
 // Host represents a QPU server.
@@ -34,25 +35,28 @@ type ResponseRecord struct {
 	Timestamp  Vectorclock
 }
 
+var poolSize = 64
+var poolOverflow = 16
+
 // Vectorclock ...
 type Vectorclock map[string]*tspb.Timestamp
 
 // NewClient creates a new Proteus client connected to the given QPU server.
 func NewClient(host Host, tracing bool) (*Client, error) {
-	grpcConn, err := grpcutils.NewClientConn(host.Name+":"+strconv.Itoa(host.Port), tracing)
-	if err != nil {
-		return nil, err
-	}
+	// pool :=
+	// grpcConn, err := grpcutils.NewClientConn(host.Name+":"+strconv.Itoa(host.Port), poolSize, poolOverflow, tracing)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &Client{
-		cli:  qpu_api.NewQPUAPIClient(grpcConn.Conn),
-		conn: grpcConn,
+		pool: connpool.NewConnectionPool(host.Name+":"+strconv.Itoa(host.Port), true, poolSize, poolOverflow, tracing),
 	}, nil
 }
 
 // Close closes the connection to Proteus.
 func (c *Client) Close() error {
-	return c.conn.Close()
+	return c.pool.Close()
 }
 
 // func (c *Client) getResponse(stream qpu_api.QPUAPI_QueryClient, responseCh chan ResponseRecord, errorCh chan error) {
@@ -82,8 +86,16 @@ func (c *Client) Close() error {
 // }
 
 func (c *Client) query(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
 	ctx := context.TODO()
-	resp, err := c.cli.QueryUnary(ctx, req.Req)
+	resp, err := client.Cli.QueryUnary(ctx, req.Req)
+
+	c.pool.Return(client)
+
 	return resp, err
 }
 
