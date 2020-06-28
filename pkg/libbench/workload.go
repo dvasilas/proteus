@@ -105,6 +105,7 @@ func (w workload) run(measurementBufferSize int64) (map[string][]time.Duration, 
 
 // Preload ...
 func (w workload) preload() error {
+	fmt.Println("Preloading ..")
 	// start from 1 because when MySQL automaticall assigns ids
 	// it starts from 1
 	// ¯\_(ツ)_/¯
@@ -113,6 +114,8 @@ func (w workload) preload() error {
 			return err
 		}
 	}
+
+	fmt.Printf("Created %d users\n", w.config.Preload.RecordCount.Users)
 
 	for i := 1; i <= w.config.Preload.RecordCount.Stories; i++ {
 		if err := w.addStory(); err != nil {
@@ -123,6 +126,8 @@ func (w workload) preload() error {
 		}
 	}
 
+	fmt.Printf("Created %d stories\n", w.config.Preload.RecordCount.Stories)
+
 	for i := 1; i <= w.config.Preload.RecordCount.Comments; i++ {
 		if err := w.addComment(); err != nil {
 			return err
@@ -131,6 +136,8 @@ func (w workload) preload() error {
 			return err
 		}
 	}
+
+	fmt.Printf("Created %d comments\n", w.config.Preload.RecordCount.Comments)
 
 	for i := 1; i <= w.config.Preload.RecordCount.StoryVotes; i++ {
 		vote := rand.Float64()
@@ -143,8 +150,13 @@ func (w workload) preload() error {
 				return err
 			}
 		}
+		if i%1000 == 0 {
+			fmt.Printf("Created %d votes\n", i)
+		}
 	}
 
+	fmt.Printf("Created %d votes\n", w.config.Preload.RecordCount.StoryVotes)
+	fmt.Println("Preloading done")
 	return nil
 }
 
