@@ -166,6 +166,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	if err != nil {
 		return err
 	}
+	defer stmtInsert.Close()
 
 	_, err = stmtInsert.Exec(insertValues...)
 
@@ -215,12 +216,13 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, updateStmt, whereStmt)
 	libqpu.Trace("update", map[string]interface{}{"query": query, "updateValues": updateValues})
-	stmtInsert, err := s.db.Prepare(query)
+	stmtUpdate, err := s.db.Prepare(query)
 	if err != nil {
 		return err
 	}
+	defer stmtUpdate.Close()
 
-	_, err = stmtInsert.Exec(updateValues...)
+	_, err = stmtUpdate.Exec(updateValues...)
 
 	return err
 }

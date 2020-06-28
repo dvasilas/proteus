@@ -158,7 +158,7 @@ func (w workload) preload() error {
 						panic(err)
 					}
 				}
-				if i%100 == 0 {
+				if i%1000 == 0 {
 					fmt.Printf("Created %d votes\n", i)
 				}
 			}

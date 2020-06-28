@@ -1,4 +1,4 @@
-tracing = true
+tracing = false
 
 [Connection]
 endpoint = "127.0.0.1:3307"
