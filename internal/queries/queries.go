@@ -9,8 +9,8 @@ import (
 )
 
 // NewQuerySubscribe ...
-func NewQuerySubscribe(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
-	predicate := make([]*qpu.AttributePredicate, 0)
+func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{
@@ -43,8 +43,8 @@ func NewQuerySubscribe(table string, projection []string, isNull []string, isNot
 }
 
 // NewQuerySnapshot ...
-func NewQuerySnapshot(table string, projection []string, isNull []string, isNotNull []string, limit int64) libqpu.InternalQuery {
-	predicate := make([]*qpu.AttributePredicate, 0)
+func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, limit int64, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{
@@ -77,8 +77,8 @@ func NewQuerySnapshot(table string, projection []string, isNull []string, isNotN
 }
 
 // NewQuerySnapshotAndSubscribe ...
-func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []string, isNotNull []string) libqpu.InternalQuery {
-	predicate := make([]*qpu.AttributePredicate, 0)
+func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{

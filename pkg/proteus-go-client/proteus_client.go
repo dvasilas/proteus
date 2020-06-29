@@ -101,7 +101,7 @@ func (c *Client) query(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) 
 
 // QueryInternal ...
 func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
-	query := queries.NewQuerySnapshot(table, []string{}, []string{}, []string{}, limit)
+	query := queries.NewQuerySnapshot(table, predicate, []string{}, []string{}, []string{}, limit, ts)
 	resp, err := c.query(libqpu.NewQueryRequestI(query, nil, false))
 	if err != nil {
 		return nil, err

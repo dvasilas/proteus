@@ -114,8 +114,12 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
 		querySnapshot := queries.NewQuerySnapshotAndSubscribe(
 			qpu.Config.JoinConfig.Source[i].Table,
+			nil,
 			qpu.Config.JoinConfig.Source[i].Projection,
-			[]string{}, []string{})
+			[]string{},
+			[]string{},
+			nil,
+		)
 		responseStreamStories, err := qpugraph.SendQueryI(querySnapshot, qpu.AdjacentQPUs[i])
 		if err != nil {
 			return &JoinQPU{}, err

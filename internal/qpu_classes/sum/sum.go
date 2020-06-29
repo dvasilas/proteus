@@ -107,9 +107,11 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 
 	query := queries.NewQuerySnapshotAndSubscribe(
 		sqpu.sourceTable,
+		nil,
 		q.Config.SumConfig.Query.Projection,
 		q.Config.SumConfig.Query.IsNull,
 		q.Config.SumConfig.Query.IsNotNull,
+		nil,
 	)
 
 	for _, adjQPU := range q.AdjacentQPUs {
