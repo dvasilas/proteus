@@ -4,8 +4,11 @@ package qpu;
 option go_package = "github.com/dvasilas/proteus/internal/proto/qpu";
 import "google/protobuf/timestamp.proto";
 
+// The important part of every stream record.
 message LogOperation {
   string object_id = 1;
+  // Bucket/Table
+  // TODO: use a single term through the codebase
   string bucket = 2;
   Vectorclock timestamp = 3;
   Payload payload = 4;
@@ -17,26 +20,18 @@ message Payload {
     ObjectState new = 2;
   }
   oneof val {
-    StateDelta delta = 1;
-    Operation op = 2;
-    ObjectState state = 3;
+    ObjectState state = 1;
+    StateDelta delta = 2;
+    // Usefull for Antidote, where an udpate can be for example (add, 1)
+    // Not user for now.
+    // Operation op = 3;
   }
 }
 
 message ObjectState {
+  // Data model: a data item is a primary key (object_id) + a set of attributes.
+  // An attribute is a key value pair (attrKey, attrValue)
   map<string, Value> attributes = 1;
-}
-
-message Operation {
-  message Update {
-    string op_type = 1;
-    Value value = 2;
-  }
-  message Op {
-    Attribute attr = 1;
-    Update update = 2;
-  }
-  repeated Op op = 1;
 }
 
 message Attribute {
@@ -52,31 +47,20 @@ message Value {
   }
 }
 
-message SnapshotTime {
-  enum SnapshotTimeType {
-    LATEST = 0;
-    ZERO = 1;
-    INF = 2;
-    VECTORCLOCK = 3;
-  }
-  SnapshotTimeType type = 1;
-  Vectorclock value = 2;
-  bool isClosed = 3;
-}
-
-message Vectorclock {
-  map<string, google.protobuf.Timestamp> vc = 1;
-}
-
 message AttributePredicate {
   enum PredicateType {
+    // Used to implement the SQL 'IS NULL'.
     ISNULL = 0;
+    // Used to implement the SQL 'IS NOT NULL'
     ISNOTNULL = 1;
+    // Implements the SQL WHERE attr >= lbound AND attr < ubound
     RANGE = 2;
   }
   Attribute attr = 1;
   PredicateType type = 2;
+  // Lower bound.
   Value lbound = 3;
+  // Upper bound.
   Value ubound = 4;
 }
 
@@ -84,3 +68,42 @@ message SnapshotTimePredicate {
   SnapshotTime lbound = 1;
   SnapshotTime ubound = 2;
 }
+
+message SnapshotTime {
+  enum SnapshotTimeType {
+    // Keyword used to refer to for the most recent snapshot if we don't know
+    // the actual timestamp value.
+    LATEST = 0;
+    // Keyword used to refer to the earliest snapshot in the system.
+    ZERO = 1;
+    // Keyword used to refer to a timestamp that is always greater than any
+    // other timestamp
+    // Used to implement long-lived queries.
+    // Results in a stream that stays open indefinitely.
+    INF = 2;
+    // Keyword used to signify that this SnapshotTime has an actual value.
+    VECTORCLOCK = 3;
+  }
+  SnapshotTimeType type = 1;
+  Vectorclock value = 2;
+  // SnapshotTime is always used in ranges.
+  // isClosed is used to signify if a range is open or closed.
+  // E.g. (isClosed=true, isClosed=false) -> [SnapshotTime1, SnapshotTime2).
+  bool isClosed = 3;
+}
+
+message Vectorclock {
+  map<string, google.protobuf.Timestamp> vc = 1;
+}
+
+// message Operation {
+//   message Update {
+//     string op_type = 1;
+//     Value value = 2;
+//   }
+//   message Op {
+//     Attribute attr = 1;
+//     Update update = 2;
+//   }
+//   repeated Op op = 1;
+// }

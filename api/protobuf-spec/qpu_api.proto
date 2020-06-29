@@ -5,71 +5,109 @@ option go_package = "github.com/dvasilas/proteus/internal/proto/qpu_api";
 import "api/protobuf-spec/qpu.proto";
 
 service QPUAPI {
-  rpc QueryUnary(QueryRequest) returns (QueryResponse) {}
+  // The QPU Query API.
   rpc Query(stream RequestStreamRecord) returns (stream ResponseStreamRecord) {}
+  // QueryUnary is a simplification of Query that returns a single response
+  // instead of a stream.
+  // It is used to simplify the client code for clients that have queries
+  // that look like SELECT .. FROM .. WHERE .. LIMIT N
+  // and so do not care about streaming anyways.
+  rpc QueryUnary(QueryRequest) returns (QueryResponse) {}
+  // The QPU GetConfig API.
+  // Used by a 'parent' QPU to request the configuration and query processing
+  // capabilities of a 'child` QPU.
   rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
-  rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
+  // QPUs implemement a mechanism for measuring the traffic between them
+  // (each QPU measuring the total size of outbound messages)
+  // GetDataTransfer was used for getting this measuremrents.
+  // Disabled for now.
+  // rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
 }
 
-message GetDataRequest{
-}
-
-message DataTransferResponse {
-  float kBytesTranferred = 1;
-}
-
-message QueryResponse {
-  repeated qpu.LogOperation results = 1;
-}
 message RequestStreamRecord {
   oneof request {
     QueryRequest queryRequest = 1;
+    // Used to implement synchronous streams.
+    // (synchronous stream : the sender blocks until it receives an ack for
+    // each record)
     AckMsg ack = 2;
-    PingMsg ping = 3;
+    // Used by traceroute-like utility, used to track the path of a
+    // query/update through the QPU graph.
+    // Disabled for now.
+    // PingMsg ping = 3;
   }
-}
-
-message ResponseStreamRecord {
-  enum StreamRecordType {
-      UPDATEOP = 0;
-      UPDATEDELTA = 1;
-      STATE = 2;
-      HEARTBEAT = 3;
-      END_OF_STREAM = 4;
-    }
-  int64 sequence_id = 1;
-  StreamRecordType type = 2;
-  qpu.LogOperation logOp = 3;
 }
 
 message QueryRequest {
   Query query = 1;
   map<string, string> metadata = 2;
+  // Synchronous or asynhronous mode.
+  // Only makes sence to use synchronous mode when the underlying datastore'
+  // subscribe API has the ability to block updates waiting for acks.
   bool sync = 3;
 }
 
 message Query {
-  message internalQuery {
-    string table = 1;
-    repeated string projection = 2;
-    repeated qpu.AttributePredicate predicate = 3;
-    qpu.SnapshotTimePredicate tsPredicate = 4;
-    int64 limit = 5;
-  }
   message SQLQuery {
     string queryStr = 1;
   }
-  oneof val {
-    internalQuery query_i = 1;
+  // Internal query representation.
+  message InternalQuery {
+    string table = 1;
+    // Like the SQL PROJECTION.
+    repeated string projection = 2;
+    // Like the SQL WHERE statement.
+    repeated qpu.AttributePredicate predicate = 3;
+    // Timespamp predicate.
+    // Has the same form as AttributePredicate, but it is separate simply
+    // to allow as to refer to this with a specific name (tsPredicate).
+    qpu.SnapshotTimePredicate tsPredicate = 4;
+    // Like the SQL LIMIT
+    int64 limit = 5;
+  }
+  oneof query {
+    InternalQuery query_i = 1;
     SQLQuery query_sql = 2;
   }
 }
 
-message AckMsg {
+// A record for the stream returned by Query.
+message ResponseStreamRecord {
+  enum StreamRecordType {
+      // Not used for now.
+      UPDATEOP = 0;
+      // Respresents an update.
+      // udpate = (value_before_update, value_after_update)
+      UPDATEDELTA = 1;
+      // Represents the state of a data item.
+      STATE = 2;
+      // Sometimes we exchange heartbeats in long-lived streams to make sure
+      // the two parts are still alive and the connection is open.
+      HEARTBEAT = 3;
+      // It informs the receiver of the stream for the end of a 'getSnapshot'
+      // query (all STATE records will be sent, but more UPDATEDELTA may follow).
+      // It is missleading:
+      // an END_OF_STREAM can be send in a steam, and the stream may then
+      // continue being used (for UPDATEDELTA records).
+      END_OF_STREAM = 4;
+    }
+  // This is here to be used for checking for gaps in the stream and for
+  // ordering records per stream
+  // (not yet implemented)
   int64 sequence_id = 1;
+  StreamRecordType type = 2;
+  qpu.LogOperation logOp = 3;
 }
 
+// Simplification of ResponseStreamRecord
+// used for QueryUnary.
+message QueryResponse {
+  repeated qpu.LogOperation results = 1;
+}
+
+
 message ConfigRequest {
+  // Just here for future use, not actually used.
   qpu.SnapshotTimePredicate clock = 1;
 }
 
@@ -81,19 +119,19 @@ message ConfigResponse {
   }
   QPUType qpu_type = 1;
   repeated qpu.AttributePredicate supportedQueries = 2;
-  DataSet dataset = 3;
 }
 
-message DataSet {
-  message DB {
-    map<string, DC> datacenters = 1;
-  }
-  message DC {
-    repeated string shards = 1;
-  }
-  map<string, DB> databases = 1;
+message AckMsg {
+  int64 sequence_id = 1;
 }
 
-message PingMsg {
-  int64 seq_id = 1;
-}
+// message PingMsg {
+//   int64 sequence_id = 1;
+// }
+
+// message GetDataRequest{
+// }
+
+// message DataTransferResponse {
+//   float kBytesTranferred = 1;
+// }
