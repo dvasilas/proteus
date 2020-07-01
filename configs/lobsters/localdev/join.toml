@@ -1,0 +1,61 @@
+qpuType = "join"
+port = "50350"
+
+tracing = true
+maxWorkers = 64
+maxJobQueue = 1000
+
+[[connections]]
+address = "127.0.0.1:50150"
+local = "local"
+[[connections]]
+address = "127.0.0.1:50250"
+local = "local"
+
+[StateBackend]
+endpoint = "127.0.0.1:3308"
+
+[StateBackend.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecrectQPUPwd"
+
+# assumptions
+# - the first attribute in 'Projection' is the one to use for the join and is treated as libqpu.INT
+#   (better make sure it actually is libqpu.INT)
+# - the order of JoinConfig.Source entries match the order of connecions
+# - i.e. the 1st entry of source is used to construct queries that are then sent to
+#   the 1st connection, etc.
+[[JoinConfig.Source]]
+table = "stories"
+Projection = ["id", "user_id", "title", "description", "short_id"]
+[[JoinConfig.Source]]
+table = "stateTableSum"
+Projection = ["story_id", "vote_sum"]
+
+[[Schema]]
+table = "stateTableSum"
+[[Schema.Attributes]]
+key = "story_id"
+type = "int"
+[[Schema.Attributes]]
+key = "vote_sum"
+type = "int"
+
+
+[[Schema]]
+table = "stories"
+[[Schema.Attributes]]
+key = "id"
+type = "int"
+[[Schema.Attributes]]
+key = "user_id"
+type = "int"
+[[Schema.Attributes]]
+key = "title"
+type = "string"
+[[Schema.Attributes]]
+key = "description"
+type = "string"
+[[Schema.Attributes]]
+key = "short_id"
+type = "string"

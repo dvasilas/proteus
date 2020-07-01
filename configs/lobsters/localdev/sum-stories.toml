@@ -1,0 +1,23 @@
+qpuType = "sum"
+port = "50250"
+
+tracing = false
+
+[[connections]]
+address = "docker.for.mac.localhost:50150"
+local = "local"
+
+[StateBackend]
+endpoint = "127.0.0.1:3306"
+
+[StateBackend.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecrectQPUPwd"
+
+[SumConfig]
+SourceTable = "votes"
+RecordIDAttribute = ["story_id"]
+AttributeToSum = "vote"
+[SumConfig.Query]
+Projection = ["id", "story_id", "vote"]
+IsNull = ["comment_id"]

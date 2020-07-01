@@ -1,0 +1,43 @@
+qpuType = "datastore_driver"
+port = "50150"
+
+tracing = false
+
+[DatastoreConfig]
+type = "mysql"
+endpoint = "127.0.0.1:3307"
+logStreamEndpoint = "127.0.0.1:50000"
+DBName = "proteus_lobsters_db"
+[DatastoreConfig.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecretPwd"
+
+[[Schema]]
+table = "votes"
+[[Schema.Attributes]]
+key = "story_id"
+type = "int"
+[[Schema.Attributes]]
+key = "comment_id"
+type = "int"
+[[Schema.Attributes]]
+key = "vote"
+type = "int"
+
+[[Schema]]
+table = "stories"
+[[Schema.Attributes]]
+key = "id"
+type = "int"
+[[Schema.Attributes]]
+key = "user_id"
+type = "int"
+[[Schema.Attributes]]
+key = "title"
+type = "string"
+[[Schema.Attributes]]
+key = "description"
+type = "string"
+[[Schema.Attributes]]
+key = "short_id"
+type = "string"
