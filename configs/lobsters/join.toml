@@ -1,6 +1,9 @@
 qpuType = "join"
 port = "50350"
+
 tracing = false
+maxWorkers = 64
+maxJobQueue = 1000
 
 [[connections]]
 # address = "docker.for.mac.localhost:50150"

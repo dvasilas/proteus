@@ -14,6 +14,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
@@ -33,6 +34,7 @@ type JoinQPU struct {
 	inMemState     *inMemState
 	endOfStreamCnt int
 	catchUpDoneCh  chan int
+	dispatcher     *workerpool.Dispatcher
 }
 
 type stateEntry struct {
@@ -44,6 +46,21 @@ type stateEntry struct {
 type inMemState struct {
 	entries map[int64]*stateEntry
 	mutex   sync.RWMutex
+}
+
+// Job ...
+type Job struct {
+	qpu        *JoinQPU
+	query      libqpu.InternalQuery
+	parentSpan opentracing.Span
+	logOpCh    chan libqpu.LogOperation
+	errCh      chan error
+	do         func(*JoinQPU, libqpu.InternalQuery, opentracing.Span, chan libqpu.LogOperation, chan error)
+}
+
+// Do ...
+func (j Job) Do() {
+	j.do(j.qpu, j.query, j.parentSpan, j.logOpCh, j.errCh)
 }
 
 // ---------------- API Functions -------------------
@@ -111,6 +128,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		return &JoinQPU{}, err
 	}
 
+	jqpu.dispatcher = workerpool.NewDispatcher(qpu.Config.MaxWorkers, qpu.Config.MaxJobQueue)
+	jqpu.dispatcher.Run()
+
 	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
 		querySnapshot := queries.NewQuerySnapshotAndSubscribe(
 			qpu.Config.JoinConfig.Source[i].Table,
@@ -146,30 +166,37 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	projection := make([]string, len(q.schema[query.GetTable()]))
-	i := 0
-	for attr := range q.schema[query.GetTable()] {
-		projection[i] = attr
-		i++
+	work := Job{
+		qpu:        q,
+		query:      query,
+		parentSpan: parentSpan,
+		logOpCh:    logOpCh,
+		errCh:      errCh,
 	}
 
-	var stateScanSp opentracing.Span
-	stateScanSp = nil
-	if tracer != nil {
-		stateScanSp = tracer.StartSpan("state_scan", opentracing.ChildOf(parentSpan.Context()))
-	}
+	work.do = func(q *JoinQPU, query libqpu.InternalQuery, parentSpan opentracing.Span, logOpCh chan libqpu.LogOperation, errCh chan error) {
+		projection := make([]string, len(q.schema[query.GetTable()]))
+		i := 0
+		for attr := range q.schema[query.GetTable()] {
+			projection[i] = attr
+			i++
+		}
 
-	stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit(), stateScanSp)
-	if err != nil {
-		errCh <- err
-		return logOpCh, errCh
-	}
+		var stateScanSp opentracing.Span
+		stateScanSp = nil
+		if tracer != nil {
+			stateScanSp = tracer.StartSpan("state_scan", opentracing.ChildOf(parentSpan.Context()))
+		}
 
-	if stateScanSp != nil {
-		stateScanSp.Finish()
-	}
+		stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit(), stateScanSp)
+		if err != nil {
+			errCh <- err
+			// return logOpCh, errCh
+		}
 
-	go func() {
+		if stateScanSp != nil {
+			stateScanSp.Finish()
+		}
 		var stateScanProcSp opentracing.Span
 		stateScanProcSp = nil
 		if tracer != nil {
@@ -217,7 +244,9 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 		}
 		close(logOpCh)
 		close(errCh)
-	}()
+	}
+
+	q.dispatcher.JobQueue <- work
 
 	return logOpCh, errCh
 }
@@ -333,7 +362,6 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 	if err != nil {
 		return nil, err
 	}
-
 	return values, nil
 }
 

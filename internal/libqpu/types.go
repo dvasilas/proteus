@@ -66,7 +66,6 @@ type QPUState interface {
 type QPUConfig struct {
 	QpuType      qpu_api.ConfigResponse_QPUType
 	Port         string
-	Tracing      bool
 	Connections  []QPUConnection
 	StateBackend struct {
 		Endpoint    string
@@ -101,6 +100,9 @@ type QPUConfig struct {
 			Projection []string
 		}
 	}
+	Tracing     bool
+	MaxWorkers  int
+	MaxJobQueue int
 }
 
 // QPUConnection ...

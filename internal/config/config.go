@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -16,7 +18,6 @@ import (
 type inputQPUConfig struct {
 	QpuType     string
 	Port        string
-	Tracing     bool
 	Connections []struct {
 		Address string
 		Local   string
@@ -83,6 +84,9 @@ type inputQPUConfig struct {
 		Rate     float32
 		Delay    int64
 	}
+	Tracing     bool
+	MaxWorkers  int
+	MaxJobQueue int
 }
 
 // ---------------- API Functions -------------------
@@ -121,9 +125,6 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 		return err
 	}
 
-	// Tracing
-	config.Tracing = inputConfig.Tracing
-
 	// DatastoreConfiguration
 	if config.QpuType == qpu_api.ConfigResponse_DATASTORE_DRIVER {
 		if err := getDatastoreConfig(inputConfig, config); err != nil {
@@ -137,10 +138,30 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 		if err := getJoinConfig(inputConfig, config); err != nil {
 			return err
 		}
+
+		// Misc
+		config.Tracing = inputConfig.Tracing
+		config.MaxWorkers = inputConfig.MaxWorkers
+		if val, isSet := os.LookupEnv("MAX_WORKERS"); isSet {
+			maxWorkers, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil
+			}
+			config.MaxWorkers = int(maxWorkers)
+		}
+		config.MaxJobQueue = inputConfig.MaxJobQueue
+		if val, isSet := os.LookupEnv("MAX_JOB_QUEUE"); isSet {
+			maxWorkers, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil
+			}
+			config.MaxWorkers = int(maxWorkers)
+		}
 	}
 
 	qpu.Config = config
-	libqpu.Trace("configuration parsed", map[string]interface{}{"config": qpu.Config})
+	fmt.Printf("%+v\n", qpu.Config)
+	// libqpu.Trace("configuration parsed", map[string]interface{}{"config": qpu.Config})
 
 	return nil
 }
