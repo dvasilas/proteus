@@ -95,6 +95,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
 						libqpu.Error(err)
 						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
+						return nil
 					}
 					seqID++
 				}
