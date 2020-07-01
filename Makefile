@@ -107,12 +107,14 @@ image-push:
 .PHONY: sync
 ## sync:
 sync:
-	ssh proteus-worker1 'sudo rm -r /mount/'
-	ssh proteus-worker1 'sudo mkdir -p /mount/'
-	ssh proteus-worker1 'mkdir -p mount'
+	ssh proteus-worker1 'sudo rm -r /mount/; sudo mkdir -p /mount/; mkdir -p mount'
+	ssh proteus-worker2 'sudo rm -r /mount/; sudo mkdir -p /mount/; mkdir -p mount'
 	scp -r build/datastore/lobsters-MySQL/docker-entrypoint-init.d/* proteus-worker1:~/mount
+	scp -r build/datastore/lobsters-MySQL/docker-entrypoint-init.d/* proteus-worker2:~/mount
 	scp -r configs proteus-worker1:~/mount
+	scp -r configs proteus-worker2:~/mount
 	ssh proteus-worker1 'sudo mv ~/mount/* /mount/'
+	ssh proteus-worker2 'sudo mv ~/mount/* /mount/'
 
 .PHONY: clean
 ## clean: cleans the binary
