@@ -47,7 +47,7 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.queryengine == true ]
+        constraints: [ node.labels.queryengine-join == true ]
 
 networks:
   qpu_graph:
