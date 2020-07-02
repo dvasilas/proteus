@@ -19,9 +19,8 @@ type GrpcServer struct {
 
 // GrpcClientConn ...
 type GrpcClientConn struct {
-	Conn   *grpc.ClientConn
-	Cli    qpu_api.QPUAPIClient
-	closer io.Closer
+	Conn *grpc.ClientConn
+	Cli  qpu_api.QPUAPIClient
 }
 
 // NewServer ...
@@ -65,31 +64,26 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 
 	clientConn := GrpcClientConn{}
 	if tracing {
-		tracer, closer, err := tracer.NewTracer()
-		if err != nil {
-			return &clientConn, err
+		if tracer := opentracing.GlobalTracer(); tracer != nil {
+			c, err := grpc.Dial(
+				address,
+				grpc.WithInsecure(),
+				grpc.WithStreamInterceptor(grpc_middleware.ChainStreamClient(
+					grpc_opentracing.StreamClientInterceptor(grpc_opentracing.WithTracer(tracer)),
+				)),
+				grpc.WithUnaryInterceptor(grpc_middleware.ChainUnaryClient(
+					grpc_opentracing.UnaryClientInterceptor(grpc_opentracing.WithTracer(tracer)),
+				)),
+			)
+			if err != nil {
+				return &clientConn, err
+			}
+
+			clientConn.Conn = c
+			clientConn.Cli = qpu_api.NewQPUAPIClient(c)
+
+			return &clientConn, nil
 		}
-		opentracing.SetGlobalTracer(tracer)
-
-		c, err := grpc.Dial(
-			address,
-			grpc.WithInsecure(),
-			grpc.WithStreamInterceptor(grpc_middleware.ChainStreamClient(
-				grpc_opentracing.StreamClientInterceptor(grpc_opentracing.WithTracer(tracer)),
-			)),
-			grpc.WithUnaryInterceptor(grpc_middleware.ChainUnaryClient(
-				grpc_opentracing.UnaryClientInterceptor(grpc_opentracing.WithTracer(tracer)),
-			)),
-		)
-		if err != nil {
-			return &clientConn, err
-		}
-
-		clientConn.Conn = c
-		clientConn.Cli = qpu_api.NewQPUAPIClient(c)
-		clientConn.closer = closer
-
-		return &clientConn, nil
 	}
 
 	c, err := grpc.Dial(address, grpc.WithInsecure())
@@ -99,7 +93,6 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 
 	clientConn.Conn = c
 	clientConn.Cli = qpu_api.NewQPUAPIClient(c)
-	clientConn.closer = nil
 
 	return &clientConn, nil
 
@@ -107,8 +100,5 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 
 // Close ...
 func (c *GrpcClientConn) Close() error {
-	if c.closer != nil {
-		c.closer.Close()
-	}
 	return c.Conn.Close()
 }

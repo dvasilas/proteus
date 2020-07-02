@@ -82,20 +82,18 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qpu_api.QueryResponse, error) {
-	var tracer opentracing.Tracer
 	var querySp opentracing.Span
-	tracer = nil
-
-	if s.tracing {
-		tracer = opentracing.GlobalTracer()
-		querySp = tracer.StartSpan("query")
-		defer querySp.Finish()
+	querySp = nil
+	if parent := opentracing.SpanFromContext(ctx); parent != nil {
+		pCtx := parent.Context()
+		if tracer := opentracing.GlobalTracer(); tracer != nil {
+			querySp = tracer.StartSpan("qpu/query", opentracing.ChildOf(pCtx))
+			defer querySp.Finish()
+		}
 	}
 
-	resp, err := s.api.QueryUnary(
-		libqpu.QueryRequest{Req: req},
-		querySp,
-	)
+	resp, err := s.api.QueryUnary(libqpu.QueryRequest{Req: req}, querySp)
+
 	results := make([]*qpu.LogOperation, len(resp))
 	for i, entry := range resp {
 		results[i] = entry.Op

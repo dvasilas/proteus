@@ -151,6 +151,8 @@ func (cp *ConnectionPool) GetWithTimeout(d time.Duration) (rv *grpcutils.GrpcCli
 		case cp.createsem <- true:
 			// Build a connection
 			rv, err := cp.makeConn(cp.host, cp.tracing)
+			// Enable tracing only the first client we create.
+			cp.tracing = false
 			if err != nil {
 				// On error, release our create hold
 				<-cp.createsem
