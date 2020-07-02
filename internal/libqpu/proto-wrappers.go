@@ -155,7 +155,7 @@ func NewQueryRequestI(query InternalQuery, md map[string]string, sync bool) Quer
 	return QueryRequest{
 		Req: &qpu_api.QueryRequest{
 			Query: &qpu_api.Query{
-				Val: &qpu_api.Query_QueryI{
+				Query: &qpu_api.Query_QueryI{
 					QueryI: query.Q,
 				},
 			},
@@ -170,7 +170,7 @@ func NewQueryRequestSQL(query string, md map[string]string, sync bool) QueryRequ
 	return QueryRequest{
 		Req: &qpu_api.QueryRequest{
 			Query: &qpu_api.Query{
-				Val: &qpu_api.Query_QuerySql{
+				Query: &qpu_api.Query_QuerySql{
 					QuerySql: &qpu_api.Query_SQLQuery{
 						QueryStr: query,
 					},
@@ -223,7 +223,7 @@ func (r ResponseRecord) GetRecordID() string {
 
 // QueryType ...
 func (r QueryRequest) QueryType() QueryType {
-	switch r.Req.GetQuery().GetVal().(type) {
+	switch r.Req.GetQuery().GetQuery().(type) {
 	case *qpu_api.Query_QueryI:
 		return InternalQueryType
 	case *qpu_api.Query_QuerySql:
@@ -257,7 +257,7 @@ func (r QueryRequest) GetSync() bool {
 
 // InternalQuery ...
 type InternalQuery struct {
-	Q *qpu_api.QueryInternalQuery
+	Q *qpu_api.Query_InternalQuery
 }
 
 // GetTable ...
@@ -360,28 +360,28 @@ func RequestStreamAck(sID int64) *qpu_api.RequestStreamRecord {
 }
 
 // RequestStreamPing ...
-func RequestStreamPing(sID int64) *qpu_api.RequestStreamRecord {
-	return &qpu_api.RequestStreamRecord{
-		Request: &qpu_api.RequestStreamRecord_Ping{
-			Ping: &qpu_api.PingMsg{
-				SeqId: sID,
-			},
-		},
-	}
-}
+// func RequestStreamPing(sID int64) *qpu_api.RequestStreamRecord {
+// 	return &qpu_api.RequestStreamRecord{
+// 		Request: &qpu_api.RequestStreamRecord_Ping{
+// 			Ping: &qpu_api.PingMsg{
+// 				SeqId: sID,
+// 			},
+// 		},
+// 	}
+// }
 
 // Query ...
-func Query(queryI *qpu_api.QueryInternalQuery) *qpu_api.Query {
+func Query(queryI *qpu_api.Query_InternalQuery) *qpu_api.Query {
 	return &qpu_api.Query{
-		Val: &qpu_api.Query_QueryI{
+		Query: &qpu_api.Query_QueryI{
 			QueryI: queryI,
 		},
 	}
 }
 
 // QueryInternal ...
-func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpu_api.QueryInternalQuery {
-	return &qpu_api.QueryInternalQuery{
+func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpu_api.Query_InternalQuery {
+	return &qpu_api.Query_InternalQuery{
 		Table:       table,
 		Projection:  projection,
 		Predicate:   predicate,
@@ -393,7 +393,7 @@ func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu
 // QuerySQL ...
 func QuerySQL(query string) *qpu_api.Query {
 	return &qpu_api.Query{
-		Val: &qpu_api.Query_QuerySql{
+		Query: &qpu_api.Query_QuerySql{
 			QuerySql: &qpu_api.Query_SQLQuery{
 				QueryStr: query,
 			},
@@ -414,26 +414,26 @@ func ConfigRequest() *qpu_api.ConfigRequest {
 }
 
 //ConfigRespοnse ...
-func ConfigRespοnse(typ qpu_api.ConfigResponse_QPUType, attrs []*qpu.AttributePredicate, ds *qpu_api.DataSet) *qpu_api.ConfigResponse {
+func ConfigRespοnse(typ qpu_api.ConfigResponse_QPUType, attrs []*qpu.AttributePredicate) *qpu_api.ConfigResponse {
 	return &qpu_api.ConfigResponse{
 		QpuType:          typ,
 		SupportedQueries: attrs,
-		Dataset:          ds,
+		// Dataset:          ds,
 	}
 }
 
 //DataSet creates a protos/utils/Dataset object
-func DataSet(dbMap map[string]map[string][]string) *qpu_api.DataSet {
-	dbs := make(map[string]*qpu_api.DataSet_DB)
-	for dbID, dcMap := range dbMap {
-		dcs := make(map[string]*qpu_api.DataSet_DC)
-		for dcID, shards := range dcMap {
-			dcs[dcID] = &qpu_api.DataSet_DC{Shards: shards}
-		}
-		dbs[dbID] = &qpu_api.DataSet_DB{Datacenters: dcs}
-	}
-	return &qpu_api.DataSet{Databases: dbs}
-}
+// func DataSet(dbMap map[string]map[string][]string) *qpu_api.DataSet {
+// 	dbs := make(map[string]*qpu_api.DataSet_DB)
+// 	for dbID, dcMap := range dbMap {
+// 		dcs := make(map[string]*qpu_api.DataSet_DC)
+// 		for dcID, shards := range dcMap {
+// 			dcs[dcID] = &qpu_api.DataSet_DC{Shards: shards}
+// 		}
+// 		dbs[dbID] = &qpu_api.DataSet_DB{Datacenters: dcs}
+// 	}
+// 	return &qpu_api.DataSet{Databases: dbs}
+// }
 
 //AttributePredicate create a protos/utils/AttributePredicate object
 func AttributePredicate(attr *qpu.Attribute, lb *qpu.Value, ub *qpu.Value) *qpu.AttributePredicate {

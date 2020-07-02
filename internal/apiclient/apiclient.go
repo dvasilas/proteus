@@ -89,11 +89,11 @@ func (c QPUAPIClient) GetConfig() (*qpu_api.ConfigResponse, error) {
 }
 
 // GetDataTransfer implements the QPU's API GetDataTransfer method.
-func (c QPUAPIClient) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
-	ctx := context.TODO()
-	resp, err := c.cli.GetDataTransfer(ctx, &qpu_api.GetDataRequest{})
-	return resp, err
-}
+// func (c QPUAPIClient) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
+// 	ctx := context.TODO()
+// 	resp, err := c.cli.GetDataTransfer(ctx, &qpu_api.GetDataRequest{})
+// 	return resp, err
+// }
 
 // Forward implements the QPU's API Forward method.
 func (c *QPUAPIClient) Forward() (qpu_api.QPUAPI_QueryClient, context.CancelFunc, error) {

@@ -29,7 +29,7 @@ type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
 	QueryUnary(QueryRequest, opentracing.Span) ([]*LogOperation, error)
 	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
-	GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
+	// GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
 }
 
 // QPUClass ...

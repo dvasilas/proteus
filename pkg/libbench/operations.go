@@ -4,8 +4,6 @@ import (
 	"errors"
 	"math/rand"
 	"strconv"
-
-	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -83,22 +81,22 @@ func (op *operations) getHomepage() (homepage, error) {
 
 	switch op.config.Benchmark.measuredSystem {
 	case "proteus":
-		response := resp.([]proteusclient.ResponseRecord)
-		stories := make([]story, len(response))
-		for i, entry := range response {
-			stories[i] = story{
-				title:       entry.State["title"],
-				description: entry.State["description"],
-				shortID:     entry.State["short_id"],
-			}
+		// response := resp.([]proteusclient.ResponseRecord)
+		// stories := make([]story, len(response))
+		// for i, entry := range response {
+		// 	stories[i] = story{
+		// 		title:       entry.State["title"],
+		// 		description: entry.State["description"],
+		// 		shortID:     entry.State["short_id"],
+		// 	}
 
-			val, err := strconv.ParseInt(entry.State["vote_sum"], 10, 64)
-			if err != nil {
-				return homepage{}, err
-			}
-			stories[i].voteCount = val
-		}
-		hp.stories = stories
+		// 	val, err := strconv.ParseInt(entry.State["vote_sum"], 10, 64)
+		// 	if err != nil {
+		// 		return homepage{}, err
+		// 	}
+		// 	stories[i].voteCount = val
+		// }
+		// hp.stories = stories
 	case "mysql_plain":
 		response := resp.([]map[string]string)
 		stories := make([]story, len(response))

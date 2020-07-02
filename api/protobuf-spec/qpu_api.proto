@@ -22,6 +22,15 @@ service QPUAPI {
   // GetDataTransfer was used for getting this measuremrents.
   // Disabled for now.
   // rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
+  rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
+}
+
+message NoOpReq {
+  string str = 1;
+}
+
+message NoOpResp {
+  string str = 1;
 }
 
 message RequestStreamRecord {

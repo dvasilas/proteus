@@ -26,10 +26,21 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 type ResponseStreamRecord_StreamRecordType int32
 
 const (
-	ResponseStreamRecord_UPDATEOP      ResponseStreamRecord_StreamRecordType = 0
-	ResponseStreamRecord_UPDATEDELTA   ResponseStreamRecord_StreamRecordType = 1
-	ResponseStreamRecord_STATE         ResponseStreamRecord_StreamRecordType = 2
-	ResponseStreamRecord_HEARTBEAT     ResponseStreamRecord_StreamRecordType = 3
+	// Not used for now.
+	ResponseStreamRecord_UPDATEOP ResponseStreamRecord_StreamRecordType = 0
+	// Respresents an update.
+	// udpate = (value_before_update, value_after_update)
+	ResponseStreamRecord_UPDATEDELTA ResponseStreamRecord_StreamRecordType = 1
+	// Represents the state of a data item.
+	ResponseStreamRecord_STATE ResponseStreamRecord_StreamRecordType = 2
+	// Sometimes we exchange heartbeats in long-lived streams to make sure
+	// the two parts are still alive and the connection is open.
+	ResponseStreamRecord_HEARTBEAT ResponseStreamRecord_StreamRecordType = 3
+	// It informs the receiver of the stream for the end of a 'getSnapshot'
+	// query (all STATE records will be sent, but more UPDATEDELTA may follow).
+	// It is missleading:
+	// an END_OF_STREAM can be send in a steam, and the stream may then
+	// continue being used (for UPDATEDELTA records).
 	ResponseStreamRecord_END_OF_STREAM ResponseStreamRecord_StreamRecordType = 4
 )
 
@@ -54,7 +65,7 @@ func (x ResponseStreamRecord_StreamRecordType) String() string {
 }
 
 func (ResponseStreamRecord_StreamRecordType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{4, 0}
+	return fileDescriptor_55c136aa8978e5e9, []int{5, 0}
 }
 
 type ConfigResponse_QPUType int32
@@ -82,123 +93,91 @@ func (x ConfigResponse_QPUType) String() string {
 }
 
 func (ConfigResponse_QPUType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{9, 0}
+	return fileDescriptor_55c136aa8978e5e9, []int{8, 0}
 }
 
-type GetDataRequest struct {
+type NoOpReq struct {
+	Str                  string   `protobuf:"bytes,1,opt,name=str,proto3" json:"str,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *GetDataRequest) Reset()         { *m = GetDataRequest{} }
-func (m *GetDataRequest) String() string { return proto.CompactTextString(m) }
-func (*GetDataRequest) ProtoMessage()    {}
-func (*GetDataRequest) Descriptor() ([]byte, []int) {
+func (m *NoOpReq) Reset()         { *m = NoOpReq{} }
+func (m *NoOpReq) String() string { return proto.CompactTextString(m) }
+func (*NoOpReq) ProtoMessage()    {}
+func (*NoOpReq) Descriptor() ([]byte, []int) {
 	return fileDescriptor_55c136aa8978e5e9, []int{0}
 }
 
-func (m *GetDataRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetDataRequest.Unmarshal(m, b)
+func (m *NoOpReq) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_NoOpReq.Unmarshal(m, b)
 }
-func (m *GetDataRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetDataRequest.Marshal(b, m, deterministic)
+func (m *NoOpReq) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_NoOpReq.Marshal(b, m, deterministic)
 }
-func (m *GetDataRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetDataRequest.Merge(m, src)
+func (m *NoOpReq) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NoOpReq.Merge(m, src)
 }
-func (m *GetDataRequest) XXX_Size() int {
-	return xxx_messageInfo_GetDataRequest.Size(m)
+func (m *NoOpReq) XXX_Size() int {
+	return xxx_messageInfo_NoOpReq.Size(m)
 }
-func (m *GetDataRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetDataRequest.DiscardUnknown(m)
+func (m *NoOpReq) XXX_DiscardUnknown() {
+	xxx_messageInfo_NoOpReq.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_GetDataRequest proto.InternalMessageInfo
+var xxx_messageInfo_NoOpReq proto.InternalMessageInfo
 
-type DataTransferResponse struct {
-	KBytesTranferred     float32  `protobuf:"fixed32,1,opt,name=kBytesTranferred,proto3" json:"kBytesTranferred,omitempty"`
+func (m *NoOpReq) GetStr() string {
+	if m != nil {
+		return m.Str
+	}
+	return ""
+}
+
+type NoOpResp struct {
+	Str                  string   `protobuf:"bytes,1,opt,name=str,proto3" json:"str,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *DataTransferResponse) Reset()         { *m = DataTransferResponse{} }
-func (m *DataTransferResponse) String() string { return proto.CompactTextString(m) }
-func (*DataTransferResponse) ProtoMessage()    {}
-func (*DataTransferResponse) Descriptor() ([]byte, []int) {
+func (m *NoOpResp) Reset()         { *m = NoOpResp{} }
+func (m *NoOpResp) String() string { return proto.CompactTextString(m) }
+func (*NoOpResp) ProtoMessage()    {}
+func (*NoOpResp) Descriptor() ([]byte, []int) {
 	return fileDescriptor_55c136aa8978e5e9, []int{1}
 }
 
-func (m *DataTransferResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_DataTransferResponse.Unmarshal(m, b)
+func (m *NoOpResp) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_NoOpResp.Unmarshal(m, b)
 }
-func (m *DataTransferResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_DataTransferResponse.Marshal(b, m, deterministic)
+func (m *NoOpResp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_NoOpResp.Marshal(b, m, deterministic)
 }
-func (m *DataTransferResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DataTransferResponse.Merge(m, src)
+func (m *NoOpResp) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NoOpResp.Merge(m, src)
 }
-func (m *DataTransferResponse) XXX_Size() int {
-	return xxx_messageInfo_DataTransferResponse.Size(m)
+func (m *NoOpResp) XXX_Size() int {
+	return xxx_messageInfo_NoOpResp.Size(m)
 }
-func (m *DataTransferResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_DataTransferResponse.DiscardUnknown(m)
+func (m *NoOpResp) XXX_DiscardUnknown() {
+	xxx_messageInfo_NoOpResp.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_DataTransferResponse proto.InternalMessageInfo
+var xxx_messageInfo_NoOpResp proto.InternalMessageInfo
 
-func (m *DataTransferResponse) GetKBytesTranferred() float32 {
+func (m *NoOpResp) GetStr() string {
 	if m != nil {
-		return m.KBytesTranferred
+		return m.Str
 	}
-	return 0
-}
-
-type QueryResponse struct {
-	Results              []*qpu.LogOperation `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
-	XXX_unrecognized     []byte              `json:"-"`
-	XXX_sizecache        int32               `json:"-"`
-}
-
-func (m *QueryResponse) Reset()         { *m = QueryResponse{} }
-func (m *QueryResponse) String() string { return proto.CompactTextString(m) }
-func (*QueryResponse) ProtoMessage()    {}
-func (*QueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{2}
-}
-
-func (m *QueryResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_QueryResponse.Unmarshal(m, b)
-}
-func (m *QueryResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_QueryResponse.Marshal(b, m, deterministic)
-}
-func (m *QueryResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryResponse.Merge(m, src)
-}
-func (m *QueryResponse) XXX_Size() int {
-	return xxx_messageInfo_QueryResponse.Size(m)
-}
-func (m *QueryResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryResponse proto.InternalMessageInfo
-
-func (m *QueryResponse) GetResults() []*qpu.LogOperation {
-	if m != nil {
-		return m.Results
-	}
-	return nil
+	return ""
 }
 
 type RequestStreamRecord struct {
 	// Types that are valid to be assigned to Request:
 	//	*RequestStreamRecord_QueryRequest
 	//	*RequestStreamRecord_Ack
-	//	*RequestStreamRecord_Ping
 	Request              isRequestStreamRecord_Request `protobuf_oneof:"request"`
 	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
 	XXX_unrecognized     []byte                        `json:"-"`
@@ -209,7 +188,7 @@ func (m *RequestStreamRecord) Reset()         { *m = RequestStreamRecord{} }
 func (m *RequestStreamRecord) String() string { return proto.CompactTextString(m) }
 func (*RequestStreamRecord) ProtoMessage()    {}
 func (*RequestStreamRecord) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{3}
+	return fileDescriptor_55c136aa8978e5e9, []int{2}
 }
 
 func (m *RequestStreamRecord) XXX_Unmarshal(b []byte) error {
@@ -242,15 +221,9 @@ type RequestStreamRecord_Ack struct {
 	Ack *AckMsg `protobuf:"bytes,2,opt,name=ack,proto3,oneof"`
 }
 
-type RequestStreamRecord_Ping struct {
-	Ping *PingMsg `protobuf:"bytes,3,opt,name=ping,proto3,oneof"`
-}
-
 func (*RequestStreamRecord_QueryRequest) isRequestStreamRecord_Request() {}
 
 func (*RequestStreamRecord_Ack) isRequestStreamRecord_Request() {}
-
-func (*RequestStreamRecord_Ping) isRequestStreamRecord_Request() {}
 
 func (m *RequestStreamRecord) GetRequest() isRequestStreamRecord_Request {
 	if m != nil {
@@ -273,91 +246,31 @@ func (m *RequestStreamRecord) GetAck() *AckMsg {
 	return nil
 }
 
-func (m *RequestStreamRecord) GetPing() *PingMsg {
-	if x, ok := m.GetRequest().(*RequestStreamRecord_Ping); ok {
-		return x.Ping
-	}
-	return nil
-}
-
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*RequestStreamRecord) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*RequestStreamRecord_QueryRequest)(nil),
 		(*RequestStreamRecord_Ack)(nil),
-		(*RequestStreamRecord_Ping)(nil),
 	}
-}
-
-type ResponseStreamRecord struct {
-	SequenceId           int64                                 `protobuf:"varint,1,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
-	Type                 ResponseStreamRecord_StreamRecordType `protobuf:"varint,2,opt,name=type,proto3,enum=ResponseStreamRecord_StreamRecordType" json:"type,omitempty"`
-	LogOp                *qpu.LogOperation                     `protobuf:"bytes,3,opt,name=logOp,proto3" json:"logOp,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                              `json:"-"`
-	XXX_unrecognized     []byte                                `json:"-"`
-	XXX_sizecache        int32                                 `json:"-"`
-}
-
-func (m *ResponseStreamRecord) Reset()         { *m = ResponseStreamRecord{} }
-func (m *ResponseStreamRecord) String() string { return proto.CompactTextString(m) }
-func (*ResponseStreamRecord) ProtoMessage()    {}
-func (*ResponseStreamRecord) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{4}
-}
-
-func (m *ResponseStreamRecord) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ResponseStreamRecord.Unmarshal(m, b)
-}
-func (m *ResponseStreamRecord) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ResponseStreamRecord.Marshal(b, m, deterministic)
-}
-func (m *ResponseStreamRecord) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResponseStreamRecord.Merge(m, src)
-}
-func (m *ResponseStreamRecord) XXX_Size() int {
-	return xxx_messageInfo_ResponseStreamRecord.Size(m)
-}
-func (m *ResponseStreamRecord) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResponseStreamRecord.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ResponseStreamRecord proto.InternalMessageInfo
-
-func (m *ResponseStreamRecord) GetSequenceId() int64 {
-	if m != nil {
-		return m.SequenceId
-	}
-	return 0
-}
-
-func (m *ResponseStreamRecord) GetType() ResponseStreamRecord_StreamRecordType {
-	if m != nil {
-		return m.Type
-	}
-	return ResponseStreamRecord_UPDATEOP
-}
-
-func (m *ResponseStreamRecord) GetLogOp() *qpu.LogOperation {
-	if m != nil {
-		return m.LogOp
-	}
-	return nil
 }
 
 type QueryRequest struct {
-	Query                *Query            `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
-	Metadata             map[string]string `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Sync                 bool              `protobuf:"varint,3,opt,name=sync,proto3" json:"sync,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
+	Query    *Query            `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	Metadata map[string]string `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Synchronous or asynhronous mode.
+	// Only makes sence to use synchronous mode when the underlying datastore'
+	// subscribe API has the ability to block updates waiting for acks.
+	Sync                 bool     `protobuf:"varint,3,opt,name=sync,proto3" json:"sync,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *QueryRequest) Reset()         { *m = QueryRequest{} }
 func (m *QueryRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryRequest) ProtoMessage()    {}
 func (*QueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{5}
+	return fileDescriptor_55c136aa8978e5e9, []int{3}
 }
 
 func (m *QueryRequest) XXX_Unmarshal(b []byte) error {
@@ -400,20 +313,20 @@ func (m *QueryRequest) GetSync() bool {
 }
 
 type Query struct {
-	// Types that are valid to be assigned to Val:
+	// Types that are valid to be assigned to Query:
 	//	*Query_QueryI
 	//	*Query_QuerySql
-	Val                  isQuery_Val `protobuf_oneof:"val"`
-	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
-	XXX_unrecognized     []byte      `json:"-"`
-	XXX_sizecache        int32       `json:"-"`
+	Query                isQuery_Query `protobuf_oneof:"query"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
 }
 
 func (m *Query) Reset()         { *m = Query{} }
 func (m *Query) String() string { return proto.CompactTextString(m) }
 func (*Query) ProtoMessage()    {}
 func (*Query) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{6}
+	return fileDescriptor_55c136aa8978e5e9, []int{4}
 }
 
 func (m *Query) XXX_Unmarshal(b []byte) error {
@@ -434,38 +347,38 @@ func (m *Query) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Query proto.InternalMessageInfo
 
-type isQuery_Val interface {
-	isQuery_Val()
+type isQuery_Query interface {
+	isQuery_Query()
 }
 
 type Query_QueryI struct {
-	QueryI *QueryInternalQuery `protobuf:"bytes,1,opt,name=query_i,json=queryI,proto3,oneof"`
+	QueryI *Query_InternalQuery `protobuf:"bytes,1,opt,name=query_i,json=queryI,proto3,oneof"`
 }
 
 type Query_QuerySql struct {
 	QuerySql *Query_SQLQuery `protobuf:"bytes,2,opt,name=query_sql,json=querySql,proto3,oneof"`
 }
 
-func (*Query_QueryI) isQuery_Val() {}
+func (*Query_QueryI) isQuery_Query() {}
 
-func (*Query_QuerySql) isQuery_Val() {}
+func (*Query_QuerySql) isQuery_Query() {}
 
-func (m *Query) GetVal() isQuery_Val {
+func (m *Query) GetQuery() isQuery_Query {
 	if m != nil {
-		return m.Val
+		return m.Query
 	}
 	return nil
 }
 
-func (m *Query) GetQueryI() *QueryInternalQuery {
-	if x, ok := m.GetVal().(*Query_QueryI); ok {
+func (m *Query) GetQueryI() *Query_InternalQuery {
+	if x, ok := m.GetQuery().(*Query_QueryI); ok {
 		return x.QueryI
 	}
 	return nil
 }
 
 func (m *Query) GetQuerySql() *Query_SQLQuery {
-	if x, ok := m.GetVal().(*Query_QuerySql); ok {
+	if x, ok := m.GetQuery().(*Query_QuerySql); ok {
 		return x.QuerySql
 	}
 	return nil
@@ -479,77 +392,6 @@ func (*Query) XXX_OneofWrappers() []interface{} {
 	}
 }
 
-type QueryInternalQuery struct {
-	Table                string                     `protobuf:"bytes,1,opt,name=table,proto3" json:"table,omitempty"`
-	Projection           []string                   `protobuf:"bytes,2,rep,name=projection,proto3" json:"projection,omitempty"`
-	Predicate            []*qpu.AttributePredicate  `protobuf:"bytes,3,rep,name=predicate,proto3" json:"predicate,omitempty"`
-	TsPredicate          *qpu.SnapshotTimePredicate `protobuf:"bytes,4,opt,name=tsPredicate,proto3" json:"tsPredicate,omitempty"`
-	Limit                int64                      `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
-	XXX_unrecognized     []byte                     `json:"-"`
-	XXX_sizecache        int32                      `json:"-"`
-}
-
-func (m *QueryInternalQuery) Reset()         { *m = QueryInternalQuery{} }
-func (m *QueryInternalQuery) String() string { return proto.CompactTextString(m) }
-func (*QueryInternalQuery) ProtoMessage()    {}
-func (*QueryInternalQuery) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{6, 0}
-}
-
-func (m *QueryInternalQuery) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_QueryInternalQuery.Unmarshal(m, b)
-}
-func (m *QueryInternalQuery) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_QueryInternalQuery.Marshal(b, m, deterministic)
-}
-func (m *QueryInternalQuery) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryInternalQuery.Merge(m, src)
-}
-func (m *QueryInternalQuery) XXX_Size() int {
-	return xxx_messageInfo_QueryInternalQuery.Size(m)
-}
-func (m *QueryInternalQuery) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryInternalQuery.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryInternalQuery proto.InternalMessageInfo
-
-func (m *QueryInternalQuery) GetTable() string {
-	if m != nil {
-		return m.Table
-	}
-	return ""
-}
-
-func (m *QueryInternalQuery) GetProjection() []string {
-	if m != nil {
-		return m.Projection
-	}
-	return nil
-}
-
-func (m *QueryInternalQuery) GetPredicate() []*qpu.AttributePredicate {
-	if m != nil {
-		return m.Predicate
-	}
-	return nil
-}
-
-func (m *QueryInternalQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
-	if m != nil {
-		return m.TsPredicate
-	}
-	return nil
-}
-
-func (m *QueryInternalQuery) GetLimit() int64 {
-	if m != nil {
-		return m.Limit
-	}
-	return 0
-}
-
 type Query_SQLQuery struct {
 	QueryStr             string   `protobuf:"bytes,1,opt,name=queryStr,proto3" json:"queryStr,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -561,7 +403,7 @@ func (m *Query_SQLQuery) Reset()         { *m = Query_SQLQuery{} }
 func (m *Query_SQLQuery) String() string { return proto.CompactTextString(m) }
 func (*Query_SQLQuery) ProtoMessage()    {}
 func (*Query_SQLQuery) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{6, 1}
+	return fileDescriptor_55c136aa8978e5e9, []int{4, 0}
 }
 
 func (m *Query_SQLQuery) XXX_Unmarshal(b []byte) error {
@@ -589,46 +431,186 @@ func (m *Query_SQLQuery) GetQueryStr() string {
 	return ""
 }
 
-type AckMsg struct {
-	SequenceId           int64    `protobuf:"varint,1,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
+// Internal query representation.
+type Query_InternalQuery struct {
+	Table string `protobuf:"bytes,1,opt,name=table,proto3" json:"table,omitempty"`
+	// Like the SQL PROJECTION.
+	Projection []string `protobuf:"bytes,2,rep,name=projection,proto3" json:"projection,omitempty"`
+	// Like the SQL WHERE statement.
+	Predicate []*qpu.AttributePredicate `protobuf:"bytes,3,rep,name=predicate,proto3" json:"predicate,omitempty"`
+	// Timespamp predicate.
+	// Has the same form as AttributePredicate, but it is separate simply
+	// to allow as to refer to this with a specific name (tsPredicate).
+	TsPredicate *qpu.SnapshotTimePredicate `protobuf:"bytes,4,opt,name=tsPredicate,proto3" json:"tsPredicate,omitempty"`
+	// Like the SQL LIMIT
+	Limit                int64    `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *AckMsg) Reset()         { *m = AckMsg{} }
-func (m *AckMsg) String() string { return proto.CompactTextString(m) }
-func (*AckMsg) ProtoMessage()    {}
-func (*AckMsg) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{7}
+func (m *Query_InternalQuery) Reset()         { *m = Query_InternalQuery{} }
+func (m *Query_InternalQuery) String() string { return proto.CompactTextString(m) }
+func (*Query_InternalQuery) ProtoMessage()    {}
+func (*Query_InternalQuery) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55c136aa8978e5e9, []int{4, 1}
 }
 
-func (m *AckMsg) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_AckMsg.Unmarshal(m, b)
+func (m *Query_InternalQuery) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Query_InternalQuery.Unmarshal(m, b)
 }
-func (m *AckMsg) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_AckMsg.Marshal(b, m, deterministic)
+func (m *Query_InternalQuery) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Query_InternalQuery.Marshal(b, m, deterministic)
 }
-func (m *AckMsg) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AckMsg.Merge(m, src)
+func (m *Query_InternalQuery) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Query_InternalQuery.Merge(m, src)
 }
-func (m *AckMsg) XXX_Size() int {
-	return xxx_messageInfo_AckMsg.Size(m)
+func (m *Query_InternalQuery) XXX_Size() int {
+	return xxx_messageInfo_Query_InternalQuery.Size(m)
 }
-func (m *AckMsg) XXX_DiscardUnknown() {
-	xxx_messageInfo_AckMsg.DiscardUnknown(m)
+func (m *Query_InternalQuery) XXX_DiscardUnknown() {
+	xxx_messageInfo_Query_InternalQuery.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AckMsg proto.InternalMessageInfo
+var xxx_messageInfo_Query_InternalQuery proto.InternalMessageInfo
 
-func (m *AckMsg) GetSequenceId() int64 {
+func (m *Query_InternalQuery) GetTable() string {
+	if m != nil {
+		return m.Table
+	}
+	return ""
+}
+
+func (m *Query_InternalQuery) GetProjection() []string {
+	if m != nil {
+		return m.Projection
+	}
+	return nil
+}
+
+func (m *Query_InternalQuery) GetPredicate() []*qpu.AttributePredicate {
+	if m != nil {
+		return m.Predicate
+	}
+	return nil
+}
+
+func (m *Query_InternalQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
+	if m != nil {
+		return m.TsPredicate
+	}
+	return nil
+}
+
+func (m *Query_InternalQuery) GetLimit() int64 {
+	if m != nil {
+		return m.Limit
+	}
+	return 0
+}
+
+// A record for the stream returned by Query.
+type ResponseStreamRecord struct {
+	// This is here to be used for checking for gaps in the stream and for
+	// ordering records per stream
+	// (not yet implemented)
+	SequenceId           int64                                 `protobuf:"varint,1,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
+	Type                 ResponseStreamRecord_StreamRecordType `protobuf:"varint,2,opt,name=type,proto3,enum=ResponseStreamRecord_StreamRecordType" json:"type,omitempty"`
+	LogOp                *qpu.LogOperation                     `protobuf:"bytes,3,opt,name=logOp,proto3" json:"logOp,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                              `json:"-"`
+	XXX_unrecognized     []byte                                `json:"-"`
+	XXX_sizecache        int32                                 `json:"-"`
+}
+
+func (m *ResponseStreamRecord) Reset()         { *m = ResponseStreamRecord{} }
+func (m *ResponseStreamRecord) String() string { return proto.CompactTextString(m) }
+func (*ResponseStreamRecord) ProtoMessage()    {}
+func (*ResponseStreamRecord) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55c136aa8978e5e9, []int{5}
+}
+
+func (m *ResponseStreamRecord) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ResponseStreamRecord.Unmarshal(m, b)
+}
+func (m *ResponseStreamRecord) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ResponseStreamRecord.Marshal(b, m, deterministic)
+}
+func (m *ResponseStreamRecord) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ResponseStreamRecord.Merge(m, src)
+}
+func (m *ResponseStreamRecord) XXX_Size() int {
+	return xxx_messageInfo_ResponseStreamRecord.Size(m)
+}
+func (m *ResponseStreamRecord) XXX_DiscardUnknown() {
+	xxx_messageInfo_ResponseStreamRecord.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ResponseStreamRecord proto.InternalMessageInfo
+
+func (m *ResponseStreamRecord) GetSequenceId() int64 {
 	if m != nil {
 		return m.SequenceId
 	}
 	return 0
 }
 
+func (m *ResponseStreamRecord) GetType() ResponseStreamRecord_StreamRecordType {
+	if m != nil {
+		return m.Type
+	}
+	return ResponseStreamRecord_UPDATEOP
+}
+
+func (m *ResponseStreamRecord) GetLogOp() *qpu.LogOperation {
+	if m != nil {
+		return m.LogOp
+	}
+	return nil
+}
+
+// Simplification of ResponseStreamRecord
+// used for QueryUnary.
+type QueryResponse struct {
+	Results              []*qpu.LogOperation `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
+}
+
+func (m *QueryResponse) Reset()         { *m = QueryResponse{} }
+func (m *QueryResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryResponse) ProtoMessage()    {}
+func (*QueryResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55c136aa8978e5e9, []int{6}
+}
+
+func (m *QueryResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_QueryResponse.Unmarshal(m, b)
+}
+func (m *QueryResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_QueryResponse.Marshal(b, m, deterministic)
+}
+func (m *QueryResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryResponse.Merge(m, src)
+}
+func (m *QueryResponse) XXX_Size() int {
+	return xxx_messageInfo_QueryResponse.Size(m)
+}
+func (m *QueryResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryResponse proto.InternalMessageInfo
+
+func (m *QueryResponse) GetResults() []*qpu.LogOperation {
+	if m != nil {
+		return m.Results
+	}
+	return nil
+}
+
 type ConfigRequest struct {
+	// Just here for future use, not actually used.
 	Clock                *qpu.SnapshotTimePredicate `protobuf:"bytes,1,opt,name=clock,proto3" json:"clock,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
@@ -639,7 +621,7 @@ func (m *ConfigRequest) Reset()         { *m = ConfigRequest{} }
 func (m *ConfigRequest) String() string { return proto.CompactTextString(m) }
 func (*ConfigRequest) ProtoMessage()    {}
 func (*ConfigRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{8}
+	return fileDescriptor_55c136aa8978e5e9, []int{7}
 }
 
 func (m *ConfigRequest) XXX_Unmarshal(b []byte) error {
@@ -670,7 +652,6 @@ func (m *ConfigRequest) GetClock() *qpu.SnapshotTimePredicate {
 type ConfigResponse struct {
 	QpuType              ConfigResponse_QPUType    `protobuf:"varint,1,opt,name=qpu_type,json=qpuType,proto3,enum=ConfigResponse_QPUType" json:"qpu_type,omitempty"`
 	SupportedQueries     []*qpu.AttributePredicate `protobuf:"bytes,2,rep,name=supportedQueries,proto3" json:"supportedQueries,omitempty"`
-	Dataset              *DataSet                  `protobuf:"bytes,3,opt,name=dataset,proto3" json:"dataset,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                  `json:"-"`
 	XXX_unrecognized     []byte                    `json:"-"`
 	XXX_sizecache        int32                     `json:"-"`
@@ -680,7 +661,7 @@ func (m *ConfigResponse) Reset()         { *m = ConfigResponse{} }
 func (m *ConfigResponse) String() string { return proto.CompactTextString(m) }
 func (*ConfigResponse) ProtoMessage()    {}
 func (*ConfigResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{9}
+	return fileDescriptor_55c136aa8978e5e9, []int{8}
 }
 
 func (m *ConfigResponse) XXX_Unmarshal(b []byte) error {
@@ -715,165 +696,41 @@ func (m *ConfigResponse) GetSupportedQueries() []*qpu.AttributePredicate {
 	return nil
 }
 
-func (m *ConfigResponse) GetDataset() *DataSet {
-	if m != nil {
-		return m.Dataset
-	}
-	return nil
-}
-
-type DataSet struct {
-	Databases            map[string]*DataSet_DB `protobuf:"bytes,1,rep,name=databases,proto3" json:"databases,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
-	XXX_unrecognized     []byte                 `json:"-"`
-	XXX_sizecache        int32                  `json:"-"`
-}
-
-func (m *DataSet) Reset()         { *m = DataSet{} }
-func (m *DataSet) String() string { return proto.CompactTextString(m) }
-func (*DataSet) ProtoMessage()    {}
-func (*DataSet) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{10}
-}
-
-func (m *DataSet) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_DataSet.Unmarshal(m, b)
-}
-func (m *DataSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_DataSet.Marshal(b, m, deterministic)
-}
-func (m *DataSet) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DataSet.Merge(m, src)
-}
-func (m *DataSet) XXX_Size() int {
-	return xxx_messageInfo_DataSet.Size(m)
-}
-func (m *DataSet) XXX_DiscardUnknown() {
-	xxx_messageInfo_DataSet.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DataSet proto.InternalMessageInfo
-
-func (m *DataSet) GetDatabases() map[string]*DataSet_DB {
-	if m != nil {
-		return m.Databases
-	}
-	return nil
-}
-
-type DataSet_DB struct {
-	Datacenters          map[string]*DataSet_DC `protobuf:"bytes,1,rep,name=datacenters,proto3" json:"datacenters,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
-	XXX_unrecognized     []byte                 `json:"-"`
-	XXX_sizecache        int32                  `json:"-"`
-}
-
-func (m *DataSet_DB) Reset()         { *m = DataSet_DB{} }
-func (m *DataSet_DB) String() string { return proto.CompactTextString(m) }
-func (*DataSet_DB) ProtoMessage()    {}
-func (*DataSet_DB) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{10, 0}
-}
-
-func (m *DataSet_DB) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_DataSet_DB.Unmarshal(m, b)
-}
-func (m *DataSet_DB) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_DataSet_DB.Marshal(b, m, deterministic)
-}
-func (m *DataSet_DB) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DataSet_DB.Merge(m, src)
-}
-func (m *DataSet_DB) XXX_Size() int {
-	return xxx_messageInfo_DataSet_DB.Size(m)
-}
-func (m *DataSet_DB) XXX_DiscardUnknown() {
-	xxx_messageInfo_DataSet_DB.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DataSet_DB proto.InternalMessageInfo
-
-func (m *DataSet_DB) GetDatacenters() map[string]*DataSet_DC {
-	if m != nil {
-		return m.Datacenters
-	}
-	return nil
-}
-
-type DataSet_DC struct {
-	Shards               []string `protobuf:"bytes,1,rep,name=shards,proto3" json:"shards,omitempty"`
+type AckMsg struct {
+	SequenceId           int64    `protobuf:"varint,1,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *DataSet_DC) Reset()         { *m = DataSet_DC{} }
-func (m *DataSet_DC) String() string { return proto.CompactTextString(m) }
-func (*DataSet_DC) ProtoMessage()    {}
-func (*DataSet_DC) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{10, 1}
+func (m *AckMsg) Reset()         { *m = AckMsg{} }
+func (m *AckMsg) String() string { return proto.CompactTextString(m) }
+func (*AckMsg) ProtoMessage()    {}
+func (*AckMsg) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55c136aa8978e5e9, []int{9}
 }
 
-func (m *DataSet_DC) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_DataSet_DC.Unmarshal(m, b)
+func (m *AckMsg) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AckMsg.Unmarshal(m, b)
 }
-func (m *DataSet_DC) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_DataSet_DC.Marshal(b, m, deterministic)
+func (m *AckMsg) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AckMsg.Marshal(b, m, deterministic)
 }
-func (m *DataSet_DC) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DataSet_DC.Merge(m, src)
+func (m *AckMsg) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AckMsg.Merge(m, src)
 }
-func (m *DataSet_DC) XXX_Size() int {
-	return xxx_messageInfo_DataSet_DC.Size(m)
+func (m *AckMsg) XXX_Size() int {
+	return xxx_messageInfo_AckMsg.Size(m)
 }
-func (m *DataSet_DC) XXX_DiscardUnknown() {
-	xxx_messageInfo_DataSet_DC.DiscardUnknown(m)
+func (m *AckMsg) XXX_DiscardUnknown() {
+	xxx_messageInfo_AckMsg.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_DataSet_DC proto.InternalMessageInfo
+var xxx_messageInfo_AckMsg proto.InternalMessageInfo
 
-func (m *DataSet_DC) GetShards() []string {
+func (m *AckMsg) GetSequenceId() int64 {
 	if m != nil {
-		return m.Shards
-	}
-	return nil
-}
-
-type PingMsg struct {
-	SeqId                int64    `protobuf:"varint,1,opt,name=seq_id,json=seqId,proto3" json:"seq_id,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *PingMsg) Reset()         { *m = PingMsg{} }
-func (m *PingMsg) String() string { return proto.CompactTextString(m) }
-func (*PingMsg) ProtoMessage()    {}
-func (*PingMsg) Descriptor() ([]byte, []int) {
-	return fileDescriptor_55c136aa8978e5e9, []int{11}
-}
-
-func (m *PingMsg) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_PingMsg.Unmarshal(m, b)
-}
-func (m *PingMsg) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_PingMsg.Marshal(b, m, deterministic)
-}
-func (m *PingMsg) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PingMsg.Merge(m, src)
-}
-func (m *PingMsg) XXX_Size() int {
-	return xxx_messageInfo_PingMsg.Size(m)
-}
-func (m *PingMsg) XXX_DiscardUnknown() {
-	xxx_messageInfo_PingMsg.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PingMsg proto.InternalMessageInfo
-
-func (m *PingMsg) GetSeqId() int64 {
-	if m != nil {
-		return m.SeqId
+		return m.SequenceId
 	}
 	return 0
 }
@@ -881,97 +738,80 @@ func (m *PingMsg) GetSeqId() int64 {
 func init() {
 	proto.RegisterEnum("ResponseStreamRecord_StreamRecordType", ResponseStreamRecord_StreamRecordType_name, ResponseStreamRecord_StreamRecordType_value)
 	proto.RegisterEnum("ConfigResponse_QPUType", ConfigResponse_QPUType_name, ConfigResponse_QPUType_value)
-	proto.RegisterType((*GetDataRequest)(nil), "GetDataRequest")
-	proto.RegisterType((*DataTransferResponse)(nil), "DataTransferResponse")
-	proto.RegisterType((*QueryResponse)(nil), "QueryResponse")
+	proto.RegisterType((*NoOpReq)(nil), "NoOpReq")
+	proto.RegisterType((*NoOpResp)(nil), "NoOpResp")
 	proto.RegisterType((*RequestStreamRecord)(nil), "RequestStreamRecord")
-	proto.RegisterType((*ResponseStreamRecord)(nil), "ResponseStreamRecord")
 	proto.RegisterType((*QueryRequest)(nil), "QueryRequest")
 	proto.RegisterMapType((map[string]string)(nil), "QueryRequest.MetadataEntry")
 	proto.RegisterType((*Query)(nil), "Query")
-	proto.RegisterType((*QueryInternalQuery)(nil), "Query.internalQuery")
 	proto.RegisterType((*Query_SQLQuery)(nil), "Query.SQLQuery")
-	proto.RegisterType((*AckMsg)(nil), "AckMsg")
+	proto.RegisterType((*Query_InternalQuery)(nil), "Query.InternalQuery")
+	proto.RegisterType((*ResponseStreamRecord)(nil), "ResponseStreamRecord")
+	proto.RegisterType((*QueryResponse)(nil), "QueryResponse")
 	proto.RegisterType((*ConfigRequest)(nil), "ConfigRequest")
 	proto.RegisterType((*ConfigResponse)(nil), "ConfigResponse")
-	proto.RegisterType((*DataSet)(nil), "DataSet")
-	proto.RegisterMapType((map[string]*DataSet_DB)(nil), "DataSet.DatabasesEntry")
-	proto.RegisterType((*DataSet_DB)(nil), "DataSet.DB")
-	proto.RegisterMapType((map[string]*DataSet_DC)(nil), "DataSet.DB.DatacentersEntry")
-	proto.RegisterType((*DataSet_DC)(nil), "DataSet.DC")
-	proto.RegisterType((*PingMsg)(nil), "PingMsg")
+	proto.RegisterType((*AckMsg)(nil), "AckMsg")
 }
 
 func init() { proto.RegisterFile("api/protobuf-spec/qpu_api.proto", fileDescriptor_55c136aa8978e5e9) }
 
 var fileDescriptor_55c136aa8978e5e9 = []byte{
-	// 1048 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x56, 0xcd, 0x72, 0xe3, 0xc4,
-	0x13, 0xb7, 0xfc, 0xed, 0x76, 0xec, 0x68, 0xe7, 0xef, 0xfc, 0xe3, 0x52, 0x52, 0xbb, 0x41, 0x87,
-	0x25, 0x40, 0xad, 0xb2, 0xe5, 0x85, 0x82, 0xca, 0x6e, 0x51, 0x25, 0xc7, 0x66, 0x63, 0x48, 0x36,
-	0xce, 0x58, 0xe1, 0xc0, 0x01, 0xd7, 0x58, 0x9e, 0x38, 0x22, 0x8a, 0x24, 0x6b, 0x46, 0xa9, 0xf2,
-	0x63, 0xc0, 0xc3, 0x70, 0xe3, 0x1d, 0x78, 0x04, 0xb8, 0xf2, 0x0c, 0x1c, 0x28, 0xcd, 0x48, 0xb1,
-	0x94, 0x35, 0x50, 0x9c, 0xec, 0xee, 0xfe, 0x75, 0xcf, 0x6f, 0x7a, 0xfa, 0x43, 0xf0, 0x8c, 0x04,
-	0xce, 0x51, 0x10, 0xfa, 0xdc, 0x9f, 0x45, 0xd7, 0x2f, 0x58, 0x40, 0xed, 0xa3, 0x65, 0x10, 0x4d,
-	0x49, 0xe0, 0x18, 0x42, 0xab, 0xed, 0x6d, 0x04, 0x48, 0xa3, 0xae, 0x42, 0xfb, 0x2d, 0xe5, 0x03,
-	0xc2, 0x09, 0xa6, 0xcb, 0x88, 0x32, 0xae, 0xf7, 0xa1, 0x13, 0x8b, 0x56, 0x48, 0x3c, 0x76, 0x4d,
-	0x43, 0x4c, 0x59, 0xe0, 0x7b, 0x8c, 0xa2, 0x8f, 0x41, 0xbd, 0xed, 0xaf, 0x38, 0x65, 0xb1, 0xe5,
-	0x9a, 0x86, 0x21, 0x9d, 0x77, 0x95, 0x03, 0xe5, 0xb0, 0x88, 0xdf, 0xd3, 0xeb, 0x6f, 0xa0, 0x75,
-	0x19, 0xd1, 0x70, 0xf5, 0xe0, 0xfc, 0x09, 0xd4, 0x42, 0xca, 0x22, 0x97, 0xb3, 0xae, 0x72, 0x50,
-	0x3a, 0x6c, 0xf6, 0x9e, 0x18, 0x31, 0x87, 0x33, 0x7f, 0x71, 0x11, 0xd0, 0x90, 0x70, 0xc7, 0xf7,
-	0x70, 0x8a, 0xd0, 0x7f, 0x52, 0xe0, 0x7f, 0x09, 0x9b, 0x09, 0x0f, 0x29, 0xb9, 0xc3, 0xd4, 0xf6,
-	0xc3, 0x39, 0x7a, 0x05, 0x5b, 0x4b, 0x19, 0x55, 0xd8, 0xc4, 0xe9, 0xcd, 0x5e, 0xcb, 0xb8, 0xcc,
-	0x28, 0x4f, 0x0b, 0x38, 0x07, 0x42, 0x7b, 0x50, 0x22, 0xf6, 0x6d, 0xb7, 0x28, 0xb0, 0x35, 0xc3,
-	0xb4, 0x6f, 0xcf, 0xd9, 0xe2, 0xb4, 0x80, 0x63, 0x2d, 0x7a, 0x0a, 0xe5, 0xc0, 0xf1, 0x16, 0xdd,
-	0x92, 0xb0, 0xd6, 0x8d, 0xb1, 0xe3, 0x2d, 0xa4, 0x59, 0xe8, 0xfb, 0x8d, 0x98, 0xb6, 0x4c, 0xcb,
-	0x9f, 0x0a, 0x74, 0xd2, 0xeb, 0xe4, 0x58, 0x3d, 0x83, 0x26, 0x8b, 0x31, 0x9e, 0x4d, 0xa7, 0x8e,
-	0x4c, 0x49, 0x09, 0x43, 0xaa, 0x1a, 0xcd, 0xd1, 0x31, 0x94, 0xf9, 0x2a, 0xa0, 0x82, 0x42, 0xbb,
-	0xf7, 0xdc, 0xd8, 0x14, 0xc5, 0xc8, 0x0a, 0xd6, 0x2a, 0xa0, 0x58, 0xf8, 0xa0, 0x0f, 0xa1, 0xe2,
-	0xc6, 0x39, 0x4a, 0x18, 0x6e, 0xc8, 0x9a, 0xb4, 0xeb, 0xdf, 0x83, 0xfa, 0x38, 0x04, 0xda, 0x82,
-	0xfa, 0xd5, 0x78, 0x60, 0x5a, 0xc3, 0x8b, 0xb1, 0x5a, 0x40, 0xdb, 0xd0, 0x94, 0xd2, 0x60, 0x78,
-	0x66, 0x99, 0xaa, 0x82, 0x1a, 0x50, 0x99, 0x58, 0xa6, 0x35, 0x54, 0x8b, 0xa8, 0x05, 0x8d, 0xd3,
-	0xa1, 0x89, 0xad, 0xfe, 0xd0, 0xb4, 0xd4, 0x12, 0x7a, 0x02, 0xad, 0xe1, 0xbb, 0xc1, 0xf4, 0xe2,
-	0xab, 0xe9, 0xc4, 0xc2, 0x43, 0xf3, 0x5c, 0x2d, 0xeb, 0x3f, 0x2b, 0xb0, 0x95, 0xcd, 0x33, 0xda,
-	0x87, 0x8a, 0xc8, 0x73, 0xf2, 0x0a, 0xd5, 0xe4, 0x15, 0xa4, 0x12, 0x7d, 0x0e, 0xf5, 0x3b, 0xca,
-	0xc9, 0x9c, 0x70, 0xd2, 0x2d, 0x8a, 0x07, 0xdf, 0xcb, 0x3d, 0x93, 0x71, 0x9e, 0x58, 0x87, 0x1e,
-	0x0f, 0x57, 0xf8, 0x01, 0x8c, 0x10, 0x94, 0xd9, 0xca, 0xb3, 0xc5, 0x7d, 0xeb, 0x58, 0xfc, 0xd7,
-	0x5e, 0x43, 0x2b, 0x07, 0x47, 0x2a, 0x94, 0x6e, 0xa9, 0x3c, 0xb9, 0x81, 0xe3, 0xbf, 0xa8, 0x03,
-	0x95, 0x7b, 0xe2, 0x46, 0x32, 0xc9, 0x0d, 0x2c, 0x85, 0xe3, 0xe2, 0x17, 0x8a, 0xfe, 0x47, 0x11,
-	0x2a, 0xe2, 0x64, 0x74, 0x04, 0x35, 0x41, 0x6e, 0xea, 0x24, 0x9c, 0x3b, 0x92, 0x92, 0xe1, 0x78,
-	0x9c, 0x86, 0x1e, 0x71, 0x85, 0x74, 0x5a, 0xc0, 0x55, 0x01, 0x1b, 0x21, 0x03, 0x1a, 0xd2, 0x81,
-	0x2d, 0xdd, 0xa4, 0x80, 0xb6, 0x13, 0x97, 0xc9, 0xe5, 0x59, 0x8a, 0xae, 0x0b, 0xcc, 0x64, 0xe9,
-	0x6a, 0xbf, 0x2a, 0xd0, 0xca, 0xc5, 0x8a, 0x69, 0x71, 0x32, 0x73, 0x69, 0x42, 0x55, 0x0a, 0xe8,
-	0x29, 0x40, 0x10, 0xfa, 0x3f, 0x50, 0x3b, 0x7e, 0x40, 0x91, 0x9e, 0x06, 0xce, 0x68, 0xd0, 0x67,
-	0xd0, 0x08, 0x42, 0x3a, 0x77, 0x6c, 0xc2, 0x69, 0xb7, 0x24, 0xb2, 0xb7, 0x2b, 0x1e, 0xde, 0xe4,
-	0x3c, 0x74, 0x66, 0x11, 0xa7, 0xe3, 0xd4, 0x8c, 0xd7, 0x48, 0xf4, 0x06, 0x9a, 0x9c, 0x3d, 0x58,
-	0xba, 0x65, 0x41, 0x58, 0x13, 0x8e, 0x13, 0x8f, 0x04, 0xec, 0xc6, 0xe7, 0x96, 0x73, 0x97, 0xf1,
-	0xcd, 0xc2, 0x63, 0xaa, 0xae, 0x73, 0xe7, 0xf0, 0x6e, 0x45, 0x14, 0xb0, 0x14, 0xb4, 0xe7, 0x50,
-	0x4f, 0xaf, 0x8a, 0x34, 0x48, 0xae, 0xca, 0xc3, 0xe4, 0x3e, 0x0f, 0x72, 0xbf, 0x02, 0xa5, 0x7b,
-	0xe2, 0xea, 0x1f, 0x41, 0x55, 0x36, 0xd8, 0xbf, 0x76, 0x85, 0x6e, 0x42, 0xeb, 0xc4, 0xf7, 0xae,
-	0x9d, 0x45, 0x5a, 0x50, 0x2f, 0xa1, 0x62, 0xbb, 0xbe, 0x7d, 0x9b, 0x3c, 0xce, 0x3f, 0x11, 0x97,
-	0x40, 0xfd, 0x77, 0x05, 0xda, 0x69, 0x8c, 0x64, 0xce, 0xf4, 0xa0, 0x1e, 0x0f, 0x3f, 0xd1, 0x6f,
-	0x8a, 0xe8, 0xb7, 0x5d, 0x23, 0x0f, 0x31, 0x2e, 0xc7, 0x57, 0xa2, 0xc1, 0x6a, 0xcb, 0x20, 0x12,
-	0x6d, 0x72, 0x02, 0x2a, 0x8b, 0x82, 0xc0, 0x0f, 0x39, 0x9d, 0xc7, 0x37, 0x75, 0x28, 0x4b, 0x6a,
-	0xf6, 0x6f, 0xb3, 0xfe, 0x9e, 0x03, 0xd2, 0xa1, 0x16, 0xd7, 0x27, 0xa3, 0xfc, 0x61, 0x98, 0xc4,
-	0x53, 0x74, 0x42, 0x39, 0x4e, 0x0d, 0x7a, 0x0f, 0x6a, 0xc9, 0xe1, 0xa8, 0x03, 0xea, 0xc0, 0xb4,
-	0xcc, 0x89, 0x75, 0x81, 0x87, 0xd3, 0x01, 0x1e, 0x7d, 0x3b, 0xc4, 0x6a, 0x01, 0xd5, 0xa0, 0x34,
-	0xb9, 0x3a, 0x57, 0x15, 0x54, 0x87, 0xf2, 0xd7, 0x17, 0xa3, 0x77, 0x6a, 0x51, 0xff, 0xa5, 0x08,
-	0xb5, 0x24, 0x50, 0x5c, 0x17, 0x71, 0xa8, 0x19, 0x61, 0x34, 0x1d, 0xa3, 0xbb, 0xe9, 0x29, 0xe2,
-	0x57, 0x58, 0x64, 0x47, 0xad, 0x91, 0xda, 0x8f, 0x0a, 0x14, 0x07, 0x7d, 0xf4, 0x25, 0x34, 0x63,
-	0x9d, 0x4d, 0xe3, 0x0a, 0x4d, 0xfd, 0xf7, 0xd7, 0xfe, 0x7d, 0xf1, 0x37, 0x31, 0xcb, 0x20, 0x59,
-	0x07, 0xed, 0x1b, 0x50, 0x1f, 0x03, 0x36, 0x34, 0xe2, 0x07, 0xd9, 0x46, 0x6c, 0xf6, 0x9a, 0xeb,
-	0xf8, 0x27, 0x99, 0xae, 0xd4, 0xf6, 0xa1, 0x38, 0x38, 0x41, 0xff, 0x87, 0x2a, 0xbb, 0x21, 0xe1,
-	0x5c, 0xb2, 0x69, 0xe0, 0x44, 0xd2, 0x46, 0xd0, 0xce, 0x5f, 0xe7, 0x3f, 0x1d, 0xd4, 0xcf, 0xb6,
-	0xff, 0x01, 0xd4, 0x92, 0xa1, 0x8e, 0x76, 0xa0, 0xca, 0xe8, 0x72, 0x5d, 0x8d, 0x15, 0x46, 0x97,
-	0xa3, 0x79, 0xef, 0x37, 0x05, 0xaa, 0x97, 0xe3, 0x2b, 0x73, 0x3c, 0x42, 0x2f, 0x00, 0x44, 0xa9,
-	0x5f, 0x79, 0x24, 0x5c, 0xa1, 0xfc, 0x62, 0xd1, 0xda, 0x46, 0x6e, 0xa5, 0xe9, 0x05, 0x74, 0x9c,
-	0x4e, 0x96, 0x8e, 0xb1, 0x61, 0x5d, 0x69, 0x3b, 0x1b, 0x27, 0xbd, 0x5e, 0x38, 0x54, 0x5e, 0x2a,
-	0xf1, 0x6c, 0x79, 0x4b, 0xb9, 0x2c, 0x4d, 0xd4, 0x36, 0x72, 0xad, 0xa0, 0x6d, 0x3f, 0xaa, 0x59,
-	0xbd, 0x80, 0x5e, 0xc3, 0x76, 0xb2, 0xa7, 0xd3, 0xc5, 0x8c, 0xb6, 0x8d, 0xfc, 0xe6, 0xd6, 0x76,
-	0x8c, 0x4d, 0x8b, 0x5b, 0x2f, 0xf4, 0x3f, 0xfd, 0xae, 0xb7, 0x70, 0xf8, 0x4d, 0x34, 0x33, 0x6c,
-	0xff, 0xee, 0x68, 0x7e, 0x4f, 0x98, 0xe3, 0x12, 0x26, 0xbe, 0x09, 0x68, 0xc4, 0x8e, 0xd2, 0x99,
-	0x25, 0x3f, 0x12, 0xd2, 0xaf, 0x87, 0x59, 0x55, 0x88, 0xaf, 0xfe, 0x0a, 0x00, 0x00, 0xff, 0xff,
-	0x77, 0xba, 0x18, 0x47, 0x61, 0x08, 0x00, 0x00,
+	// 869 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x55, 0xcd, 0x72, 0xe3, 0x44,
+	0x10, 0x96, 0x2c, 0xff, 0x48, 0xed, 0x38, 0xd1, 0x0e, 0xa6, 0xd6, 0xa5, 0x6c, 0xb1, 0x29, 0x1d,
+	0x16, 0x53, 0xd4, 0xca, 0x5b, 0x5e, 0x28, 0xa8, 0xb0, 0x17, 0x65, 0x2d, 0x88, 0xa9, 0x24, 0x76,
+	0xc6, 0x32, 0x07, 0x0e, 0xb8, 0x64, 0x79, 0x36, 0x2b, 0x2c, 0x4b, 0xb2, 0x66, 0xb4, 0x55, 0x7e,
+	0x31, 0x6e, 0x9c, 0xb9, 0xf2, 0x20, 0x3c, 0x02, 0x07, 0x4a, 0xa3, 0x91, 0xb1, 0x82, 0x81, 0x9b,
+	0xba, 0xfb, 0xeb, 0x9e, 0x9e, 0xaf, 0xbf, 0x69, 0xc1, 0x73, 0x2f, 0x09, 0x06, 0x49, 0x1a, 0xb3,
+	0x78, 0x99, 0xbd, 0x7b, 0x49, 0x13, 0xe2, 0x0f, 0xb6, 0x49, 0xb6, 0xf0, 0x92, 0xc0, 0xe2, 0x5e,
+	0xe3, 0xfc, 0x28, 0xa0, 0x08, 0x9a, 0xe7, 0xd0, 0xba, 0x8b, 0x27, 0x09, 0x26, 0x5b, 0xa4, 0x83,
+	0x42, 0x59, 0xda, 0x93, 0x2f, 0xe4, 0xbe, 0x86, 0xf3, 0x4f, 0xf3, 0x19, 0xa8, 0x45, 0x90, 0x26,
+	0x47, 0xa2, 0x29, 0x7c, 0x84, 0xc9, 0x36, 0x23, 0x94, 0xcd, 0x58, 0x4a, 0xbc, 0x0d, 0x26, 0x7e,
+	0x9c, 0xae, 0xd0, 0x6b, 0x38, 0xd9, 0x66, 0x24, 0xdd, 0x89, 0x18, 0xcf, 0x68, 0x0f, 0x3b, 0xd6,
+	0xfd, 0x81, 0xf3, 0x5a, 0xc2, 0x15, 0x10, 0x3a, 0x07, 0xc5, 0xf3, 0xd7, 0xbd, 0x1a, 0xc7, 0xb6,
+	0x2c, 0xdb, 0x5f, 0xdf, 0xd2, 0x87, 0x6b, 0x09, 0xe7, 0xde, 0x2b, 0x0d, 0x5a, 0x69, 0x81, 0x33,
+	0x7f, 0x91, 0xe1, 0xe4, 0xb0, 0x10, 0x7a, 0x06, 0x0d, 0x5e, 0x48, 0x1c, 0xd3, 0x14, 0xc7, 0x14,
+	0x4e, 0xf4, 0x15, 0xa8, 0x1b, 0xc2, 0xbc, 0x95, 0xc7, 0xbc, 0x5e, 0xed, 0x42, 0xe9, 0xb7, 0x87,
+	0xe7, 0x95, 0x3e, 0xac, 0x5b, 0x11, 0x75, 0x22, 0x96, 0xee, 0xf0, 0x1e, 0x8c, 0x10, 0xd4, 0xe9,
+	0x2e, 0xf2, 0x7b, 0xca, 0x85, 0xdc, 0x57, 0x31, 0xff, 0x36, 0xbe, 0x81, 0x4e, 0x05, 0x9e, 0x53,
+	0xb2, 0x26, 0xbb, 0x92, 0x92, 0x35, 0xd9, 0xa1, 0x2e, 0x34, 0x3e, 0x78, 0x61, 0x46, 0xf8, 0x45,
+	0x34, 0x5c, 0x18, 0x97, 0xb5, 0xaf, 0x65, 0xf3, 0x8f, 0x1a, 0x34, 0xf8, 0xc9, 0x68, 0x00, 0x2d,
+	0xde, 0xdc, 0x22, 0x10, 0x3d, 0x77, 0x8b, 0x96, 0xac, 0x71, 0xc4, 0x48, 0x1a, 0x79, 0x21, 0xb7,
+	0xae, 0x25, 0xdc, 0xe4, 0xb0, 0x31, 0xb2, 0x40, 0x2b, 0x12, 0xe8, 0x36, 0x14, 0x0c, 0x9d, 0x89,
+	0x94, 0xd9, 0xfd, 0x4d, 0x89, 0x56, 0x39, 0x66, 0xb6, 0x0d, 0x8d, 0x17, 0xa0, 0x96, 0x7e, 0x64,
+	0x80, 0xf0, 0xef, 0x47, 0xb7, 0xb7, 0x8d, 0xdf, 0x65, 0xe8, 0x54, 0xce, 0xcc, 0xdb, 0x67, 0xde,
+	0x32, 0x24, 0x02, 0x5a, 0x18, 0xe8, 0x13, 0x80, 0x24, 0x8d, 0x7f, 0x26, 0x3e, 0x0b, 0xe2, 0x88,
+	0xd3, 0xa8, 0xe1, 0x03, 0x0f, 0xfa, 0x12, 0xb4, 0x24, 0x25, 0xab, 0xc0, 0xf7, 0x18, 0xe9, 0x29,
+	0x9c, 0xe5, 0xa7, 0x56, 0xae, 0x30, 0x9b, 0xb1, 0x34, 0x58, 0x66, 0x8c, 0x4c, 0xcb, 0x30, 0xfe,
+	0x1b, 0x89, 0xde, 0x40, 0x9b, 0xd1, 0x7d, 0xa4, 0x57, 0xe7, 0x17, 0x33, 0x78, 0xe2, 0x2c, 0xf2,
+	0x12, 0xfa, 0x3e, 0x66, 0x6e, 0xb0, 0x39, 0xc8, 0x3d, 0x84, 0xe7, 0xad, 0x86, 0xc1, 0x26, 0x60,
+	0xbd, 0xc6, 0x85, 0xdc, 0x57, 0x70, 0x61, 0x5c, 0xb5, 0x84, 0x1a, 0xcc, 0x3f, 0x65, 0xe8, 0xe6,
+	0xb2, 0x8d, 0x23, 0x4a, 0x2a, 0xea, 0x7c, 0x0e, 0x6d, 0x9a, 0xcf, 0x3e, 0xf2, 0xc9, 0x22, 0x58,
+	0xf1, 0x8b, 0x2a, 0x18, 0x4a, 0xd7, 0x78, 0x85, 0x2e, 0xa1, 0xce, 0x76, 0x49, 0x31, 0xc1, 0xd3,
+	0xe1, 0x0b, 0xeb, 0x58, 0x15, 0xeb, 0xd0, 0x70, 0x77, 0x09, 0xc1, 0x3c, 0x07, 0x7d, 0x0a, 0x8d,
+	0x30, 0x7e, 0x98, 0x24, 0x5c, 0x36, 0xed, 0xe1, 0x13, 0x7e, 0x99, 0x9b, 0xdc, 0x43, 0x52, 0x2f,
+	0xe7, 0x0a, 0x17, 0x71, 0xf3, 0x27, 0xd0, 0x1f, 0x97, 0x40, 0x27, 0xa0, 0xce, 0xa7, 0x23, 0xdb,
+	0x75, 0x26, 0x53, 0x5d, 0x42, 0x67, 0xd0, 0x2e, 0xac, 0x91, 0x73, 0xe3, 0xda, 0xba, 0x8c, 0x34,
+	0x68, 0xcc, 0x5c, 0xdb, 0x75, 0xf4, 0x1a, 0xea, 0x80, 0x76, 0xed, 0xd8, 0xd8, 0xbd, 0x72, 0x6c,
+	0x57, 0x57, 0xd0, 0x13, 0xe8, 0x38, 0x77, 0xa3, 0xc5, 0xe4, 0xdb, 0xc5, 0xcc, 0xc5, 0x8e, 0x7d,
+	0xab, 0xd7, 0xcd, 0x37, 0xd0, 0x11, 0x32, 0x2f, 0x9a, 0x47, 0x9f, 0xe7, 0x4f, 0x88, 0x66, 0x21,
+	0xa3, 0x3d, 0x99, 0x4f, 0xe8, 0x48, 0x6f, 0x25, 0xc2, 0xb4, 0xa1, 0xf3, 0x36, 0x8e, 0xde, 0x05,
+	0x0f, 0xe5, 0x23, 0x7b, 0x05, 0x0d, 0x3f, 0x8c, 0xfd, 0xb5, 0x10, 0xec, 0x7f, 0x0d, 0xa9, 0x00,
+	0x9a, 0xbf, 0xca, 0x70, 0x5a, 0xd6, 0x10, 0x2d, 0x0c, 0x41, 0xcd, 0xf7, 0x12, 0x27, 0x57, 0xe6,
+	0xe4, 0x3e, 0xb5, 0xaa, 0x10, 0xeb, 0x7e, 0x3a, 0xe7, 0x6c, 0xb6, 0xb6, 0x49, 0xc6, 0x39, 0x79,
+	0x0b, 0x3a, 0xcd, 0x92, 0x24, 0x4e, 0x19, 0x59, 0xe5, 0x17, 0x0a, 0x08, 0x15, 0xef, 0xf8, 0x5f,
+	0x15, 0xf6, 0x8f, 0x04, 0x73, 0x08, 0x2d, 0x51, 0x18, 0x75, 0x41, 0x1f, 0xd9, 0xae, 0x3d, 0x73,
+	0x27, 0xd8, 0x59, 0x8c, 0xf0, 0xf8, 0x07, 0x07, 0xeb, 0x12, 0x6a, 0x81, 0x32, 0x9b, 0xdf, 0xea,
+	0x32, 0x52, 0xa1, 0xfe, 0xfd, 0x64, 0x7c, 0xa7, 0xd7, 0xcc, 0xcf, 0xa0, 0x59, 0xec, 0xa0, 0xff,
+	0x15, 0xcc, 0xf0, 0x37, 0x19, 0x9a, 0xf7, 0xd3, 0xb9, 0x3d, 0x1d, 0xa3, 0xcb, 0xf2, 0x8d, 0x77,
+	0xad, 0x23, 0x9b, 0xd1, 0xf8, 0xf8, 0xa8, 0x98, 0x4c, 0xa9, 0x2f, 0xbf, 0x92, 0xd1, 0x4b, 0x00,
+	0x9e, 0x3b, 0x8f, 0xbc, 0x74, 0x87, 0xaa, 0xeb, 0xd2, 0x38, 0xb5, 0x2a, 0xe3, 0x34, 0xa5, 0x7c,
+	0x29, 0x7c, 0x47, 0x58, 0xc1, 0x1f, 0x3a, 0xb5, 0x2a, 0xf3, 0x32, 0xce, 0x1e, 0x11, 0x6b, 0x4a,
+	0xc8, 0x04, 0x8d, 0x97, 0xc8, 0xf7, 0x39, 0x52, 0x2d, 0xb1, 0xf3, 0x0d, 0xcd, 0x2a, 0x17, 0xbc,
+	0x29, 0x5d, 0x7d, 0xf1, 0xe3, 0xf0, 0x21, 0x60, 0xef, 0xb3, 0xa5, 0xe5, 0xc7, 0x9b, 0xc1, 0xea,
+	0x83, 0x47, 0x83, 0xd0, 0xa3, 0xfc, 0xd7, 0x41, 0x32, 0x3a, 0x08, 0xc4, 0xae, 0x28, 0xfe, 0x25,
+	0xe5, 0x4f, 0x66, 0xd9, 0xe4, 0xe6, 0xeb, 0xbf, 0x02, 0x00, 0x00, 0xff, 0xff, 0x58, 0xac, 0xa4,
+	0xe9, 0x88, 0x06, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -986,10 +826,24 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type QPUAPIClient interface {
-	QueryUnary(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryResponse, error)
+	// The QPU Query API.
 	Query(ctx context.Context, opts ...grpc.CallOption) (QPUAPI_QueryClient, error)
+	// QueryUnary is a simplification of Query that returns a single response
+	// instead of a stream.
+	// It is used to simplify the client code for clients that have queries
+	// that look like SELECT .. FROM .. WHERE .. LIMIT N
+	// and so do not care about streaming anyways.
+	QueryUnary(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryResponse, error)
+	// The QPU GetConfig API.
+	// Used by a 'parent' QPU to request the configuration and query processing
+	// capabilities of a 'child` QPU.
 	GetConfig(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
-	GetDataTransfer(ctx context.Context, in *GetDataRequest, opts ...grpc.CallOption) (*DataTransferResponse, error)
+	// QPUs implemement a mechanism for measuring the traffic between them
+	// (each QPU measuring the total size of outbound messages)
+	// GetDataTransfer was used for getting this measuremrents.
+	// Disabled for now.
+	// rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
+	QueryNoOp(ctx context.Context, in *NoOpReq, opts ...grpc.CallOption) (*NoOpResp, error)
 }
 
 type qPUAPIClient struct {
@@ -998,15 +852,6 @@ type qPUAPIClient struct {
 
 func NewQPUAPIClient(cc *grpc.ClientConn) QPUAPIClient {
 	return &qPUAPIClient{cc}
-}
-
-func (c *qPUAPIClient) QueryUnary(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryResponse, error) {
-	out := new(QueryResponse)
-	err := c.cc.Invoke(ctx, "/QPUAPI/QueryUnary", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *qPUAPIClient) Query(ctx context.Context, opts ...grpc.CallOption) (QPUAPI_QueryClient, error) {
@@ -1040,6 +885,15 @@ func (x *qPUAPIQueryClient) Recv() (*ResponseStreamRecord, error) {
 	return m, nil
 }
 
+func (c *qPUAPIClient) QueryUnary(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryResponse, error) {
+	out := new(QueryResponse)
+	err := c.cc.Invoke(ctx, "/QPUAPI/QueryUnary", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *qPUAPIClient) GetConfig(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error) {
 	out := new(ConfigResponse)
 	err := c.cc.Invoke(ctx, "/QPUAPI/GetConfig", in, out, opts...)
@@ -1049,9 +903,9 @@ func (c *qPUAPIClient) GetConfig(ctx context.Context, in *ConfigRequest, opts ..
 	return out, nil
 }
 
-func (c *qPUAPIClient) GetDataTransfer(ctx context.Context, in *GetDataRequest, opts ...grpc.CallOption) (*DataTransferResponse, error) {
-	out := new(DataTransferResponse)
-	err := c.cc.Invoke(ctx, "/QPUAPI/GetDataTransfer", in, out, opts...)
+func (c *qPUAPIClient) QueryNoOp(ctx context.Context, in *NoOpReq, opts ...grpc.CallOption) (*NoOpResp, error) {
+	out := new(NoOpResp)
+	err := c.cc.Invoke(ctx, "/QPUAPI/QueryNoOp", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1060,32 +914,28 @@ func (c *qPUAPIClient) GetDataTransfer(ctx context.Context, in *GetDataRequest, 
 
 // QPUAPIServer is the server API for QPUAPI service.
 type QPUAPIServer interface {
-	QueryUnary(context.Context, *QueryRequest) (*QueryResponse, error)
+	// The QPU Query API.
 	Query(QPUAPI_QueryServer) error
+	// QueryUnary is a simplification of Query that returns a single response
+	// instead of a stream.
+	// It is used to simplify the client code for clients that have queries
+	// that look like SELECT .. FROM .. WHERE .. LIMIT N
+	// and so do not care about streaming anyways.
+	QueryUnary(context.Context, *QueryRequest) (*QueryResponse, error)
+	// The QPU GetConfig API.
+	// Used by a 'parent' QPU to request the configuration and query processing
+	// capabilities of a 'child` QPU.
 	GetConfig(context.Context, *ConfigRequest) (*ConfigResponse, error)
-	GetDataTransfer(context.Context, *GetDataRequest) (*DataTransferResponse, error)
+	// QPUs implemement a mechanism for measuring the traffic between them
+	// (each QPU measuring the total size of outbound messages)
+	// GetDataTransfer was used for getting this measuremrents.
+	// Disabled for now.
+	// rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
+	QueryNoOp(context.Context, *NoOpReq) (*NoOpResp, error)
 }
 
 func RegisterQPUAPIServer(s *grpc.Server, srv QPUAPIServer) {
 	s.RegisterService(&_QPUAPI_serviceDesc, srv)
-}
-
-func _QPUAPI_QueryUnary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).QueryUnary(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/QPUAPI/QueryUnary",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).QueryUnary(ctx, req.(*QueryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _QPUAPI_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -1114,6 +964,24 @@ func (x *qPUAPIQueryServer) Recv() (*RequestStreamRecord, error) {
 	return m, nil
 }
 
+func _QPUAPI_QueryUnary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QPUAPIServer).QueryUnary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/QPUAPI/QueryUnary",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QPUAPIServer).QueryUnary(ctx, req.(*QueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _QPUAPI_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConfigRequest)
 	if err := dec(in); err != nil {
@@ -1132,20 +1000,20 @@ func _QPUAPI_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_GetDataTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetDataRequest)
+func _QPUAPI_QueryNoOp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NoOpReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QPUAPIServer).GetDataTransfer(ctx, in)
+		return srv.(QPUAPIServer).QueryNoOp(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/QPUAPI/GetDataTransfer",
+		FullMethod: "/QPUAPI/QueryNoOp",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).GetDataTransfer(ctx, req.(*GetDataRequest))
+		return srv.(QPUAPIServer).QueryNoOp(ctx, req.(*NoOpReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1163,8 +1031,8 @@ var _QPUAPI_serviceDesc = grpc.ServiceDesc{
 			Handler:    _QPUAPI_GetConfig_Handler,
 		},
 		{
-			MethodName: "GetDataTransfer",
-			Handler:    _QPUAPI_GetDataTransfer_Handler,
+			MethodName: "QueryNoOp",
+			Handler:    _QPUAPI_QueryNoOp_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

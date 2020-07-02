@@ -123,6 +123,19 @@ func (c *Client) query(req libqpu.QueryRequest, parentSpan opentracing.Span) (*q
 	return resp, err
 }
 
+func (c *Client) QueryNoOp() (string, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Cli.QueryNoOp(context.TODO(), &qpu_api.NoOpReq{Str: "hey"})
+
+	c.pool.Return(client)
+
+	return resp.GetStr(), nil
+}
+
 // QueryInternal ...
 func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
 	var querySp opentracing.Span

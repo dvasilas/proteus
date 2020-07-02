@@ -197,9 +197,9 @@ func (s APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) 
 }
 
 // GetDataTransfer is responsible for the top-level processing of invocation of the GetDataTransfer API.
-func (s APIProcessor) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
-	return nil, libqpu.Error(errors.New("not implemented"))
-}
+// func (s APIProcessor) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
+// 	return nil, libqpu.Error(errors.New("not implemented"))
+// }
 
 // ---------------- Internal Functions --------------
 

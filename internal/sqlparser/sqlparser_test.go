@@ -17,11 +17,11 @@ func TestMain(m *testing.M) {
 
 var filterTests = []struct {
 	querySQL       string
-	expectedQueryI *qpu_api.QueryInternalQuery
+	expectedQueryI *qpu_api.Query_InternalQuery
 }{
 	{
 		"select * from t where x = 42",
-		&qpu_api.QueryInternalQuery{
+		&qpu_api.Query_InternalQuery{
 			Table: "t",
 			Predicate: []*qpu.AttributePredicate{
 				libqpu.AttributePredicate(libqpu.Attribute("x", nil), libqpu.ValueInt(42), libqpu.ValueInt(42)),
