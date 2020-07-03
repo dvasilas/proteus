@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -11,6 +12,7 @@ import (
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 
+	//
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -64,6 +66,11 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 	if err != nil {
 		return err
 	}
+
+	// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
+	db.SetMaxIdleConns(128)
+	db.SetMaxOpenConns(128)
+	db.SetConnMaxLifetime(10 * time.Minute)
 
 	if _, err := db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
 		return err
