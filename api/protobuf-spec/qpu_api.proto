@@ -23,6 +23,7 @@ service QPUAPI {
   // Disabled for now.
   // rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
   rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
+  rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
 }
 
 message NoOpReq {

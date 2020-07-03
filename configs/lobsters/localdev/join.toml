@@ -1,7 +1,7 @@
 qpuType = "join"
 port = "50350"
 
-tracing = true
+tracing = false
 maxWorkers = 64
 maxJobQueue = 1000
 

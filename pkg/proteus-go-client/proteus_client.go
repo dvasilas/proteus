@@ -123,6 +123,46 @@ func (c *Client) query(req libqpu.QueryRequest, parentSpan opentracing.Span) (*q
 	return resp, err
 }
 
+// QueryArgs ...
+func (c *Client) QueryArgs() (*qpu_api.QueryResponse, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &qpu_api.QueryRequest{
+		Query: &qpu_api.Query{
+			Query: &qpu_api.Query_QueryI{
+				QueryI: &qpu_api.Query_InternalQuery{
+					Table:      "table",
+					Projection: []string{"a", "b", "c"},
+					Predicate: []*qpu.AttributePredicate{
+						&qpu.AttributePredicate{
+							Attr:   &qpu.Attribute{AttrKey: "attr"},
+							Lbound: &qpu.Value{Val: &qpu.Value_Int{Int: 0}},
+							Ubound: &qpu.Value{Val: &qpu.Value_Int{Int: 100}},
+						},
+					},
+					TsPredicate: &qpu.SnapshotTimePredicate{
+						Lbound: &qpu.SnapshotTime{Type: qpu.SnapshotTime_LATEST},
+						Ubound: &qpu.SnapshotTime{Type: qpu.SnapshotTime_INF},
+					},
+					Limit: 10,
+				},
+			},
+		},
+		Metadata: nil,
+		Sync:     false,
+	}
+
+	resp, err := client.Cli.QueryArgs(context.TODO(), req)
+
+	c.pool.Return(client)
+
+	return resp, nil
+}
+
+// QueryNoOp ...
 func (c *Client) QueryNoOp() (string, error) {
 	client, err := c.pool.Get()
 	if err != nil {
@@ -133,7 +173,7 @@ func (c *Client) QueryNoOp() (string, error) {
 
 	c.pool.Return(client)
 
-	return resp.GetStr(), nil
+	return resp.GetStr(), err
 }
 
 // QueryInternal ...

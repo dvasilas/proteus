@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc/reflection"
 )
@@ -107,6 +110,35 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qp
 // QueryNoOp ...
 func (s *Server) QueryNoOp(ctx context.Context, req *qpu_api.NoOpReq) (*qpu_api.NoOpResp, error) {
 	return &qpu_api.NoOpResp{Str: "hi "}, nil
+}
+
+// QueryArgs ...
+func (s *Server) QueryArgs(ctx context.Context, req *qpu_api.QueryRequest) (*qpu_api.QueryResponse, error) {
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	return &qpu_api.QueryResponse{
+		Results: []*qpu.LogOperation{
+			&qpu.LogOperation{
+				ObjectId:  "obj0",
+				Bucket:    "table",
+				Timestamp: &qpu.Vectorclock{Vc: map[string]*timestamp.Timestamp{"ts": ts}},
+				Payload: &qpu.Payload{
+					Val: &qpu.Payload_State{
+						State: &qpu.ObjectState{Attributes: map[string]*qpu.Value{
+							"attrA": &qpu.Value{Val: &qpu.Value_Int{Int: 2}},
+							"attrB": &qpu.Value{Val: &qpu.Value_Int{Int: 4}},
+							"attrC": &qpu.Value{Val: &qpu.Value_Int{Int: 6}},
+						},
+						},
+					},
+				},
+			},
+			&qpu.LogOperation{},
+		},
+	}, nil
 }
 
 // GetConfig implements the QPU's low level GetConfig API.
