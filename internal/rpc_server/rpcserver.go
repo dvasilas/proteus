@@ -27,11 +27,12 @@ type Server struct {
 	tracing    bool
 	grpcServer grpcutils.GrpcServer
 	api        libqpu.APIProcessor
+	// temporarily here
+	state libqpu.QPUState
 }
 
 // NewServer initializes a grpc server.
-func NewServer(port string, tracing bool, api libqpu.APIProcessor) (*Server, error) {
-
+func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.QPUState) (*Server, error) {
 	grpcServer, err := grpcutils.NewServer(tracing)
 	if err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor) (*Server, err
 		tracing:    tracing,
 		grpcServer: grpcServer,
 		api:        api,
+		state:      state,
 	}
 
 	qpu_api.RegisterQPUAPIServer(grpcServer.Server, &server)
@@ -109,6 +111,16 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qp
 
 // QueryNoOp ...
 func (s *Server) QueryNoOp(ctx context.Context, req *qpu_api.NoOpReq) (*qpu_api.NoOpResp, error) {
+
+	stateCh, err := s.state.Scan("stateTableJoin", []string{"title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for record := range stateCh {
+		record["title"] = ""
+	}
+
 	return &qpu_api.NoOpResp{Str: "hi "}, nil
 }
 
