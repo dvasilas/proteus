@@ -257,7 +257,7 @@ func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64, pa
 	if limit > 0 {
 		limitStmt = "LIMIT " + strconv.Itoa(int(limit))
 	}
-	query := fmt.Sprintf("SELECT %s FROM %s %s", projection, table, limitStmt)
+	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY vote_sum DESC %s", projection, table, limitStmt)
 
 	var dbQuerySp opentracing.Span
 	dbQuerySp = nil

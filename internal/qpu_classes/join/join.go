@@ -118,7 +118,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		stateDatabase,
 		stateTable,
 		fmt.Sprintf(
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts TIMESTAMP, PRIMARY KEY (%s) )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts TIMESTAMP, PRIMARY KEY (%s), INDEX i (vote_sum) )",
 			stateTable,
 			idAttributesColumns,
 			joinAttributeKey,
