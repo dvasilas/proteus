@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+
 	var endpoint, query string
 	flag.StringVar(&endpoint, "e", "noArg", "QPU endpoint")
 	flag.StringVar(&query, "q", "noArg", "query")

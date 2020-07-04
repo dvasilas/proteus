@@ -48,12 +48,12 @@ func newProteusQueryEngine(tracing bool) (proteusQueryEngine, error) {
 	}, nil
 }
 
-func (qe proteusQueryEngine) query(limit int) (interface{}, error) {
+func (qe proteusQueryEngine) query(limit int) (resp interface{}, err error) {
 	// resp, err := qe.proteusClient.QueryInternal("stateTableJoin", nil, nil, int64(limit), nil, false)
 
 	// resp, err := qe.proteusClient.QueryNoOp()
 
-	resp, err := qe.proteusClient.QueryUnary()
+	resp, err = qe.proteusClient.QueryUnary()
 
 	// resp, err := qe.proteusClient.QueryArgs()
 	if err != nil {

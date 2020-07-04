@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"text/tabwriter"
 
@@ -23,6 +24,8 @@ import (
 // - and finally creating and starting the QPU service.
 
 func main() {
+	fmt.Println("GOMAXPROCS= ", runtime.GOMAXPROCS(runtime.NumCPU()))
+
 	configFile, logLevel, err := getFlags()
 	if err != nil {
 		log.Fatal("qpuService.NewQPUService() failed: ", err)

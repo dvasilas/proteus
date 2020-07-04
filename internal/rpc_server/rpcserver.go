@@ -12,6 +12,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/grpc/reflection"
@@ -27,11 +28,12 @@ type Server struct {
 	grpcServer grpcutils.GrpcServer
 	api        libqpu.APIProcessor
 	// temporarily here
-	state libqpu.QPUState
+	state      libqpu.QPUState
+	dispatcher *workerpool.Dispatcher
 }
 
 // NewServer initializes a grpc server.
-func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.QPUState) (*Server, error) {
+func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.QPUState, conf *libqpu.QPUConfig) (*Server, error) {
 	grpcServer, err := grpcutils.NewServer(tracing)
 	if err != nil {
 		return nil, err
@@ -44,6 +46,9 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 		api:        api,
 		state:      state,
 	}
+
+	server.dispatcher = workerpool.NewDispatcher(conf.MaxWorkers, conf.MaxJobQueue)
+	server.dispatcher.Run()
 
 	qpu_api.RegisterQPUAPIServer(grpcServer.Server, &server)
 	reflection.Register(grpcServer.Server)
@@ -84,6 +89,34 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 	}
 }
 
+// Job ...
+type Job struct {
+	server *Server
+	ctx    context.Context
+	req    *qpu_api.QueryReq
+	result *jobResult
+	done   chan bool
+	// do     func(*Server, context.Context, *qpu_api.QueryReq, interface{})
+}
+
+// Do ...
+func (j *Job) Do() {
+	j.do(j.ctx, j.server, j.req)
+	j.done <- true
+}
+
+func (j *Job) do(ctx context.Context, s *Server, req *qpu_api.QueryReq) {
+	resp, err := s.api.QueryUnary(libqpu.QueryRequest{}, nil)
+
+	j.result.response = resp
+	j.result.err = err
+}
+
+type jobResult struct {
+	response *qpu_api.QueryResp
+	err      error
+}
+
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_api.QueryResp, error) {
 	// 	var querySp opentracing.Span
@@ -107,7 +140,19 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_ap
 	// 		Results: results,
 	// 	}, err
 
-	return s.api.QueryUnary(libqpu.QueryRequest{}, nil)
+	work := &Job{
+		server: s,
+		ctx:    ctx,
+		req:    req,
+		result: &jobResult{},
+		done:   make(chan bool),
+	}
+
+	s.dispatcher.JobQueue <- work
+
+	<-work.done
+
+	return work.result.response, work.result.err
 }
 
 // QueryNoOp ...

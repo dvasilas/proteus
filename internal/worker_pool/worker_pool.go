@@ -1,7 +1,5 @@
 package workerpool
 
-import "fmt"
-
 // Job represents a job to be executed.
 // Being an interface with only a Do() method allows the worker pool to be
 // agnostic of the actual jobs
@@ -56,7 +54,6 @@ func (w worker) start() {
 			case job := <-w.jobChannel:
 				job.Do()
 			case <-w.quit:
-				fmt.Println("done, exiting")
 				return
 			}
 		}

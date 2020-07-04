@@ -15,7 +15,6 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
-	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
@@ -35,7 +34,7 @@ type JoinQPU struct {
 	inMemState     *inMemState
 	endOfStreamCnt int
 	catchUpDoneCh  chan int
-	dispatcher     *workerpool.Dispatcher
+	// dispatcher     *workerpool.Dispatcher
 }
 
 type stateEntry struct {
@@ -129,8 +128,8 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		return &JoinQPU{}, err
 	}
 
-	jqpu.dispatcher = workerpool.NewDispatcher(qpu.Config.MaxWorkers, qpu.Config.MaxJobQueue)
-	jqpu.dispatcher.Run()
+	// jqpu.dispatcher = workerpool.NewDispatcher(qpu.Config.MaxWorkers, qpu.Config.MaxJobQueue)
+	// jqpu.dispatcher.Run()
 
 	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
 		querySnapshot := queries.NewQuerySnapshotAndSubscribe(
@@ -158,96 +157,96 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 // ProcessQuerySnapshot ...
 func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	libqpu.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
-	var tracer opentracing.Tracer
-	tracer = nil
-	if parentSpan != nil {
-		tracer = opentracing.GlobalTracer()
-	}
+	// var tracer opentracing.Tracer
+	// tracer = nil
+	// if parentSpan != nil {
+	// if	tracer = opentracing.GlobalTracer(); tracer != nil
+	// }
 
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	work := Job{
-		qpu:        q,
-		query:      query,
-		parentSpan: parentSpan,
-		logOpCh:    logOpCh,
-		errCh:      errCh,
-	}
+	// work := Job{
+	// 	qpu:        q,
+	// 	query:      query,
+	// 	parentSpan: parentSpan,
+	// 	logOpCh:    logOpCh,
+	// 	errCh:      errCh,
+	// }
 
-	work.do = func(q *JoinQPU, query libqpu.InternalQuery, parentSpan opentracing.Span, logOpCh chan libqpu.LogOperation, errCh chan error) {
-		projection := make([]string, len(q.schema[query.GetTable()]))
-		i := 0
-		for attr := range q.schema[query.GetTable()] {
-			projection[i] = attr
-			i++
-		}
+	// work.do = func(q *JoinQPU, query libqpu.InternalQuery, parentSpan opentracing.Span, logOpCh chan libqpu.LogOperation, errCh chan error) {
+	// 	projection := make([]string, len(q.schema[query.GetTable()]))
+	// 	i := 0
+	// 	for attr := range q.schema[query.GetTable()] {
+	// 		projection[i] = attr
+	// 		i++
+	// 	}
 
-		var stateScanSp opentracing.Span
-		stateScanSp = nil
-		if tracer != nil {
-			stateScanSp = tracer.StartSpan("state_scan", opentracing.ChildOf(parentSpan.Context()))
-		}
+	// 	var stateScanSp opentracing.Span
+	// 	stateScanSp = nil
+	// 	if tracer != nil {
+	// 		stateScanSp = tracer.StartSpan("state_scan", opentracing.ChildOf(parentSpan.Context()))
+	// 	}
 
-		stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit(), stateScanSp)
-		if err != nil {
-			errCh <- err
-			// return logOpCh, errCh
-		}
+	// 	stateCh, err := q.state.Scan(stateTable, projection, query.GetLimit(), stateScanSp)
+	// 	if err != nil {
+	// 		errCh <- err
+	// 		// return logOpCh, errCh
+	// 	}
 
-		if stateScanSp != nil {
-			stateScanSp.Finish()
-		}
-		var stateScanProcSp opentracing.Span
-		stateScanProcSp = nil
-		if tracer != nil {
-			stateScanProcSp = tracer.StartSpan("state_scan_process", opentracing.ChildOf(parentSpan.Context()))
-			defer stateScanProcSp.Finish()
-		}
-		for record := range stateCh {
-			recordID := record[joinAttributeKey]
+	// 	if stateScanSp != nil {
+	// 		stateScanSp.Finish()
+	// 	}
+	// 	var stateScanProcSp opentracing.Span
+	// 	stateScanProcSp = nil
+	// 	if tracer != nil {
+	// 		stateScanProcSp = tracer.StartSpan("state_scan_process", opentracing.ChildOf(parentSpan.Context()))
+	// 		defer stateScanProcSp.Finish()
+	// 	}
+	// 	for record := range stateCh {
+	// 		recordID := record[joinAttributeKey]
 
-			vectorClockKey := record["ts_key"]
-			vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
-			if err != nil {
-				libqpu.Error(err)
-				errCh <- err
-				break
-			}
-			timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
-			if err != nil {
-				libqpu.Error(err)
-				errCh <- err
-				break
-			}
+	// 		vectorClockKey := record["ts_key"]
+	// 		vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
+	// 		if err != nil {
+	// 			libqpu.Error(err)
+	// 			errCh <- err
+	// 			break
+	// 		}
+	// 		timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
+	// 		if err != nil {
+	// 			libqpu.Error(err)
+	// 			errCh <- err
+	// 			break
+	// 		}
 
-			delete(record, "unix_timestamp(ts)")
-			delete(record, "ts_key")
+	// 		delete(record, "unix_timestamp(ts)")
+	// 		delete(record, "ts_key")
 
-			attributes, err := q.schema.StrToAttributes(stateTable, record)
-			if err != nil {
-				libqpu.Error(err)
-				errCh <- err
-				break
-			}
+	// 		attributes, err := q.schema.StrToAttributes(stateTable, record)
+	// 		if err != nil {
+	// 			libqpu.Error(err)
+	// 			errCh <- err
+	// 			break
+	// 		}
 
-			if _, found := attributes["vote_sum"]; !found {
-				attributes["vote_sum"] = libqpu.ValueInt(0)
-			}
+	// 		if _, found := attributes["vote_sum"]; !found {
+	// 			attributes["vote_sum"] = libqpu.ValueInt(0)
+	// 		}
 
-			logOpCh <- libqpu.LogOperationState(
-				recordID,
-				stateTable,
-				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
-				attributes,
-			)
+	// 		logOpCh <- libqpu.LogOperationState(
+	// 			recordID,
+	// 			stateTable,
+	// 			libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
+	// 			attributes,
+	// 		)
 
-		}
-		close(logOpCh)
-		close(errCh)
-	}
+	// 	}
+	// 	close(logOpCh)
+	// 	close(errCh)
+	// }
 
-	q.dispatcher.JobQueue <- work
+	// // q.dispatcher.JobQueue <- work
 
 	return logOpCh, errCh
 }
