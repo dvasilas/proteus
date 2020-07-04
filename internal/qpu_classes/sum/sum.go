@@ -9,6 +9,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
@@ -196,6 +197,11 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string
 	q.subscribeQueries = append(q.subscribeQueries, logOpCh)
 
 	return -1, logOpCh, errCh
+}
+
+// ClientQuery ...
+func (q *SumQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	return nil, nil
 }
 
 // RemovePersistentQuery ...

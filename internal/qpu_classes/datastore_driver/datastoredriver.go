@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	"github.com/opentracing/opentracing-go"
 )
@@ -126,6 +127,11 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, m
 	}
 
 	return id, logOpCh, errCh
+}
+
+// ClientQuery ...
+func (q *DatastoreDriverQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	return nil, nil
 }
 
 // RemovePersistentQuery ...

@@ -81,7 +81,9 @@ func (op *operations) getHomepage() (homepage, error) {
 
 	switch op.config.Benchmark.measuredSystem {
 	case "proteus":
-		// response := resp.([]proteusclient.ResponseRecord)
+		// response := resp.(*qpu_api.QueryResp)
+		// fmt.Println(response)
+
 		// stories := make([]story, len(response))
 		// for i, entry := range response {
 		// 	stories[i] = story{

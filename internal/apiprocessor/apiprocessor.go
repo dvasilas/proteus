@@ -162,33 +162,34 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 }
 
 // QueryUnary ...
-func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) ([]*libqpu.LogOperation, error) {
-	result := make([]*libqpu.LogOperation, 0)
-	logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)
-	for {
-		select {
-		case logOp, ok := <-logOpCh:
-			if !ok {
-				logOpCh = nil
-			} else {
-				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
-				result = append(result, &logOp)
-			}
-		case err, ok := <-errCh:
-			if !ok {
-				errCh = nil
-			} else {
-				libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
-				// 			if cancel != nil {
-				// 				cancel()
-				// 			}
-				return nil, err
-			}
-		}
-		if logOpCh == nil && errCh == nil {
-			return result, nil
-		}
-	}
+func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	return s.qpuClass.ClientQuery(libqpu.InternalQuery{}, parentSpan)
+	// result := make([]*libqpu.LogOperation, 0)
+	// logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)
+	// for {
+	// 	select {
+	// 	case logOp, ok := <-logOpCh:
+	// 		if !ok {
+	// 			logOpCh = nil
+	// 		} else {
+	// 			libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+	// 			result = append(result, &logOp)
+	// 		}
+	// 	case err, ok := <-errCh:
+	// 		if !ok {
+	// 			errCh = nil
+	// 		} else {
+	// 			libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
+	// 			// 			if cancel != nil {
+	// 			// 				cancel()
+	// 			// 			}
+	// 			return nil, err
+	// 		}
+	// 	}
+	// 	if logOpCh == nil && errCh == nil {
+	// 		return result, nil
+	// 	}
+	// }
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.

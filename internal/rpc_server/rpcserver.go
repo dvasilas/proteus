@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
@@ -15,7 +14,6 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -109,46 +107,7 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_ap
 	// 		Results: results,
 	// 	}, err
 
-	respRecords := make([]*qpu_api.QueryRespRecord, 5)
-	stateCh, err := s.state.Scan("stateTableJoin", []string{"title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	i := 0
-	for record := range stateCh {
-		vectorClockKey := record["ts_key"]
-		vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
-		if err != nil {
-			libqpu.Error(err)
-			return nil, err
-		}
-		timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
-		if err != nil {
-			libqpu.Error(err)
-			return nil, err
-		}
-
-		attribs := make(map[string][]byte)
-
-		delete(record, "unix_timestamp(ts)")
-		delete(record, "ts_key")
-
-		for k, v := range record {
-			attribs[k] = []byte(v)
-		}
-
-		respRecords[i] = &qpu_api.QueryRespRecord{
-			RecordId:   record["joinID"],
-			Attributes: attribs,
-			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
-		}
-		i++
-	}
-
-	return &qpu_api.QueryResp{
-		RespRecord: respRecords,
-	}, nil
+	return s.api.QueryUnary(libqpu.QueryRequest{}, nil)
 }
 
 // QueryNoOp ...

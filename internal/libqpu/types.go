@@ -27,13 +27,14 @@ type QPU struct {
 // APIProcessor ...
 type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
-	QueryUnary(QueryRequest, opentracing.Span) ([]*LogOperation, error)
+	QueryUnary(QueryRequest, opentracing.Span) (*qpu_api.QueryResp, error)
 	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
 	// GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
 }
 
 // QPUClass ...
 type QPUClass interface {
+	ClientQuery(InternalQuery, opentracing.Span) (*qpu_api.QueryResp, error)
 	ProcessQuerySnapshot(InternalQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(InternalQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
