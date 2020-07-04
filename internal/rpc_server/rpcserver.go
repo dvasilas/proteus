@@ -14,7 +14,6 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -86,27 +85,48 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 }
 
 // QueryUnary ...
-func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryRequest) (*qpu_api.QueryResponse, error) {
-	var querySp opentracing.Span
-	querySp = nil
-	if parent := opentracing.SpanFromContext(ctx); parent != nil {
-		pCtx := parent.Context()
-		if tracer := opentracing.GlobalTracer(); tracer != nil {
-			querySp = tracer.StartSpan("qpu/query", opentracing.ChildOf(pCtx))
-			defer querySp.Finish()
-		}
+func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_api.QueryResp, error) {
+	// 	var querySp opentracing.Span
+	// 	querySp = nil
+	// 	if parent := opentracing.SpanFromContext(ctx); parent != nil {
+	// 		pCtx := parent.Context()
+	// 		if tracer := opentracing.GlobalTracer(); tracer != nil {
+	// 			querySp = tracer.StartSpan("qpu/query", opentracing.ChildOf(pCtx))
+	// 			defer querySp.Finish()
+	// 		}
+	// 	}
+
+	// 	resp, err := s.api.QueryUnary(libqpu.QueryRequest{Req: req}, querySp)
+
+	// 	results := make([]*qpu.LogOperation, len(resp))
+	// 	for i, entry := range resp {
+	// 		results[i] = entry.Op
+	// 	}
+
+	// 	return &qpu_api.QueryResponse{
+	// 		Results: results,
+	// 	}, err
+
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		return nil, err
 	}
 
-	resp, err := s.api.QueryUnary(libqpu.QueryRequest{Req: req}, querySp)
-
-	results := make([]*qpu.LogOperation, len(resp))
-	for i, entry := range resp {
-		results[i] = entry.Op
-	}
-
-	return &qpu_api.QueryResponse{
-		Results: results,
-	}, err
+	return &qpu_api.QueryResp{
+		RespRecord: []*qpu_api.QueryRespRecord{
+			&qpu_api.QueryRespRecord{
+				RecordId: "obj0",
+				Attributes: map[string][]byte{
+					"attrA": []byte("2"),
+					"attrB": []byte("4"),
+					"attrC": []byte("6"),
+				},
+				Timestamp: map[string]*timestamp.Timestamp{
+					"a": ts,
+				},
+			},
+		},
+	}, nil
 }
 
 // QueryNoOp ...

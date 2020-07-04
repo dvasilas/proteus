@@ -9,7 +9,6 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
@@ -98,29 +97,49 @@ func (c *Client) Close() error {
 // 	}
 // }
 
-func (c *Client) query(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResponse, error) {
-	var queryISp opentracing.Span
-	queryISp = nil
-	ctx := context.TODO()
-	if parentSpan != nil {
-		if tracer := opentracing.GlobalTracer(); tracer != nil {
-			queryISp = tracer.StartSpan("client/query_internal", opentracing.ChildOf(parentSpan.Context()))
-			defer queryISp.Finish()
+func (c *Client) query(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	// var queryISp opentracing.Span
+	// queryISp = nil
+	// ctx := context.TODO()
+	// if parentSpan != nil {
+	// 	if tracer := opentracing.GlobalTracer(); tracer != nil {
+	// 		queryISp = tracer.StartSpan("client/query_internal", opentracing.ChildOf(parentSpan.Context()))
+	// 		defer queryISp.Finish()
 
-			ctx = opentracing.ContextWithSpan(context.Background(), queryISp)
-		}
-	}
+	// 		ctx = opentracing.ContextWithSpan(context.Background(), queryISp)
+	// 	}
+	// }
 
+	// client, err := c.pool.Get()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// resp, err := client.Cli.QueryUnary(ctx, req.Req)
+
+	// c.pool.Return(client)
+
+	// return resp, err
+
+	return nil, nil
+}
+
+// QueryUnary ...
+func (c *Client) QueryUnary() (*qpu_api.QueryResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Cli.QueryUnary(ctx, req.Req)
+	r := &qpu_api.QueryReq{
+		QueryStr: "SELECT title, description, short_id, vote_count FROM stories ORDER BY vote_count DESC LIMIT 5",
+	}
+
+	resp, err := client.Cli.QueryUnary(context.TODO(), r)
 
 	c.pool.Return(client)
 
-	return resp, err
+	return resp, nil
 }
 
 // QueryArgs ...
@@ -177,37 +196,37 @@ func (c *Client) QueryNoOp() (string, error) {
 }
 
 // QueryInternal ...
-func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
-	var querySp opentracing.Span
-	querySp = nil
-	if tracer := opentracing.GlobalTracer(); tracer != nil {
-		querySp = tracer.StartSpan("client/query")
-		defer querySp.Finish()
-	}
+// func (c *Client) QueryInternal(table string, predicate []*qpu.AttributePredicate, ts *qpu.SnapshotTimePredicate, limit int64, metadata map[string]string, sync bool) ([]ResponseRecord, error) {
+// 	var querySp opentracing.Span
+// 	querySp = nil
+// 	if tracer := opentracing.GlobalTracer(); tracer != nil {
+// 		querySp = tracer.StartSpan("client/query")
+// 		defer querySp.Finish()
+// 	}
 
-	query := queries.NewQuerySnapshot(table, predicate, []string{}, []string{}, []string{}, limit, ts)
-	resp, err := c.query(libqpu.NewQueryRequestI(query, nil, false), querySp)
-	if err != nil {
-		return nil, err
-	}
+// 	query := queries.NewQuerySnapshot(table, predicate, []string{}, []string{}, []string{}, limit, ts)
+// 	resp, err := c.query(libqpu.NewQueryRequestI(query, nil, false), querySp)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	logOps := make([]libqpu.LogOperation, len(resp.GetResults()))
-	for i, entry := range resp.GetResults() {
-		logOps[i] = libqpu.LogOperation{Op: entry}
-	}
+// 	logOps := make([]libqpu.LogOperation, len(resp.GetResults()))
+// 	for i, entry := range resp.GetResults() {
+// 		logOps[i] = libqpu.LogOperation{Op: entry}
+// 	}
 
-	response := make([]ResponseRecord, len(logOps))
-	for i, entry := range logOps {
-		response[i] = ResponseRecord{
-			ObjectID:  entry.Op.GetObjectId(),
-			Bucket:    entry.Op.GetBucket(),
-			State:     logOpToObjectState(entry.Op),
-			Timestamp: entry.Op.GetTimestamp().GetVc(),
-		}
-	}
+// 	response := make([]ResponseRecord, len(logOps))
+// 	for i, entry := range logOps {
+// 		response[i] = ResponseRecord{
+// 			ObjectID:  entry.Op.GetObjectId(),
+// 			Bucket:    entry.Op.GetBucket(),
+// 			State:     logOpToObjectState(entry.Op),
+// 			Timestamp: entry.Op.GetTimestamp().GetVc(),
+// 		}
+// 	}
 
-	return response, err
-}
+// 	return response, err
+// }
 
 func processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	return nil

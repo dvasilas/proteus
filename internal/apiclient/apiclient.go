@@ -76,9 +76,9 @@ func (c QPUAPIClient) QuerySQL(query string, metadata map[string]string, sync bo
 
 // QueryUnary ...
 func (c QPUAPIClient) QueryUnary(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) {
-	ctx := context.TODO()
-	resp, err := c.cli.QueryUnary(ctx, req.Req)
-	return resp, err
+	// ctx := context.TODO()
+	// resp, err := c.cli.QueryUnary(ctx, req.Req)
+	return nil, nil
 }
 
 // GetConfig implements the QPU's API GetConfig method.
