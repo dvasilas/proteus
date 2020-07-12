@@ -32,12 +32,13 @@ type Perf struct {
 
 // OpMetrics ...
 type OpMetrics struct {
-	OpCount    int64
-	Throughput float64
-	P50        float64
-	P90        float64
-	P95        float64
-	P99        float64
+	OpCount        int64
+	Throughput     float64
+	ThroughputNorm float64
+	P50            float64
+	P90            float64
+	P95            float64
+	P99            float64
 }
 
 // Metrics ...
@@ -67,9 +68,12 @@ func (p *Perf) ReportMeasurements(m map[string][]time.Duration, opCount map[stri
 
 // CalculateMetrics ...
 func (p *Perf) CalculateMetrics() Metrics {
-	aggregatedMeasurements := make(map[string]durations)
-	aggregatedOpCount := make(map[string]int64)
+	aggregateMeasurements := make(map[string]durations)
+	aggregateOpCount := make(map[string]int64)
+
+	var aggregateRuntime time.Duration
 	var experimentSt, experimentEn time.Time
+
 	for threadID, threadReport := range p.measurementsBuf {
 		if threadID == 0 {
 			experimentSt = threadReport.start
@@ -81,18 +85,21 @@ func (p *Perf) CalculateMetrics() Metrics {
 		if threadReport.end.After(experimentEn) {
 			experimentEn = threadReport.end
 		}
+
+		aggregateRuntime += threadReport.end.Sub(threadReport.start)
+
 		for measurementType, rawMeasurements := range p.measurementsBuf[threadID].buf {
-			aggregatedMeasurements[measurementType] = append(
-				aggregatedMeasurements[measurementType],
+			aggregateMeasurements[measurementType] = append(
+				aggregateMeasurements[measurementType],
 				rawMeasurements[:threadReport.opCount[measurementType]]...,
 			)
-			aggregatedOpCount[measurementType] += threadReport.opCount[measurementType]
+			aggregateOpCount[measurementType] += threadReport.opCount[measurementType]
 		}
 	}
 
 	runTime := experimentEn.Sub(experimentSt)
 
-	for _, threadMeasurements := range aggregatedMeasurements {
+	for _, threadMeasurements := range aggregateMeasurements {
 		sort.Sort(durations(threadMeasurements))
 	}
 
@@ -102,15 +109,16 @@ func (p *Perf) CalculateMetrics() Metrics {
 
 	m.Runtime = runTime.Seconds()
 
-	for opType, threadMeasurements := range aggregatedMeasurements {
-		if aggregatedOpCount[opType] > 0 {
+	for opType, threadMeasurements := range aggregateMeasurements {
+		if aggregateOpCount[opType] > 0 {
 			opMetrics := OpMetrics{
-				OpCount:    aggregatedOpCount[opType],
-				Throughput: float64(aggregatedOpCount[opType]) / float64(runTime.Seconds()),
-				P50:        durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
-				P90:        durationToMillis(threadMeasurements.percentile(0.9)),
-				P95:        durationToMillis(threadMeasurements.percentile(0.95)),
-				P99:        durationToMillis(threadMeasurements.percentile(0.99)),
+				OpCount:        aggregateOpCount[opType],
+				Throughput:     float64(aggregateOpCount[opType]) / float64(runTime.Seconds()),
+				ThroughputNorm: (float64(aggregateOpCount[opType]) / float64(aggregateRuntime.Seconds())) * float64(len(p.measurementsBuf)),
+				P50:            durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
+				P90:            durationToMillis(threadMeasurements.percentile(0.9)),
+				P95:            durationToMillis(threadMeasurements.percentile(0.95)),
+				P99:            durationToMillis(threadMeasurements.percentile(0.99)),
 			}
 			m.PerOpMetrics[opType] = opMetrics
 		}
