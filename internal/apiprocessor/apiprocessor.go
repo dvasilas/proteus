@@ -3,7 +3,7 @@ package apiprocessor
 import (
 	"context"
 	"errors"
-	"fmt"
+	"sync"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -23,24 +23,39 @@ import (
 // It provides access to the methods implemented by libqpu.QPUClass.
 type APIProcessor struct {
 	qpuClass libqpu.QPUClass
+	sqlCache *sqlToASTCache
+}
+
+type sqlToASTCache struct {
+	sync.RWMutex
+	cache map[string]libqpu.ASTQuery
+}
+
+func newSQLToASTCache() *sqlToASTCache {
+	return &sqlToASTCache{
+		cache: make(map[string]libqpu.ASTQuery),
+	}
 }
 
 // ---------------- API Functions -------------------
 
 // NewProcessor creates an instance of APIProcessor.
 // It initiates the libqpu.QPUClass corresponding to the QPU's class.
-func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (APIProcessor, error) {
+func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error) {
 	qpuClass, err := getQPUClass(qpu, catchUpDoneCh)
 	if err != nil {
 		libqpu.Error(err)
-		return APIProcessor{}, err
+		return nil, err
 	}
 
-	return APIProcessor{qpuClass: qpuClass}, nil
+	return &APIProcessor{
+		qpuClass: qpuClass,
+		sqlCache: newSQLToASTCache(),
+	}, nil
 }
 
 // Query is responsible for the top-level processing of invocation of the Query API.
-func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestStream) error {
+func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestStream) error {
 	var astQuery libqpu.ASTQuery
 	switch queryReq.QueryType() {
 	case libqpu.ASTQueryT:
@@ -157,67 +172,42 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 			return nil
 		}
 	}
-
-	// libqpu.QPUClass.ProcessQuery provides the actual query processing functionality
-	// return s.qpuClass.ProcessQuery(internalQuery, stream, queryReq.GetMetadata(), queryReq.GetSync())
 }
 
 // QueryUnary ...
-func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
-	var astQuery libqpu.ASTQuery
+func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	// var astQuery libqpu.ASTQuery
+	// var err error
+	// var ok bool
 
-	switch req.QueryType() {
-	case libqpu.ASTQueryT:
-		fmt.Println("apiprocessior:QueryUnary:ASTQueryT")
-	case libqpu.SQLQueryT:
-		fmt.Println("apiprocessior:QueryUnary:SQLQueryType")
-		var err error
-		astQuery, err = sqlparser.Parse(req.GetSQLStr())
-		if err != nil {
-			libqpu.Error(err)
-			return nil, err
-		}
-	}
-	fmt.Println(astQuery)
+	// switch req.QueryType() {
+	// case libqpu.ASTQueryT:
+	// 	astQuery = req.GetQueryI()
+	// case libqpu.SQLQueryT:
+	// 	s.sqlCache.RLock()
+	// 	astQuery, ok = s.sqlCache.cache[req.GetSQLStr()]
+	// 	s.sqlCache.RUnlock()
 
-	return s.qpuClass.ClientQuery(astQuery, parentSpan)
-	// result := make([]*libqpu.LogOperation, 0)
-	// logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)
-	// for {
-	// 	select {
-	// 	case logOp, ok := <-logOpCh:
-	// 		if !ok {
-	// 			logOpCh = nil
-	// 		} else {
-	// 			libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
-	// 			result = append(result, &logOp)
-	// 		}
-	// 	case err, ok := <-errCh:
-	// 		if !ok {
-	// 			errCh = nil
-	// 		} else {
-	// 			libqpu.Trace("api processor received error", map[string]interface{}{"error": err})
-	// 			// 			if cancel != nil {
-	// 			// 				cancel()
-	// 			// 			}
+	// 	if !ok {
+	// 		astQuery, err = sqlparser.Parse(req.GetSQLStr())
+	// 		if err != nil {
+	// 			libqpu.Error(err)
 	// 			return nil, err
 	// 		}
-	// 	}
-	// 	if logOpCh == nil && errCh == nil {
-	// 		return result, nil
+	// 		s.sqlCache.Lock()
+	// 		s.sqlCache.cache[req.GetSQLStr()] = astQuery
+	// 		s.sqlCache.Unlock()
 	// 	}
 	// }
+
+	// return s.qpuClass.ClientQuery(astQuery, parentSpan)
+	return s.qpuClass.ClientQuery(libqpu.ASTQuery{}, parentSpan)
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
-func (s APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
+func (s *APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
 	return nil, libqpu.Error(errors.New("not implemented"))
 }
-
-// GetDataTransfer is responsible for the top-level processing of invocation of the GetDataTransfer API.
-// func (s APIProcessor) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
-// 	return nil, libqpu.Error(errors.New("not implemented"))
-// }
 
 // ---------------- Internal Functions --------------
 
