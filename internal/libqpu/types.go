@@ -34,9 +34,9 @@ type APIProcessor interface {
 
 // QPUClass ...
 type QPUClass interface {
-	ClientQuery(InternalQuery, opentracing.Span) (*qpu_api.QueryResp, error)
-	ProcessQuerySnapshot(InternalQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
-	ProcessQuerySubscribe(InternalQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
+	ClientQuery(ASTQuery, opentracing.Span) (*qpu_api.QueryResp, error)
+	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
+	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
 }
 

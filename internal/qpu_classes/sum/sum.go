@@ -41,7 +41,7 @@ type SumQPU struct {
 }
 
 type subscribeQuery struct {
-	query  libqpu.InternalQuery
+	query  libqpu.ASTQuery
 	stream libqpu.RequestStream
 	seqID  int64
 }
@@ -116,7 +116,7 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 	)
 
 	for _, adjQPU := range q.AdjacentQPUs {
-		responseStream, err := qpugraph.SendQueryI(query, adjQPU)
+		responseStream, err := qpugraph.SendQuery(libqpu.NewQuery(nil, query.Q), adjQPU)
 		if err != nil {
 			return &SumQPU{}, err
 		}
@@ -131,7 +131,7 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
@@ -190,7 +190,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]
 }
 
 // ProcessQuerySubscribe ...
-func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *SumQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
@@ -200,7 +200,7 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string
 }
 
 // ClientQuery ...
-func (q *SumQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
 	return nil, nil
 }
 

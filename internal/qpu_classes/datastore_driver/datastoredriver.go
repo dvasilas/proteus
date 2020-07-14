@@ -55,13 +55,13 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 }
 
 // ProcessQuerySnapshot ...
-func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	isNull, isNotNull := query.GetPredicateContains()
 	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }
 
 // ProcessQuerySubscribe ...
-func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 	id := rand.Int()
@@ -130,7 +130,7 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, m
 }
 
 // ClientQuery ...
-func (q *DatastoreDriverQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *DatastoreDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
 	return nil, nil
 }
 

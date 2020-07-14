@@ -9,7 +9,7 @@ import (
 )
 
 // NewQuerySubscribe ...
-func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
 	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -28,8 +28,8 @@ func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projec
 		)
 	}
 
-	return libqpu.InternalQuery{
-		Q: libqpu.QueryInternal(
+	return libqpu.ASTQuery{
+		Q: libqpu.NewASTQuery(
 			table,
 			libqpu.SnapshotTimePredicate(
 				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, false),
@@ -43,7 +43,7 @@ func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projec
 }
 
 // NewQuerySnapshot ...
-func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, limit int64, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, limit int64, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
 	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -62,8 +62,8 @@ func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, project
 		)
 	}
 
-	return libqpu.InternalQuery{
-		Q: libqpu.QueryInternal(
+	return libqpu.ASTQuery{
+		Q: libqpu.NewASTQuery(
 			table,
 			libqpu.SnapshotTimePredicate(
 				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
@@ -77,7 +77,7 @@ func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, project
 }
 
 // NewQuerySnapshotAndSubscribe ...
-func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.InternalQuery {
+func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
 	predicate = make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -96,8 +96,8 @@ func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredic
 		)
 	}
 
-	return libqpu.InternalQuery{
-		Q: libqpu.QueryInternal(
+	return libqpu.ASTQuery{
+		Q: libqpu.NewASTQuery(
 			table,
 			libqpu.SnapshotTimePredicate(
 				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
@@ -111,7 +111,7 @@ func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredic
 }
 
 // QueryType ...
-func QueryType(query libqpu.InternalQuery) (bool, bool) {
+func QueryType(query libqpu.ASTQuery) (bool, bool) {
 	var isSnapshot, isSubscribe bool
 	if query.GetTsPredicate().GetLbound().GetType() == qpu.SnapshotTime_LATEST {
 		if query.GetTsPredicate().GetLbound().GetIsClosed() {
@@ -151,7 +151,7 @@ func QueryType(query libqpu.InternalQuery) (bool, bool) {
 // }
 
 // SatisfiesPredicate ...
-func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.InternalQuery) (bool, error) {
+func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool, error) {
 	if query.GetTable() != logOp.GetTable() {
 		return false, nil
 	}

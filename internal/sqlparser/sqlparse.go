@@ -12,7 +12,7 @@ import (
 )
 
 type sqlParseCtx struct {
-	proteusAST   *qpu_api.Query_InternalQuery
+	proteusAST   *qpu_api.ASTQuery
 	walkStateStr []string
 	walkState    []sqlTreeNodeType
 	whereStack   []whereExpr
@@ -73,7 +73,7 @@ const (
 
 func createSQLParseCtx() *sqlParseCtx {
 	return &sqlParseCtx{
-		proteusAST:   &qpu_api.Query_InternalQuery{},
+		proteusAST:   &qpu_api.ASTQuery{},
 		walkStateStr: make([]string, 0),
 		walkState:    make([]sqlTreeNodeType, 0),
 	}
@@ -100,10 +100,10 @@ func (ctx *sqlParseCtx) statePop() {
 }
 
 // Parse ...
-func Parse(query string) (parsedAST libqpu.InternalQuery, err error) {
+func Parse(query string) (parsedAST libqpu.ASTQuery, err error) {
 	stmt, err := sqlparser.Parse(query)
 	if err != nil {
-		return libqpu.InternalQuery{}, err
+		return libqpu.ASTQuery{}, err
 	}
 
 	switch stmt.(type) {
@@ -114,7 +114,7 @@ func Parse(query string) (parsedAST libqpu.InternalQuery, err error) {
 			return
 		}
 		err = parseCtx.buildProteusAST()
-		parsedAST = libqpu.InternalQuery{
+		parsedAST = libqpu.ASTQuery{
 			Q: parseCtx.proteusAST,
 		}
 	default:

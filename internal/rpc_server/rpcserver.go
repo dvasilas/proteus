@@ -143,7 +143,10 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_ap
 	work := &Job{
 		server: s,
 		ctx:    ctx,
-		req:    libqpu.NewQueryRequestSQL(req.QueryStr, nil, false),
+		req: libqpu.NewQueryRequest(
+			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
+			nil,
+			false),
 		result: &jobResult{},
 		done:   make(chan bool),
 	}

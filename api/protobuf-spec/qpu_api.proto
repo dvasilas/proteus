@@ -73,11 +73,17 @@ message QueryRequest {
 }
 
 message Query {
-  message SQLQuery {
+  oneof query {
+    ASTQuery query_ast = 1;
+    SQLQuery query_sql = 2;
+  }
+}
+
+message SQLQuery {
     string queryStr = 1;
   }
   // Internal query representation.
-  message InternalQuery {
+  message ASTQuery {
     string table = 1;
     // Like the SQL PROJECTION.
     repeated string projection = 2;
@@ -91,11 +97,6 @@ message Query {
     // Like the SQL LIMIT
     int64 limit = 6;
   }
-  oneof query {
-    InternalQuery query_i = 1;
-    SQLQuery query_sql = 2;
-  }
-}
 
 message OrderBy {
   enum Order {

@@ -51,11 +51,11 @@ type inMemState struct {
 // Job ...
 type Job struct {
 	qpu        *JoinQPU
-	query      libqpu.InternalQuery
+	query      libqpu.ASTQuery
 	parentSpan opentracing.Span
 	logOpCh    chan libqpu.LogOperation
 	errCh      chan error
-	do         func(*JoinQPU, libqpu.InternalQuery, opentracing.Span, chan libqpu.LogOperation, chan error)
+	do         func(*JoinQPU, libqpu.ASTQuery, opentracing.Span, chan libqpu.LogOperation, chan error)
 }
 
 // Do ...
@@ -140,7 +140,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 			[]string{},
 			nil,
 		)
-		responseStreamStories, err := qpugraph.SendQueryI(querySnapshot, qpu.AdjacentQPUs[i])
+		responseStreamStories, err := qpugraph.SendQuery(libqpu.NewQuery(nil, querySnapshot.Q), qpu.AdjacentQPUs[i])
 		if err != nil {
 			return &JoinQPU{}, err
 		}
@@ -155,7 +155,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 }
 
 // ProcessQuerySnapshot ...
-func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	libqpu.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
 	// var tracer opentracing.Tracer
 	// tracer = nil
@@ -252,7 +252,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.InternalQuery, md map[string
 }
 
 // ClientQuery ...
-func (q *JoinQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
 	respRecords := make([]*qpu_api.QueryRespRecord, 5)
 	stateCh, err := q.state.Scan("stateTableJoin", []string{"title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
 	if err != nil {
@@ -296,7 +296,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.InternalQuery, parentSpan opentracing
 }
 
 // ProcessQuerySubscribe ...
-func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.InternalQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	// q.snapshotConsumer(query, stream)
 	return -1, nil, nil
 }

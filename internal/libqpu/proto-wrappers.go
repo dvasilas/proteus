@@ -143,45 +143,6 @@ const (
 	EndOfStream ResponseRecordType = iota
 )
 
-// ---------------- QueryRequest -------------------
-
-// QueryRequest ...
-type QueryRequest struct {
-	Req *qpu_api.QueryRequest
-}
-
-// NewQueryRequestI ...
-func NewQueryRequestI(query InternalQuery, md map[string]string, sync bool) QueryRequest {
-	return QueryRequest{
-		Req: &qpu_api.QueryRequest{
-			Query: &qpu_api.Query{
-				Query: &qpu_api.Query_QueryI{
-					QueryI: query.Q,
-				},
-			},
-			Metadata: md,
-			Sync:     sync,
-		},
-	}
-}
-
-// NewQueryRequestSQL ...
-func NewQueryRequestSQL(query string, md map[string]string, sync bool) QueryRequest {
-	return QueryRequest{
-		Req: &qpu_api.QueryRequest{
-			Query: &qpu_api.Query{
-				Query: &qpu_api.Query_QuerySql{
-					QuerySql: &qpu_api.Query_SQLQuery{
-						QueryStr: query,
-					},
-				},
-			},
-			Metadata: md,
-			Sync:     sync,
-		},
-	}
-}
-
 // ---------------- ResponseRecord -------------------
 
 // ResponseRecord ...
@@ -218,98 +179,6 @@ func (r ResponseRecord) GetType() (ResponseRecordType, error) {
 func (r ResponseRecord) GetRecordID() string {
 	return r.Rec.GetLogOp().GetObjectId()
 }
-
-// ---------------- QueryRequest -------------------
-
-// QueryType ...
-func (r QueryRequest) QueryType() QueryType {
-	switch r.Req.GetQuery().GetQuery().(type) {
-	case *qpu_api.Query_QueryI:
-		return InternalQueryType
-	case *qpu_api.Query_QuerySql:
-		return SQLQueryType
-	default:
-		return UnknownType
-	}
-}
-
-// GetQueryI ...
-func (r QueryRequest) GetQueryI() InternalQuery {
-	return InternalQuery{Q: r.Req.GetQuery().GetQueryI()}
-}
-
-// GetSQLStr ...
-func (r QueryRequest) GetSQLStr() string {
-	return r.Req.GetQuery().GetQuerySql().GetQueryStr()
-}
-
-// GetMetadata ...
-func (r QueryRequest) GetMetadata() map[string]string {
-	return r.Req.GetMetadata()
-}
-
-// GetSync ...
-func (r QueryRequest) GetSync() bool {
-	return r.Req.GetSync()
-}
-
-// ---------------- InternalQuery -------------------
-
-// InternalQuery ...
-type InternalQuery struct {
-	Q *qpu_api.Query_InternalQuery
-}
-
-// GetTable ...
-func (q InternalQuery) GetTable() string {
-	return q.Q.GetTable()
-}
-
-// GetProjection ...
-func (q InternalQuery) GetProjection() []string {
-	return q.Q.GetProjection()
-}
-
-// GetPredicate ...
-func (q InternalQuery) GetPredicate() []*qpu.AttributePredicate {
-	return q.Q.GetPredicate()
-}
-
-// GetPredicateContains ...
-func (q InternalQuery) GetPredicateContains() ([]string, []string) {
-	isNull := make([]string, 0)
-	isNotNull := make([]string, 0)
-	for _, pred := range q.Q.GetPredicate() {
-		if pred.GetType() == qpu.AttributePredicate_ISNULL {
-			isNull = append(isNull, pred.GetAttr().GetAttrKey())
-		} else if pred.GetType() == qpu.AttributePredicate_ISNOTNULL {
-			isNotNull = append(isNotNull, pred.GetAttr().GetAttrKey())
-		}
-	}
-	return isNull, isNotNull
-}
-
-// GetTsPredicate ...
-func (q InternalQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
-	return q.Q.GetTsPredicate()
-}
-
-// GetLimit ...
-func (q InternalQuery) GetLimit() int64 {
-	return q.Q.GetLimit()
-}
-
-// QueryType ...
-type QueryType int
-
-const (
-	// InternalQueryType ..
-	InternalQueryType QueryType = iota
-	// SQLQueryType ..
-	SQLQueryType QueryType = iota
-	// UnknownType ...
-	UnknownType QueryType = iota
-)
 
 // ResponseStreamRecord ...
 func ResponseStreamRecord(seqID int64, t qpu_api.ResponseStreamRecord_StreamRecordType, logOp *qpu.LogOperation) *qpu_api.ResponseStreamRecord {
@@ -356,55 +225,6 @@ func RequestStreamAck(sID int64) *qpu_api.RequestStreamRecord {
 				SequenceId: sID,
 			},
 		},
-	}
-}
-
-// RequestStreamPing ...
-// func RequestStreamPing(sID int64) *qpu_api.RequestStreamRecord {
-// 	return &qpu_api.RequestStreamRecord{
-// 		Request: &qpu_api.RequestStreamRecord_Ping{
-// 			Ping: &qpu_api.PingMsg{
-// 				SeqId: sID,
-// 			},
-// 		},
-// 	}
-// }
-
-// Query ...
-func Query(queryI *qpu_api.Query_InternalQuery) *qpu_api.Query {
-	return &qpu_api.Query{
-		Query: &qpu_api.Query_QueryI{
-			QueryI: queryI,
-		},
-	}
-}
-
-// QueryInternal ...
-func QueryInternal(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpu_api.Query_InternalQuery {
-	return &qpu_api.Query_InternalQuery{
-		Table:       table,
-		Projection:  projection,
-		Predicate:   predicate,
-		TsPredicate: ts,
-		Limit:       limit,
-	}
-}
-
-// QuerySQL ...
-func QuerySQL(query string) *qpu_api.Query {
-	return &qpu_api.Query{
-		Query: &qpu_api.Query_QuerySql{
-			QuerySql: &qpu_api.Query_SQLQuery{
-				QueryStr: query,
-			},
-		},
-	}
-}
-
-// SQLQUery ...
-func SQLQUery(query string) *qpu_api.Query_SQLQuery {
-	return &qpu_api.Query_SQLQuery{
-		QueryStr: query,
 	}
 }
 

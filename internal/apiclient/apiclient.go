@@ -63,7 +63,7 @@ func (c QPUAPIClient) QuerySQL(query string, metadata map[string]string, sync bo
 	}
 	err = stream.Send(
 		libqpu.RequestStreamRequest(
-			libqpu.QuerySQL(query),
+			libqpu.NewQuery(libqpu.NewSQLQuery(query), nil),
 			metadata,
 			sync,
 		),

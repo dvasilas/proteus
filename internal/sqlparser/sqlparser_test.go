@@ -17,11 +17,11 @@ func TestMain(m *testing.M) {
 
 var filterTests = []struct {
 	querySQL       string
-	expectedQueryI *qpu_api.Query_InternalQuery
+	expectedQueryI *qpu_api.ASTQuery
 }{
 	{
 		"select * from t where x = 42",
-		&qpu_api.Query_InternalQuery{
+		&qpu_api.ASTQuery{
 			Projection: []string{"*"},
 			Table:      "t",
 			Predicate: []*qpu.AttributePredicate{
@@ -35,7 +35,7 @@ var filterTests = []struct {
 	},
 	{
 		"SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5",
-		&qpu_api.Query_InternalQuery{
+		&qpu_api.ASTQuery{
 			Projection: []string{"title", "description", "short_id", "user_id", "vote_sum"},
 			Table:      "qpu",
 			OrderBy: &qpu_api.OrderBy{

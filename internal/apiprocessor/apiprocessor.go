@@ -41,40 +41,40 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (APIProcessor, error)
 
 // Query is responsible for the top-level processing of invocation of the Query API.
 func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestStream) error {
-	var internalQuery libqpu.InternalQuery
+	var astQuery libqpu.ASTQuery
 	switch queryReq.QueryType() {
-	case libqpu.InternalQueryType:
-		internalQuery = queryReq.GetQueryI()
-	case libqpu.SQLQueryType:
+	case libqpu.ASTQueryT:
+		astQuery = queryReq.GetQueryI()
+	case libqpu.SQLQueryT:
 		var err error
-		internalQuery, err = sqlparser.Parse(queryReq.GetSQLStr())
+		astQuery, err = sqlparser.Parse(queryReq.GetSQLStr())
 		if err != nil {
 			libqpu.Error(err)
 			return err
 		}
-	case libqpu.UnknownType:
-		return libqpu.Error(errors.New("UnknownType"))
+	case libqpu.UnknownQueryT:
+		return libqpu.Error(errors.New("apiProcessor:Query:UnknownQueryT"))
 	default:
-		return libqpu.Error(errors.New("default"))
+		return libqpu.Error(errors.New("apiProcessor:Query:default"))
 	}
 
-	libqpu.Trace("internalQuery received", map[string]interface{}{"internalQuery": internalQuery})
+	libqpu.Trace("internalQuery received", map[string]interface{}{"internalQuery": astQuery})
 	var logOpSubscribeCh, logOpSnapshotCh <-chan libqpu.LogOperation
 	var errSubscribeCh, errSnapshotCh <-chan error
 	queryID := -1
 	snapshotStream := false
 
-	isSnapshot, isSubscribe := queries.QueryType(internalQuery)
+	isSnapshot, isSubscribe := queries.QueryType(astQuery)
 	if !isSubscribe && !isSnapshot {
 		return libqpu.Error(errors.New("invalid query"))
 	}
 
 	if isSubscribe {
-		queryID, logOpSubscribeCh, errSubscribeCh = s.qpuClass.ProcessQuerySubscribe(internalQuery, queryReq.GetMetadata(), queryReq.GetSync())
+		queryID, logOpSubscribeCh, errSubscribeCh = s.qpuClass.ProcessQuerySubscribe(astQuery, queryReq.GetMetadata(), queryReq.GetSync())
 	}
 	if isSnapshot {
 		snapshotStream = true
-		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(internalQuery, queryReq.GetMetadata(), queryReq.GetSync(), nil)
+		logOpSnapshotCh, errSnapshotCh = s.qpuClass.ProcessQuerySnapshot(astQuery, queryReq.GetMetadata(), queryReq.GetSync(), nil)
 	}
 
 	var seqID int64
@@ -86,7 +86,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				logOpSubscribeCh = nil
 			} else {
 				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
-				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
+				ok, err := queries.SatisfiesPredicate(logOp, astQuery)
 				if err != nil {
 					libqpu.Error(err)
 					return err
@@ -95,7 +95,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				if ok {
 					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
 						libqpu.Error(err)
-						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
+						s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
 						return nil
 					}
 					seqID++
@@ -106,7 +106,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				logOpSnapshotCh = nil
 			} else {
 				libqpu.Trace("api processor received", map[string]interface{}{"logOp": logOp})
-				ok, err := queries.SatisfiesPredicate(logOp, internalQuery)
+				ok, err := queries.SatisfiesPredicate(logOp, astQuery)
 				if err != nil {
 					libqpu.Error(err)
 					return err
@@ -115,7 +115,7 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 				if ok {
 					if err := stream.Send(seqID, libqpu.State, logOp); err != nil {
 						libqpu.Error(err)
-						s.qpuClass.RemovePersistentQuery(internalQuery.GetTable(), queryID)
+						s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
 					}
 					seqID++
 				}
@@ -164,23 +164,23 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 
 // QueryUnary ...
 func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
-	var internalQuery libqpu.InternalQuery
+	var astQuery libqpu.ASTQuery
 
 	switch req.QueryType() {
-	case libqpu.InternalQueryType:
-		fmt.Println("apiprocessior:QueryUnary:InternalQueryType")
-	case libqpu.SQLQueryType:
+	case libqpu.ASTQueryT:
+		fmt.Println("apiprocessior:QueryUnary:ASTQueryT")
+	case libqpu.SQLQueryT:
 		fmt.Println("apiprocessior:QueryUnary:SQLQueryType")
 		var err error
-		internalQuery, err = sqlparser.Parse(req.GetSQLStr())
+		astQuery, err = sqlparser.Parse(req.GetSQLStr())
 		if err != nil {
 			libqpu.Error(err)
 			return nil, err
 		}
 	}
-	fmt.Println(internalQuery)
+	fmt.Println(astQuery)
 
-	return s.qpuClass.ClientQuery(libqpu.InternalQuery{}, parentSpan)
+	return s.qpuClass.ClientQuery(astQuery, parentSpan)
 	// result := make([]*libqpu.LogOperation, 0)
 	// logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)
 	// for {

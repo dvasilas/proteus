@@ -6,6 +6,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/apiclient"
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 )
 
 // This package is responsible for the QPU's outgoing communications with the
@@ -51,33 +52,12 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 	return nil
 }
 
-// SendQueryI receives a query (represented as a libqpu.InternalQuery struct)
+// SendQuery receives a query
 // and an adjacent QPU (libqpu.AdjacentQPU struct), send a request with the
 // given query to the given QPU, and returns a response stream handler
 // (libqpu.ResponseStream struct) for receiving response records.
-func SendQueryI(query libqpu.InternalQuery, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
+func SendQuery(query *qpu_api.Query, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
 	return to.APIClient.Query(
-		libqpu.NewQueryRequestI(query, nil, false),
+		libqpu.NewQueryRequest(query, nil, false),
 	)
-}
-
-// SendQuerySQL has the same behavior as SendQueryI, but send an SQL string
-// query.
-func SendQuerySQL(query string, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
-	return to.APIClient.Query(
-		libqpu.NewQueryRequestSQL(query, nil, false),
-	)
-}
-
-// SendQueryUnary ...
-func SendQueryUnary(query libqpu.InternalQuery, to *libqpu.AdjacentQPU) ([]libqpu.LogOperation, error) {
-	resp, err := to.APIClient.QueryUnary(
-		libqpu.NewQueryRequestI(query, nil, false),
-	)
-
-	response := make([]libqpu.LogOperation, len(resp.GetResults()))
-	for i, entry := range resp.GetResults() {
-		response[i] = libqpu.LogOperation{Op: entry}
-	}
-	return response, err
 }
