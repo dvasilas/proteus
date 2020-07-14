@@ -37,7 +37,7 @@ func newProteusQueryEngine(tracing bool) (proteusQueryEngine, error) {
 	err = errors.New("not tried yet")
 	for err != nil {
 		// _, err = c.QueryInternal("stateTableJoin", nil, nil, int64(1), nil, false)
-		_, err = c.QueryUnary()
+		_, err = c.Query("SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5")
 		time.Sleep(2 * time.Second)
 		fmt.Println("retying a test query", err)
 	}
@@ -53,7 +53,7 @@ func (qe proteusQueryEngine) query(limit int) (resp interface{}, err error) {
 
 	// resp, err := qe.proteusClient.QueryNoOp()
 
-	resp, err = qe.proteusClient.QueryUnary()
+	resp, err = qe.proteusClient.Query("SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5")
 
 	// resp, err := qe.proteusClient.QueryArgs()
 	if err != nil {

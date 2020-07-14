@@ -3,6 +3,7 @@ package apiprocessor
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -163,6 +164,22 @@ func (s APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestS
 
 // QueryUnary ...
 func (s APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	var internalQuery libqpu.InternalQuery
+
+	switch req.QueryType() {
+	case libqpu.InternalQueryType:
+		fmt.Println("apiprocessior:QueryUnary:InternalQueryType")
+	case libqpu.SQLQueryType:
+		fmt.Println("apiprocessior:QueryUnary:SQLQueryType")
+		var err error
+		internalQuery, err = sqlparser.Parse(req.GetSQLStr())
+		if err != nil {
+			libqpu.Error(err)
+			return nil, err
+		}
+	}
+	fmt.Println(internalQuery)
+
 	return s.qpuClass.ClientQuery(libqpu.InternalQuery{}, parentSpan)
 	// result := make([]*libqpu.LogOperation, 0)
 	// logOpCh, errCh := s.qpuClass.ProcessQuerySnapshot(req.GetQueryI(), req.GetMetadata(), req.GetSync(), parentSpan)

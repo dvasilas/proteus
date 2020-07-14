@@ -87,13 +87,23 @@ message Query {
     // Has the same form as AttributePredicate, but it is separate simply
     // to allow as to refer to this with a specific name (tsPredicate).
     qpu.SnapshotTimePredicate tsPredicate = 4;
+    OrderBy orderBy = 5;
     // Like the SQL LIMIT
-    int64 limit = 5;
+    int64 limit = 6;
   }
   oneof query {
     InternalQuery query_i = 1;
     SQLQuery query_sql = 2;
   }
+}
+
+message OrderBy {
+  enum Order {
+    ASC = 0;
+    DESC = 1;
+  }
+  string attributeName = 1;
+  Order direction = 2;
 }
 
 // A record for the stream returned by Query.

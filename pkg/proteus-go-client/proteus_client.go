@@ -124,15 +124,15 @@ func (c *Client) query(req libqpu.QueryRequest, parentSpan opentracing.Span) (*q
 	return nil, nil
 }
 
-// QueryUnary ...
-func (c *Client) QueryUnary() (*qpu_api.QueryResp, error) {
+// Query ...
+func (c *Client) Query(queryStmt string) (*qpu_api.QueryResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
 	r := &qpu_api.QueryReq{
-		QueryStr: "SELECT title, description, short_id, vote_count FROM stories ORDER BY vote_count DESC LIMIT 5",
+		QueryStr: queryStmt,
 	}
 
 	resp, err := client.Cli.QueryUnary(context.TODO(), r)

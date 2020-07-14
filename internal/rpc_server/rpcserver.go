@@ -93,7 +93,7 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 type Job struct {
 	server *Server
 	ctx    context.Context
-	req    *qpu_api.QueryReq
+	req    libqpu.QueryRequest
 	result *jobResult
 	done   chan bool
 	// do     func(*Server, context.Context, *qpu_api.QueryReq, interface{})
@@ -105,8 +105,8 @@ func (j *Job) Do() {
 	j.done <- true
 }
 
-func (j *Job) do(ctx context.Context, s *Server, req *qpu_api.QueryReq) {
-	resp, err := s.api.QueryUnary(libqpu.QueryRequest{}, nil)
+func (j *Job) do(ctx context.Context, s *Server, req libqpu.QueryRequest) {
+	resp, err := s.api.QueryUnary(req, nil)
 
 	j.result.response = resp
 	j.result.err = err
@@ -143,7 +143,7 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_ap
 	work := &Job{
 		server: s,
 		ctx:    ctx,
-		req:    req,
+		req:    libqpu.NewQueryRequestSQL(req.QueryStr, nil, false),
 		result: &jobResult{},
 		done:   make(chan bool),
 	}

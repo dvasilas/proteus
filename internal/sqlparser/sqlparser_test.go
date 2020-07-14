@@ -22,11 +22,31 @@ var filterTests = []struct {
 	{
 		"select * from t where x = 42",
 		&qpu_api.Query_InternalQuery{
-			Table: "t",
+			Projection: []string{"*"},
+			Table:      "t",
 			Predicate: []*qpu.AttributePredicate{
 				libqpu.AttributePredicate(libqpu.Attribute("x", nil), libqpu.ValueInt(42), libqpu.ValueInt(42)),
 			},
-			TsPredicate: libqpu.SnapshotTimePredicate(libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true), libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true)),
+			TsPredicate: libqpu.SnapshotTimePredicate(
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+			),
+		},
+	},
+	{
+		"SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5",
+		&qpu_api.Query_InternalQuery{
+			Projection: []string{"title", "description", "short_id", "user_id", "vote_sum"},
+			Table:      "qpu",
+			OrderBy: &qpu_api.OrderBy{
+				AttributeName: "vote_sum",
+				Direction:     qpu_api.OrderBy_DESC,
+			},
+			Limit: int64(5),
+			TsPredicate: libqpu.SnapshotTimePredicate(
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+			),
 		},
 	},
 }

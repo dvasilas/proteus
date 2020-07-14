@@ -2,15 +2,105 @@ package sqlparser
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/xwb1989/sqlparser"
 )
 
+type sqlParseCtx struct {
+	proteusAST   *qpu_api.Query_InternalQuery
+	walkStateStr []string
+	walkState    []sqlTreeNodeType
+	whereStack   []whereExpr
+}
+
+type whereExpr interface {
+	getType() whereExprType
+}
+
+type whereExprType int
+
+const (
+	collName = whereExprType(iota)
+	val      = whereExprType(iota)
+	op       = whereExprType(iota)
+)
+
+type colName string
+
+func (expr colName) getType() whereExprType { return collName }
+
+type value struct {
+	v *qpu.Value
+}
+
+func (expr value) getType() whereExprType { return val }
+
+type operator string
+
+func (expr operator) getType() whereExprType { return op }
+
+func (ctx *sqlParseCtx) whereExprPush(expr whereExpr) error {
+	ctx.whereStack = append(ctx.whereStack, expr)
+	return nil
+}
+
+func (ctx *sqlParseCtx) whereExprPop() whereExpr {
+	expr := ctx.whereStack[len(ctx.whereStack)-1]
+	ctx.whereStack = ctx.whereStack[:len(ctx.whereStack)-1]
+	return expr
+}
+
+type sqlTreeNodeType int
+
+const (
+	selectExpr       = sqlTreeNodeType(iota)
+	starExpr         = sqlTreeNodeType(iota)
+	where            = sqlTreeNodeType(iota)
+	aliasedExpr      = sqlTreeNodeType(iota)
+	tableExpr        = sqlTreeNodeType(iota)
+	aliasedTableExpr = sqlTreeNodeType(iota)
+	groupBy          = sqlTreeNodeType(iota)
+	orderBy          = sqlTreeNodeType(iota)
+	limit            = sqlTreeNodeType(iota)
+	sqlVal           = sqlTreeNodeType(iota)
+	comparisonExpr   = sqlTreeNodeType(iota)
+)
+
+func createSQLParseCtx() *sqlParseCtx {
+	return &sqlParseCtx{
+		proteusAST:   &qpu_api.Query_InternalQuery{},
+		walkStateStr: make([]string, 0),
+		walkState:    make([]sqlTreeNodeType, 0),
+	}
+}
+
+func (ctx *sqlParseCtx) stateStrPush(str string) {
+	ctx.walkStateStr = append(ctx.walkStateStr, str)
+}
+
+func (ctx *sqlParseCtx) stateStrPop() {
+	ctx.walkStateStr = ctx.walkStateStr[:len(ctx.walkStateStr)-1]
+}
+
+func (ctx *sqlParseCtx) stateStrPrint() {
+	fmt.Println(ctx.walkStateStr)
+}
+
+func (ctx *sqlParseCtx) statePush(node sqlTreeNodeType) {
+	ctx.walkState = append(ctx.walkState, node)
+}
+
+func (ctx *sqlParseCtx) statePop() {
+	ctx.walkState = ctx.walkState[:len(ctx.walkState)-1]
+}
+
 // Parse ...
-func Parse(query string) (libqpu.InternalQuery, error) {
+func Parse(query string) (parsedAST libqpu.InternalQuery, err error) {
 	stmt, err := sqlparser.Parse(query)
 	if err != nil {
 		return libqpu.InternalQuery{}, err
@@ -18,62 +108,25 @@ func Parse(query string) (libqpu.InternalQuery, error) {
 
 	switch stmt.(type) {
 	case *sqlparser.Select:
-		return parseSelect(stmt)
-	default:
-		return libqpu.InternalQuery{}, libqpu.Error(errors.New("only select queries are supported"))
-	}
-}
-
-func parseSelect(stmt sqlparser.Statement) (libqpu.InternalQuery, error) {
-	query := parsedQuery{}
-	query.parseSelect(stmt)
-
-	return query.toQPUQuery()
-}
-
-func (q *parsedQuery) toQPUQuery() (libqpu.InternalQuery, error) {
-	var pred *qpu.AttributePredicate
-
-	var selectOp, selectAttr, selectVal expr
-	var ok bool
-	if selectOp, ok = q.popExpr(); !ok {
-		return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
-	}
-	switch selectOp.(operator) {
-	case "=":
-		if selectVal, ok = q.popExpr(); !ok {
-			return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
+		parseCtx := createSQLParseCtx()
+		err = parseCtx.parseSelect(stmt)
+		if err != nil {
+			return
 		}
-		if selectAttr, ok = q.popExpr(); !ok {
-			return libqpu.InternalQuery{}, libqpu.Error(errors.New("incorrect parsed query stack"))
+		err = parseCtx.buildProteusAST()
+		parsedAST = libqpu.InternalQuery{
+			Q: parseCtx.proteusAST,
 		}
-		pred = libqpu.AttributePredicate(
-			libqpu.Attribute(selectAttr.(attribute).qpuAttribute.AttrKey, nil),
-			selectVal.(value).qpuValue,
-			selectVal.(value).qpuValue,
-		)
 	default:
-		return libqpu.InternalQuery{}, libqpu.Error(errors.New("only = is supported for now"))
+		err = libqpu.Error(errors.New("only select queries are supported"))
 	}
 
-	return libqpu.InternalQuery{
-			Q: libqpu.QueryInternal(
-				q.table,
-				libqpu.SnapshotTimePredicate(
-					libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
-					libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
-				),
-				[]*qpu.AttributePredicate{pred},
-				nil,
-				0,
-			),
-		},
-		nil
+	return
 }
 
-func (q *parsedQuery) parseSelect(node sqlparser.SQLNode) error {
+func (ctx *sqlParseCtx) parseSelect(node sqlparser.SQLNode) error {
 	visitedSelf := false
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
 		if !visitedSelf {
 			visitedSelf = true
 			return true, nil
@@ -83,51 +136,29 @@ func (q *parsedQuery) parseSelect(node sqlparser.SQLNode) error {
 		case sqlparser.Comments:
 			return false, nil
 		case sqlparser.SelectExprs:
-			err = q.parseSelectExprs(node)
-			return false, err
+			return false, ctx.parseSelectExprs(node)
 		case sqlparser.TableExprs:
-			err = q.parseTableExprs(node)
-			return false, err
+			return false, ctx.parseTableExprs(node)
 		case *sqlparser.Where:
-			if sqlparser.String(node) == "" {
-				return false, nil
-			}
-			err = q.parseExpr(node.(*sqlparser.Where).Expr)
-			return false, err
+			return false, ctx.parseWhere(node)
 		case sqlparser.GroupBy:
-			return false, nil
+			return false, ctx.parseGroupBy(node)
 		case sqlparser.OrderBy:
-			return false, nil
+			return false, ctx.parseOrderBy(node)
 		case *sqlparser.Limit:
-			return false, nil
+			return false, ctx.parseLimit(node)
 		default:
 			return false, libqpu.Error(errors.New("should not have reached here"))
 		}
 	}, node)
-
-	return err
 }
 
-func (q *parsedQuery) parseExpr(node sqlparser.SQLNode) error {
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
-		switch node.(type) {
-		case *sqlparser.ComparisonExpr:
-			return false, q.ComparisonExpr(node)
-		case *sqlparser.ColName:
-			return false, q.parseColName(node)
-		case *sqlparser.SQLVal:
-			return false, q.parseSQLVal(node)
-		default:
-			return false, libqpu.Error(errors.New("parseExpr: not supported"))
-		}
-	}, node)
+func (ctx *sqlParseCtx) parseSelectExprs(node sqlparser.SQLNode) error {
+	ctx.statePush(selectExpr)
+	defer ctx.statePop()
 
-	return err
-}
-
-func (q *parsedQuery) parseSelectExprs(node sqlparser.SQLNode) error {
 	visitedSelf := false
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
 		if !visitedSelf {
 			visitedSelf = true
 			return true, nil
@@ -135,21 +166,21 @@ func (q *parsedQuery) parseSelectExprs(node sqlparser.SQLNode) error {
 
 		switch node.(type) {
 		case *sqlparser.StarExpr:
-			if q.projection() != nil {
-				return false, err
-			}
-			return false, q.parseStarExpr(node)
+			return false, ctx.parseStarExpr(node)
+		case *sqlparser.AliasedExpr:
+			return false, ctx.parseAliasedExpr(node)
 		default:
-			return false, libqpu.Error(errors.New("only SELECT '*' is supported for now"))
+			return false, libqpu.Error(errors.New("parseSelectExprs: should have reached here"))
 		}
 	}, node)
-
-	return err
 }
 
-func (q *parsedQuery) parseTableExprs(node sqlparser.SQLNode) error {
+func (ctx *sqlParseCtx) parseTableExprs(node sqlparser.SQLNode) error {
+	ctx.statePush(tableExpr)
+	defer ctx.statePop()
+
 	visitedSelf := false
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
 		if !visitedSelf {
 			visitedSelf = true
 			return true, nil
@@ -157,7 +188,7 @@ func (q *parsedQuery) parseTableExprs(node sqlparser.SQLNode) error {
 
 		switch node.(type) {
 		case *sqlparser.AliasedTableExpr:
-			return false, q.parseAliasedTableExpr(node)
+			return false, ctx.parseAliasedTableExpr(node)
 		case *sqlparser.ParenTableExpr:
 			return false, libqpu.Error(errors.New("ParenTableExpr: not supported"))
 		case *sqlparser.JoinTableExpr:
@@ -166,89 +197,85 @@ func (q *parsedQuery) parseTableExprs(node sqlparser.SQLNode) error {
 			return false, libqpu.Error(errors.New("should not have reached here"))
 		}
 	}, node)
-
-	return err
 }
 
-func (q *parsedQuery) ComparisonExpr(node sqlparser.SQLNode) error {
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
-		left := node.(*sqlparser.ComparisonExpr).Left
-		err = q.parseExpr(left)
-		if err != nil {
-			return false, err
-		}
+func (ctx *sqlParseCtx) parseWhere(node sqlparser.SQLNode) error {
+	ctx.statePush(where)
+	defer ctx.statePop()
 
-		right := node.(*sqlparser.ComparisonExpr).Right
-		err = q.parseExpr(right)
-		if err != nil {
-			return false, err
-		}
-
-		return false, q.pushExpr(operator(node.(*sqlparser.ComparisonExpr).Operator))
-	}, node)
-
-	return err
-}
-
-func (q *parsedQuery) parseColName(node sqlparser.SQLNode) error {
-	return q.pushExpr(
-		attribute{
-			qpuAttribute: libqpu.Attribute(
-				sqlparser.String(node.(*sqlparser.ColName).Name),
-				nil),
-		})
-}
-
-func (q *parsedQuery) parseSQLVal(node sqlparser.SQLNode) error {
-	switch node.(*sqlparser.SQLVal).Type {
-	case sqlparser.IntVal:
-		val, err := strconv.ParseInt(string(node.(*sqlparser.SQLVal).Val), 10, 64)
-		if err != nil {
-			return err
-		}
-		return q.pushExpr(
-			value{
-				qpuValue: libqpu.ValueInt(val),
-			})
-	case sqlparser.FloatVal:
-		val, err := strconv.ParseFloat(string(node.(*sqlparser.SQLVal).Val), 64)
-		if err != nil {
-			return err
-		}
-		return q.pushExpr(
-			value{
-				qpuValue: libqpu.ValueFlt(val),
-			})
-	default:
-		return libqpu.Error(errors.New("parseExpr: not supported"))
-	}
-}
-
-func (q *parsedQuery) parseAliasedTableExpr(node sqlparser.SQLNode) error {
 	visitedSelf := false
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
+		if !visitedSelf {
+			visitedSelf = true
+			return true, nil
+		}
+
+		return false, ctx.parseExpr(node)
+	}, node)
+}
+
+func (ctx *sqlParseCtx) parseGroupBy(node sqlparser.SQLNode) error {
+	ctx.statePush(groupBy)
+	defer ctx.statePop()
+
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+		switch node.(type) {
+		default:
+			return false, nil
+		}
+	}, node)
+}
+
+func (ctx *sqlParseCtx) parseOrderBy(node sqlparser.SQLNode) error {
+	ctx.statePush(orderBy)
+	defer ctx.statePop()
+
+	visitedSelf := false
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
 		if !visitedSelf {
 			visitedSelf = true
 			return true, nil
 		}
 
 		switch node.(type) {
-		case sqlparser.TableName:
-			q.setTable(sqlparser.String(node))
-			return false, nil
-		case sqlparser.TableIdent:
-			return false, nil
-		case *sqlparser.IndexHints:
-			return false, nil
+		case *sqlparser.Order:
+			ctx.proteusAST.OrderBy = &qpu_api.OrderBy{}
+			switch node.(*sqlparser.Order).Direction {
+			case "desc":
+				ctx.proteusAST.OrderBy.Direction = qpu_api.OrderBy_DESC
+			case "asc":
+				ctx.proteusAST.OrderBy.Direction = qpu_api.OrderBy_ASC
+			default:
+				return false, errors.New("unknown value in orderBy:direction")
+			}
+			return false, ctx.parseExpr(node.(*sqlparser.Order).Expr)
 		default:
-			return false, libqpu.Error(errors.New("should not have reached here"))
+			return false, libqpu.Error(errors.New("parseOrderBy: should not have reached here"))
 		}
 	}, node)
-
-	return err
 }
 
-func (q *parsedQuery) parseStarExpr(node sqlparser.SQLNode) error {
+func (ctx *sqlParseCtx) parseLimit(node sqlparser.SQLNode) error {
+	ctx.statePush(limit)
+	defer ctx.statePop()
+
+	visitedSelf := false
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+		if !visitedSelf {
+			visitedSelf = true
+			return true, nil
+		}
+
+		return false, ctx.parseExpr(node)
+	}, node)
+}
+
+func (ctx *sqlParseCtx) parseStarExpr(node sqlparser.SQLNode) error {
+	ctx.statePush(starExpr)
+	defer ctx.statePop()
+
+	ctx.proteusAST.Projection = append(ctx.proteusAST.Projection, "*")
+
 	visitedSelf := false
 	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
 		if !visitedSelf {
@@ -267,58 +294,182 @@ func (q *parsedQuery) parseStarExpr(node sqlparser.SQLNode) error {
 	return err
 }
 
-type parsedQuery struct {
-	table string
-	where []expr
+func (ctx *sqlParseCtx) parseAliasedExpr(node sqlparser.SQLNode) error {
+	ctx.statePush(aliasedExpr)
+	defer ctx.statePop()
+
+	visitedSelf := false
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
+		if !visitedSelf {
+			visitedSelf = true
+			return true, nil
+		}
+
+		switch node.(type) {
+		case sqlparser.Expr:
+			return false, ctx.parseExpr(node)
+		case sqlparser.ColIdent:
+			return false, nil
+		default:
+			return false, libqpu.Error(errors.New("parseAliasedExpr: should not have reached here"))
+		}
+	}, node)
 }
 
-func (q *parsedQuery) projection() error {
-	return nil
+func (ctx *sqlParseCtx) parseAliasedTableExpr(node sqlparser.SQLNode) error {
+	ctx.statePush(aliasedTableExpr)
+	defer ctx.statePop()
+
+	visitedSelf := false
+	err := sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+		if !visitedSelf {
+			visitedSelf = true
+			return true, nil
+		}
+
+		switch node.(type) {
+		case sqlparser.TableName:
+			ctx.proteusAST.Table = sqlparser.String(node)
+			return false, nil
+		case sqlparser.TableIdent:
+			return false, nil
+		case *sqlparser.IndexHints:
+			return false, nil
+		default:
+			return false, libqpu.Error(errors.New("should not have reached here"))
+		}
+	}, node)
+
+	return err
 }
 
-func (q *parsedQuery) setTable(tableName string) error {
-	q.table = tableName
-	return nil
+func (ctx *sqlParseCtx) parseExpr(node sqlparser.SQLNode) error {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
+		switch node.(type) {
+		case *sqlparser.ComparisonExpr:
+			return false, ctx.ComparisonExpr(node)
+		case *sqlparser.ColName:
+			return false, ctx.parseColName(node)
+		case *sqlparser.SQLVal:
+			return false, ctx.parseSQLVal(node)
+		default:
+			return false, libqpu.Error(errors.New("parseExpr: not supported"))
+		}
+	}, node)
 }
 
-type exprType int
+func (ctx *sqlParseCtx) ComparisonExpr(node sqlparser.SQLNode) error {
+	ctx.statePush(comparisonExpr)
+	defer ctx.statePop()
 
-const (
-	op   = exprType(iota)
-	attr = exprType(iota)
-	val  = exprType(iota)
-)
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
+		left := node.(*sqlparser.ComparisonExpr).Left
+		err := ctx.parseExpr(left)
+		if err != nil {
+			return false, err
+		}
 
-type expr interface {
-	getType() exprType
+		right := node.(*sqlparser.ComparisonExpr).Right
+		err = ctx.parseExpr(right)
+		if err != nil {
+			return false, err
+		}
+
+		ctx.whereExprPush(operator(node.(*sqlparser.ComparisonExpr).Operator))
+		return false, nil
+	}, node)
 }
 
-type operator string
-
-func (expr operator) getType() exprType { return op }
-
-type value struct {
-	qpuValue *qpu.Value
-}
-
-func (expr value) getType() exprType { return val }
-
-type attribute struct {
-	qpuAttribute *qpu.Attribute
-}
-
-func (expr attribute) getType() exprType { return attr }
-
-func (q *parsedQuery) popExpr() (expr, bool) {
-	if len(q.where) == 0 {
-		return operator(""), false
+func (ctx *sqlParseCtx) parseColName(node sqlparser.SQLNode) error {
+	if len(ctx.walkState) >= 2 && ctx.walkState[0] == selectExpr && ctx.walkState[1] == aliasedExpr {
+		ctx.proteusAST.Projection = append(ctx.proteusAST.Projection, node.(*sqlparser.ColName).Name.String())
+		return nil
 	}
-	expr := q.where[len(q.where)-1]
-	q.where = q.where[:len(q.where)-1]
-	return expr, true
+	if len(ctx.walkState) >= 1 && ctx.walkState[0] == orderBy {
+		ctx.proteusAST.OrderBy.AttributeName = node.(*sqlparser.ColName).Name.String()
+		return nil
+	}
+
+	if len(ctx.walkState) >= 1 && ctx.walkState[0] == where {
+		ctx.whereExprPush(colName(node.(*sqlparser.ColName).Name.String()))
+		return nil
+	}
+
+	return errors.New("parseColName: should not have reached")
 }
 
-func (q *parsedQuery) pushExpr(expr expr) error {
-	q.where = append(q.where, expr)
+func (ctx *sqlParseCtx) parseSQLVal(node sqlparser.SQLNode) (err error) {
+	err = nil
+	var valInt int64
+	var valFlt float64
+
+	switch node.(*sqlparser.SQLVal).Type {
+	case sqlparser.IntVal:
+		valInt, err = strconv.ParseInt(string(node.(*sqlparser.SQLVal).Val), 10, 64)
+		if err != nil {
+			return err
+		}
+		if ctx.walkState[0] == where {
+			ctx.whereExprPush(value{v: libqpu.ValueInt(valInt)})
+		}
+
+	case sqlparser.FloatVal:
+		valFlt, err = strconv.ParseFloat(string(node.(*sqlparser.SQLVal).Val), 64)
+		if err != nil {
+			return err
+		}
+		if ctx.walkState[0] == where {
+			ctx.whereExprPush(value{v: libqpu.ValueFlt(valFlt)})
+		}
+	default:
+		err = libqpu.Error(errors.New("parseSQLVal: value type not supported"))
+	}
+
+	if ctx.walkState[0] == limit {
+		ctx.proteusAST.Limit = valInt
+	}
+
+	return err
+}
+
+func (ctx *sqlParseCtx) buildProteusAST() error {
+	if len(ctx.whereStack) == 0 {
+		ctx.proteusAST.TsPredicate = libqpu.SnapshotTimePredicate(
+			libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+			libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+		)
+		return nil
+	}
+
+	var optr string
+	var pred *qpu.AttributePredicate
+
+	for len(ctx.whereStack) > 0 {
+		expr := ctx.whereExprPop()
+
+		switch expr.getType() {
+		case collName:
+			pred.Attr = &qpu.Attribute{
+				AttrKey: string(expr.(colName)),
+			}
+		case val:
+			if optr == "=" {
+				pred = &qpu.AttributePredicate{
+					Lbound: expr.(value).v,
+					Ubound: expr.(value).v,
+				}
+			}
+		case op:
+			optr = string(expr.(operator))
+		default:
+		}
+	}
+
+	ctx.proteusAST.Predicate = append(ctx.proteusAST.Predicate, pred)
+	ctx.proteusAST.TsPredicate = libqpu.SnapshotTimePredicate(
+		libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+		libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
+	)
+
 	return nil
 }
