@@ -74,7 +74,7 @@ func (b Benchmark) PrintMeasurements() {
 	fmt.Printf("Runtime: %.3f\n", metrics.Runtime)
 	for opType, metrics := range metrics.PerOpMetrics {
 		fmt.Printf("[%s] Operation count: %d\n", opType, metrics.OpCount)
-		fmt.Printf("[%s] Throughput: %.5f\n", opType, metrics.Throughput)
+		fmt.Printf("[%s] Throughput(old): %.5f\n", opType, metrics.Throughput)
 		fmt.Printf("[%s] Throughput(norm): %.5f\n", opType, metrics.ThroughputNorm)
 		fmt.Printf("[%s] p50(ms): %.5f\n", opType, metrics.P50)
 		fmt.Printf("[%s] p90(ms): %.5f\n", opType, metrics.P90)

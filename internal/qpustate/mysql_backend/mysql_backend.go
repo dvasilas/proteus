@@ -3,11 +3,13 @@ package mysqlbackend
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -28,6 +30,7 @@ type MySQLStateBackend struct {
 	accessKeyID     string
 	secretAccessKey string
 	endpoint        string
+	logTimestamps   bool
 }
 
 // NewStateBackend initiated a connection with the MySQL specified in the QPU's
@@ -47,6 +50,7 @@ func NewStateBackend(conf *libqpu.QPUConfig) (*MySQLStateBackend, error) {
 		accessKeyID:     conf.StateBackend.Credentials.AccessKeyID,
 		secretAccessKey: conf.StateBackend.Credentials.SecretAccessKey,
 		endpoint:        conf.StateBackend.Endpoint,
+		logTimestamps:   conf.Evaluation.LogTimestamps,
 	}, nil
 }
 
@@ -87,6 +91,29 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 	libqpu.Trace("creating table", map[string]interface{}{"stmt": createTable})
 	if _, err := db.Exec(createTable); err != nil {
 		return err
+	}
+
+	if s.logTimestamps {
+		if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_ts", table)); err != nil {
+			return err
+		}
+		createTSTable := fmt.Sprintf(
+			"CREATE TABLE %s_ts (row_id INT, ts DATETIME(6), ts_local DATETIME(6))",
+			table,
+		)
+		if _, err := db.Exec(createTSTable); err != nil {
+			return err
+		}
+		if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_ts", table)); err != nil {
+			return err
+		}
+		createTSTable = fmt.Sprintf(
+			"CREATE TABLE %s_query_ts (row_ids VARCHAR(30), ts_local DATETIME(6))",
+			table,
+		)
+		if _, err := db.Exec(createTSTable); err != nil {
+			return err
+		}
 	}
 
 	db.Close()
@@ -138,7 +165,10 @@ func (s *MySQLStateBackend) Get(table, projection string, predicate map[string]*
 }
 
 // Insert inserts a record in the state.
-func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
+func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc map[string]*timestamp.Timestamp, rowIDVal interface{}) error {
+
+	var ts time.Time
+	var err error
 
 	insertStmtAttrs := "("
 	insertStmtAttrsValues := "("
@@ -156,7 +186,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	for k, v := range vc {
 		insertValues[i] = k
 		i++
-		ts, err := ptypes.Timestamp(v)
+		ts, err = ptypes.Timestamp(v)
 		if err != nil {
 			panic(err)
 		}
@@ -176,12 +206,31 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	defer stmtInsert.Close()
 
 	_, err = stmtInsert.Exec(insertValues...)
+	if err != nil {
+		return err
+	}
+
+	if s.logTimestamps {
+		go func() {
+			tsLocal := time.Now()
+			query = fmt.Sprintf("INSERT INTO %s_ts (row_id, ts, ts_local) VALUES (?,?,?)", table)
+			stmtInsert, err = s.db.Prepare(query)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer stmtInsert.Close()
+			_, err = stmtInsert.Exec(rowIDVal, ts, tsLocal)
+		}()
+	}
 
 	return err
 }
 
 // Update updates a state record.
-func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string]interface{}, vc map[string]*timestamp.Timestamp) error {
+func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string]interface{}, vc map[string]*timestamp.Timestamp, rowIDVal interface{}) error {
+
+	var ts time.Time
+	var err error
 
 	updateStmt := ""
 	whereStmt := ""
@@ -200,7 +249,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	for k, v := range vc {
 		updateValues[i] = k
 		i++
-		ts, err := ptypes.Timestamp(v)
+		ts, err = ptypes.Timestamp(v)
 		if err != nil {
 			panic(err)
 		}
@@ -230,6 +279,22 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	defer stmtUpdate.Close()
 
 	_, err = stmtUpdate.Exec(updateValues...)
+	if err != nil {
+		return err
+	}
+
+	if s.logTimestamps {
+		go func() {
+			tsLocal := time.Now()
+			query = fmt.Sprintf("INSERT INTO %s_ts (row_id, ts, ts_local) VALUES (?,?,?)", table)
+			stmtInsert, err := s.db.Prepare(query)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer stmtInsert.Close()
+			_, err = stmtInsert.Exec(rowIDVal, ts, tsLocal)
+		}()
+	}
 
 	return err
 }
@@ -246,7 +311,7 @@ func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64, pa
 
 	projection := ""
 	columns = append(columns, "ts_key")
-	columns = append(columns, "unix_timestamp(ts)")
+	columns = append(columns, "ts")
 	for i, col := range columns {
 		projection += col
 		if i < len(columns)-1 {
@@ -305,4 +370,44 @@ func (s *MySQLStateBackend) Cleanup() {
 	if s.db != nil {
 		s.db.Close()
 	}
+}
+
+// SeparateTS ...
+func (s *MySQLStateBackend) SeparateTS(table string) error {
+	if s.logTimestamps {
+		query := fmt.Sprintf("INSERT INTO %s_ts (ts_local) VALUES (?)", table)
+		stmtInsert, err := s.db.Prepare(query)
+		if err != nil {
+			return err
+		}
+		defer stmtInsert.Close()
+		_, err = stmtInsert.Exec(time.Now())
+
+		return err
+	}
+	return nil
+}
+
+// LogQuery ...
+func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*qpu_api.QueryRespRecord) error {
+	if s.logTimestamps {
+		go func() {
+			rowID := ""
+			for _, rec := range records {
+				rowID += rec.RecordId + "|"
+			}
+			rowID = rowID[:len(rowID)-1]
+			query := fmt.Sprintf("INSERT INTO %s_query_ts (row_ids, ts_local) VALUES (?,?)", table)
+			stmtInsert, err := s.db.Prepare(query)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer stmtInsert.Close()
+			_, err = stmtInsert.Exec(rowID, ts)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+	}
+	return nil
 }

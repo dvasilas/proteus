@@ -96,7 +96,7 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 		stateTable+sqpu.port,
 		fmt.Sprintf(
 			// vote_count int
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts TIMESTAMP, UNIQUE KEY %s )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), UNIQUE KEY %s )",
 			stateTable+sqpu.port,
 			idAttributesColumns,
 			sqpu.stateSumAttribute,
@@ -154,18 +154,18 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 			}
 
 			vectorClockKey := record["ts_key"]
-			vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
+			ts, err := time.Parse("2006-01-02 15:04:05.000000", record["ts"])
 			if err != nil {
 				errCh <- err
 				break
 			}
-			timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
+			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
 				errCh <- err
 				break
 			}
 
-			delete(record, "unix_timestamp(ts)")
+			delete(record, "ts")
 			delete(record, "ts_key")
 
 			attributes, err := q.schema.StrToAttributes(stateTable, record)
@@ -300,15 +300,23 @@ func (q *SumQPU) updateState(recordID map[string]*qpu.Value, sumVal int64, vc ma
 		row[k] = v.GetInt()
 	}
 
+	// just to pass an int rowID to state.{insert|update}
+	var rowID int64
+	for _, v := range recordID {
+		rowID = v.GetInt()
+		break
+	}
+	//
+
 	if err != nil && err.Error() == "sql: no rows in result set" {
 		row[q.stateSumAttribute] = sumVal
-		err = q.state.Insert(stateTable+q.port, row, vc)
+		err = q.state.Insert(stateTable+q.port, row, vc, rowID)
 		newSumValue = sumVal
 	} else if err != nil {
 		return nil, err
 	} else {
 		newSumValue = currentSumValue.(int64) + sumVal
-		err = q.state.Update(stateTable+q.port, row, map[string]interface{}{q.stateSumAttribute: newSumValue}, vc)
+		err = q.state.Update(stateTable+q.port, row, map[string]interface{}{q.stateSumAttribute: newSumValue}, vc, rowID)
 	}
 
 	if err != nil {

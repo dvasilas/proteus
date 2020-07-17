@@ -1,7 +1,12 @@
 qpuType = "datastore_driver"
 port = "50150"
 
+maxWorkers = 4
+maxJobQueue = 10000
+
+[Evaluation]
 tracing = false
+logTimestamps = false
 
 [DatastoreConfig]
 type = "mysql"

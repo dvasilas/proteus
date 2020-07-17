@@ -54,7 +54,7 @@ func NewQPUService(configFile string) (libqpu.QPUService, error) {
 	}
 
 	// qpu.State temporarily added as the last argument for testing
-	rpcServer, err := rpcserver.NewServer(qpu.Config.Port, qpu.Config.Tracing, apiProcessor, qpu.State, qpu.Config)
+	rpcServer, err := rpcserver.NewServer(qpu.Config.Port, qpu.Config.Evaluation.Tracing, apiProcessor, qpu.State, qpu.Config)
 	if err != nil {
 		return nil, err
 	}

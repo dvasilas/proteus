@@ -2,6 +2,7 @@ package libqpu
 
 import (
 	"context"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -56,10 +57,12 @@ type APIClient interface {
 // QPUState ...
 type QPUState interface {
 	Init(string, string, string) error
-	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp) error
-	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp) error
+	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
+	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
 	Get(string, string, map[string]*qpu.Value) (interface{}, error)
 	Scan(string, []string, int64, opentracing.Span) (<-chan map[string]string, error)
+	SeparateTS(string) error
+	LogQuery(string, time.Time, []*qpu_api.QueryRespRecord) error
 	Cleanup()
 }
 
@@ -101,7 +104,10 @@ type QPUConfig struct {
 			Projection []string
 		}
 	}
-	Tracing     bool
+	Evaluation struct {
+		Tracing       bool
+		LogTimestamps bool
+	}
 	MaxWorkers  int
 	MaxJobQueue int
 }

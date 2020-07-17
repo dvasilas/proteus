@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -107,7 +106,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	projection = append(projection, "unix_timestamp(ts)")
+	projection = append(projection, "ts")
 	projectionStmt := ""
 	for i, attr := range projection {
 		projectionStmt += attr
@@ -168,18 +167,18 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 				}
 			}
 
-			ts, err := strconv.ParseInt(attributes["unix_timestamp(ts)"].GetStr(), 10, 64)
+			ts, err := time.Parse("2006-01-02 15:04:05.000000", attributes["ts"].GetStr())
 			if err != nil {
 				errCh <- err
 				break
 			}
-			delete(attributes, "unix_timestamp(ts)")
+			timestamp, err := ptypes.TimestampProto(ts)
+			if err != nil {
+				errCh <- err
+				break
+			}
 
-			timestamp, err := ptypes.TimestampProto(time.Unix(ts, 0))
-			if err != nil {
-				errCh <- err
-				break
-			}
+			delete(attributes, "ts")
 
 			logOpCh <- libqpu.LogOperationState(
 				recordID,

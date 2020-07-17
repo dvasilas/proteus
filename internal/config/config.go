@@ -84,7 +84,10 @@ type inputQPUConfig struct {
 		Rate     float32
 		Delay    int64
 	}
-	Tracing     bool
+	Evaluation struct {
+		Tracing       bool
+		LogTimestamps bool
+	}
 	MaxWorkers  int
 	MaxJobQueue int
 }
@@ -139,8 +142,12 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 			return err
 		}
 
+		// Evaluation
+		if err := getEvaluation(inputConfig, config); err != nil {
+			return err
+		}
+
 		// Misc
-		config.Tracing = inputConfig.Tracing
 		config.MaxWorkers = inputConfig.MaxWorkers
 		if val, isSet := os.LookupEnv("MAX_WORKERS"); isSet {
 			maxWorkers, err := strconv.ParseInt(val, 10, 64)
@@ -284,6 +291,13 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	}
 
 	config.JoinConfig.Source = joinConfig
+
+	return nil
+}
+
+func getEvaluation(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	config.Evaluation.Tracing = inputConf.Evaluation.Tracing
+	config.Evaluation.LogTimestamps = inputConf.Evaluation.LogTimestamps
 
 	return nil
 }

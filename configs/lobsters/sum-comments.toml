@@ -1,6 +1,12 @@
 qpuType = "sum"
 port = "50251"
+
+maxWorkers = 4
+maxJobQueue = 10000
+
+[Evaluation]
 tracing = false
+logTimestamps = false
 
 [[connections]]
 # address = "dsdriver:50150"

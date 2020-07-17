@@ -3,7 +3,6 @@ package joinqpu
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -118,7 +117,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		stateDatabase,
 		stateTable,
 		fmt.Sprintf(
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts TIMESTAMP, PRIMARY KEY (%s), INDEX i (vote_sum) )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), PRIMARY KEY (%s), INDEX i (vote_sum) )",
 			stateTable,
 			idAttributesColumns,
 			joinAttributeKey,
@@ -253,8 +252,10 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 
 // ClientQuery ...
 func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+	snapshotTs := time.Now()
+
 	respRecords := make([]*qpu_api.QueryRespRecord, 5)
-	stateCh, err := q.state.Scan("stateTableJoin", []string{"title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
+	stateCh, err := q.state.Scan("stateTableJoin", []string{"joinID", "title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -262,20 +263,18 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	i := 0
 	for record := range stateCh {
 		vectorClockKey := record["ts_key"]
-		vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
+		ts, err := time.Parse("2006-01-02 15:04:05.000000", record["ts"])
 		if err != nil {
-			libqpu.Error(err)
 			return nil, err
 		}
-		timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
+		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
-			libqpu.Error(err)
 			return nil, err
 		}
 
 		attribs := make(map[string][]byte)
 
-		delete(record, "unix_timestamp(ts)")
+		delete(record, "ts")
 		delete(record, "ts_key")
 
 		for k, v := range record {
@@ -289,6 +288,8 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		}
 		i++
 	}
+
+	q.state.LogQuery(stateTable, snapshotTs, respRecords)
 
 	return &qpu_api.QueryResp{
 		RespRecord: respRecords,
@@ -361,6 +362,7 @@ func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 		entry.mutex.Lock()
 		for attr, val := range attributes {
 			entry.attributes[attr] = val
+			entry.ts = respRecord.GetLogOp().GetTimestamp()
 		}
 		entry.mutex.Unlock()
 	} else {
@@ -394,13 +396,13 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 	_, err := q.state.Get(stateTable, joinAttributeKey, map[string]*qpu.Value{joinAttributeKey: libqpu.ValueInt(joinID)})
 	if err != nil && err.Error() == "sql: no rows in result set" {
 		row[joinAttributeKey] = joinID
-		err = q.state.Insert(stateTable, row, vc)
+		err = q.state.Insert(stateTable, row, vc, joinID)
 	} else if err != nil {
 		return nil, err
 	} else {
 		err = q.state.Update(stateTable,
 			map[string]interface{}{joinAttributeKey: joinID},
-			row, vc)
+			row, vc, joinID)
 	}
 
 	if err != nil {
@@ -418,5 +420,5 @@ func (q *JoinQPU) flushState() error {
 			return err
 		}
 	}
-	return nil
+	return q.state.SeparateTS(stateTable)
 }

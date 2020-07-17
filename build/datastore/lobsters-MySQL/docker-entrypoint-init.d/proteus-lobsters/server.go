@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	mysql "github.com/dvasilas/proteus-lobsters/proto"
@@ -100,11 +99,12 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 				ValueNew: entry.ValueNew,
 			}
 		}
-		ts, err := strconv.ParseInt(update.Timestamp, 10, 64)
+
+		ts, err := time.Parse("2006-01-02 15:04:05.000000", update.Timestamp)
 		if err != nil {
 			return err
 		}
-		timestamp, err := ptypes.TimestampProto(time.Unix(ts, 0))
+		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
 			return err
 		}
