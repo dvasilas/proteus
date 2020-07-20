@@ -8,7 +8,7 @@ services:
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /mount/configs:/configs
+      - ${PWD}/configs:/configs
     command: /configs/lobsters/dsdriver.toml error
     deploy:
       restart_policy:
@@ -22,7 +22,7 @@ services:
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /mount/configs:/configs
+      - ${PWD}/proteus/configs:/configs
     command: /configs/lobsters/sum-stories.toml error
     deploy:
       restart_policy:
@@ -36,7 +36,7 @@ services:
     environment:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
-      - /mount/configs:/configs
+      - ${PWD}/configs:/configs
     ports:
       - 50350:50350
     command: /configs/lobsters/join.toml error

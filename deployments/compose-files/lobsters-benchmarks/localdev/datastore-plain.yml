@@ -1,11 +1,11 @@
 version: '3'
 services:
-  datastore-mv:
+  datastore-plain:
     image: mysql:latest
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      - /mount/schema-mv.sql:/docker-entrypoint-initdb.d/schema-mv.sql
+      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/schema-plain.sql:/docker-entrypoint-initdb.d/schema-plain.sql
     ports:
       - 3307:3306
     deploy:

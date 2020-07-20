@@ -1,3 +1,4 @@
+# go run cmd/qpu/main.go  -c configs/lobsters/localdev/dsdriver.toml -l trace
 qpuType = "datastore_driver"
 port = "50150"
 

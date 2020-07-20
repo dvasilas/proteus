@@ -1,3 +1,4 @@
+# docker run --rm -ti --name join -p 127.0.0.1:50350:50350 -v (pwd)/configs:/configs -e MYSQL_PASSWORD="verySecrectQPUPwd" qpu/dev /configs/lobsters/localdev/join.toml trace
 qpuType = "join"
 port = "50350"
 
@@ -6,17 +7,17 @@ maxJobQueue = 10000
 
 [Evaluation]
 tracing = false
-logTimestamps = false
+logTimestamps = true
 
 [[connections]]
-address = "127.0.0.1:50150"
+address = "docker.for.mac.localhost:50150"
 local = "local"
 [[connections]]
-address = "127.0.0.1:50250"
+address = "docker.for.mac.localhost:50250"
 local = "local"
 
 [StateBackend]
-endpoint = "127.0.0.1:3308"
+endpoint = "127.0.0.1:3306"
 
 [StateBackend.Credentials]
 accessKeyID = "root"

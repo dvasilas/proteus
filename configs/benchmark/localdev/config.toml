@@ -1,0 +1,27 @@
+tracing = false
+
+[Connection]
+endpoint = "127.0.0.1:3307"
+database = "proteus_lobsters_db"
+accessKeyID = "root"
+secretAccessKey  = "verySecretPwd"
+
+[Benchmark]
+opCount = 40
+runtime = 20
+doWarmup = false
+warmup = 10
+threadCount = 1
+
+[Operations]
+writeRatio = 0.5
+downVoteRatio = 0.2
+
+[Operations.Homepage]
+storiesLimit = 5
+
+[Preload.RecordCount]
+users = 10
+stories = 10
+comments = 10
+StoryVotes = 100
