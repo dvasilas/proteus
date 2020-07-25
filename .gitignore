@@ -1,29 +1,27 @@
-benchmarks/measurements/
+# Created by https://www.toptal.com/developers/gitignore/api/go
+# Edit at https://www.toptal.com/developers/gitignore?templates=go
 
-__pycache__/
+### Go ###
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-vendor/
+# Test binary, built with `go test -c`
+*.test
 
-bin/
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
 
-credentials.json
-token.pickle
+# Dependency directories (remove the comment below to include it)
+# vendor/
 
-# OS X
-.DS_STORE
+### Go Patch ###
+/vendor/
+/Godeps/
 
-.vscode
+# End of https://www.toptal.com/developers/gitignore/api/go
 
-# Gradle
-pkg/proteus-java-client/build/
-gradle.properties
-.gradle
-local.properties
-out
-
-# Eclipse
-.classpath
-.project
-.settings
-
-.env
+/bin
