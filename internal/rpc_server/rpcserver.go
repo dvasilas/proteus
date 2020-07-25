@@ -10,6 +10,7 @@ import (
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
@@ -72,7 +73,7 @@ func (s *Server) Serve() error {
 func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 	requestRecord, err := stream.Recv()
 	if err == io.EOF {
-		return libqpu.Error(errors.New("Query:stream.Recv EOF"))
+		return utils.Error(errors.New("Query:stream.Recv EOF"))
 	}
 	if err != nil {
 		return err
@@ -85,7 +86,7 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 			libqpu.RequestStream{Stream: stream},
 		)
 	default:
-		return libqpu.Error(errors.New("Query expects RequestStream_Request"))
+		return utils.Error(errors.New("Query expects RequestStream_Request"))
 	}
 }
 

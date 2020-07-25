@@ -4,13 +4,14 @@ import (
 	"errors"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	// "github.com/prometheus/common/log"
 )
 
 // NewQuerySubscribe ...
-func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
-	predicate = make([]*qpu.AttributePredicate, 0)
+func NewQuerySubscribe(table string, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
+	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{
@@ -43,8 +44,8 @@ func NewQuerySubscribe(table string, predicate []*qpu.AttributePredicate, projec
 }
 
 // NewQuerySnapshot ...
-func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, limit int64, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
-	predicate = make([]*qpu.AttributePredicate, 0)
+func NewQuerySnapshot(table string, projection []string, isNull []string, isNotNull []string, limit int64, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
+	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{
@@ -77,8 +78,8 @@ func NewQuerySnapshot(table string, predicate []*qpu.AttributePredicate, project
 }
 
 // NewQuerySnapshotAndSubscribe ...
-func NewQuerySnapshotAndSubscribe(table string, predicate []*qpu.AttributePredicate, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
-	predicate = make([]*qpu.AttributePredicate, 0)
+func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
+	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
 			&qpu.AttributePredicate{
@@ -159,7 +160,7 @@ func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool,
 	for _, pred := range query.GetPredicate() {
 		attributes := logOp.GetAttributes()
 		if attributes == nil {
-			return false, libqpu.Error(errors.New("logOperation state not accessible"))
+			return false, utils.Error(errors.New("logOperation state not accessible"))
 		}
 		_, found := attributes[pred.GetAttr().GetAttrKey()]
 		switch pred.GetType() {

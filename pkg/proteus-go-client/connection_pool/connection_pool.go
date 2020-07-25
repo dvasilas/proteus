@@ -172,7 +172,7 @@ func (cp *ConnectionPool) Return(c *grpcutils.GrpcClientConn) {
 		return
 	}
 
-	if cp == nil {
+	if cp == nil || cp.connections == nil {
 		c.Close()
 	}
 

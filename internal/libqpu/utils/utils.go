@@ -1,4 +1,4 @@
-package libqpu
+package utils
 
 import (
 	"errors"
@@ -20,6 +20,12 @@ func Error(err error) error {
 	log.Error(err)
 	debug.PrintStack()
 	return err
+}
+
+// Warn ...
+func Warn(err error) {
+	log.Error(err)
+	debug.PrintStack()
 }
 
 // Trace is a wrapper for printing trace messaging

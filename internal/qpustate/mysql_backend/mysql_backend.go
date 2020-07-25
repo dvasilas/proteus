@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	ptypes "github.com/golang/protobuf/ptypes"
@@ -76,42 +77,42 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 	db.SetMaxOpenConns(128)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	if _, err := db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
+	if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
 		return err
 	}
 
-	if _, err := db.Exec("USE " + database); err != nil {
+	if _, err = db.Exec("USE " + database); err != nil {
 		return err
 	}
 
-	if _, err := db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+	if _, err = db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
 		return err
 	}
 
-	libqpu.Trace("creating table", map[string]interface{}{"stmt": createTable})
-	if _, err := db.Exec(createTable); err != nil {
+	utils.Trace("creating table", map[string]interface{}{"stmt": createTable})
+	if _, err = db.Exec(createTable); err != nil {
 		return err
 	}
 
 	if s.logTimestamps {
-		if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_ts", table)); err != nil {
+		if _, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_ts", table)); err != nil {
 			return err
 		}
 		createTSTable := fmt.Sprintf(
 			"CREATE TABLE %s_ts (row_id INT, ts DATETIME(6), ts_local DATETIME(6))",
 			table,
 		)
-		if _, err := db.Exec(createTSTable); err != nil {
+		if _, err = db.Exec(createTSTable); err != nil {
 			return err
 		}
-		if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_ts", table)); err != nil {
+		if _, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_ts", table)); err != nil {
 			return err
 		}
 		createTSTable = fmt.Sprintf(
 			"CREATE TABLE %s_query_ts (row_ids VARCHAR(30), ts_local DATETIME(6))",
 			table,
 		)
-		if _, err := db.Exec(createTSTable); err != nil {
+		if _, err = db.Exec(createTSTable); err != nil {
 			return err
 		}
 	}
@@ -151,7 +152,7 @@ func (s *MySQLStateBackend) Get(table, projection string, predicate map[string]*
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s", projection, table, whereStmt)
-	libqpu.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
+	utils.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
 	stmtSelect, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -198,7 +199,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	insertStmtAttrsValues += "?, ?)"
 
 	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, insertStmtAttrs, insertStmtAttrsValues)
-	libqpu.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
+	utils.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
 	stmtInsert, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -271,7 +272,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	// updateValues = append(updateValues, whereValues)
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, updateStmt, whereStmt)
-	libqpu.Trace("update", map[string]interface{}{"query": query, "updateValues": updateValues})
+	utils.Trace("update", map[string]interface{}{"query": query, "updateValues": updateValues})
 	stmtUpdate, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -285,9 +286,10 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 
 	if s.logTimestamps {
 		go func() {
+			var stmtInsert *sql.Stmt
 			tsLocal := time.Now()
 			query = fmt.Sprintf("INSERT INTO %s_ts (row_id, ts, ts_local) VALUES (?,?,?)", table)
-			stmtInsert, err := s.db.Prepare(query)
+			stmtInsert, err = s.db.Prepare(query)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -352,7 +354,7 @@ func (s *MySQLStateBackend) Scan(table string, columns []string, limit int64, pa
 			if err != nil {
 				panic(err)
 			}
-			row := make(map[string]string, 0)
+			row := make(map[string]string)
 			for i, col := range values {
 				if col != nil {
 					row[columns[i]] = string(col)

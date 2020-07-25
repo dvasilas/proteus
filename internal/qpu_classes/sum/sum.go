@@ -40,12 +40,6 @@ type SumQPU struct {
 	catchUpDoneCh     chan int
 }
 
-type subscribeQuery struct {
-	query  libqpu.ASTQuery
-	stream libqpu.RequestStream
-	seqID  int64
-}
-
 type inMemState struct {
 	entries map[string]*stateEntry
 }
@@ -108,7 +102,6 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 
 	query := queries.NewQuerySnapshotAndSubscribe(
 		sqpu.sourceTable,
-		nil,
 		q.Config.SumConfig.Query.Projection,
 		q.Config.SumConfig.Query.IsNull,
 		q.Config.SumConfig.Query.IsNotNull,

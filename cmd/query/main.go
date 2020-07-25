@@ -73,16 +73,3 @@ func doQuery(c *proteusclient.Client, query string) {
 	// 	}
 	// }
 }
-
-func processResponseRecord(respRecord proteusclient.ResponseRecord) {
-	fmt.Printf("%s: ( ", respRecord.ObjectID)
-	i := 0
-	for attrKey, attrValue := range respRecord.State {
-		fmt.Printf("%s: %s", attrKey, attrValue)
-		if i < len(respRecord.State)-1 {
-			fmt.Printf(", ")
-		}
-		i++
-	}
-	fmt.Printf(" )\n")
-}

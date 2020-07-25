@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -108,7 +109,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 			case libqpu.STR:
 				idAttributesColumns += " TEXT, "
 			default:
-				return &JoinQPU{}, libqpu.Error(errors.New("unknown attribute type"))
+				return &JoinQPU{}, utils.Error(errors.New("unknown attribute type"))
 			}
 		}
 	}
@@ -133,7 +134,6 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 	for i := 0; i < len(qpu.AdjacentQPUs); i++ {
 		querySnapshot := queries.NewQuerySnapshotAndSubscribe(
 			qpu.Config.JoinConfig.Source[i].Table,
-			nil,
 			qpu.Config.JoinConfig.Source[i].Projection,
 			[]string{},
 			[]string{},
@@ -155,7 +155,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 
 // ProcessQuerySnapshot ...
 func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
-	libqpu.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
+	utils.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
 	// var tracer opentracing.Tracer
 	// tracer = nil
 	// if parentSpan != nil {
@@ -208,13 +208,13 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 	// 		vectorClockKey := record["ts_key"]
 	// 		vectorClockVal, err := strconv.ParseInt(record["unix_timestamp(ts)"], 10, 64)
 	// 		if err != nil {
-	// 			libqpu.Error(err)
+	// 			utils.Error(err)
 	// 			errCh <- err
 	// 			break
 	// 		}
 	// 		timestamp, err := ptypes.TimestampProto(time.Unix(vectorClockVal, 0))
 	// 		if err != nil {
-	// 			libqpu.Error(err)
+	// 			utils.Error(err)
 	// 			errCh <- err
 	// 			break
 	// 		}
@@ -224,7 +224,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 
 	// 		attributes, err := q.schema.StrToAttributes(stateTable, record)
 	// 		if err != nil {
-	// 			libqpu.Error(err)
+	// 			utils.Error(err)
 	// 			errCh <- err
 	// 			break
 	// 		}
@@ -261,9 +261,10 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	}
 
 	i := 0
+	var ts time.Time
 	for record := range stateCh {
 		vectorClockKey := record["ts_key"]
-		ts, err := time.Parse("2006-01-02 15:04:05.000000", record["ts"])
+		ts, err = time.Parse("2006-01-02 15:04:05.000000", record["ts"])
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +290,10 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		i++
 	}
 
-	q.state.LogQuery(stateTable, snapshotTs, respRecords)
+	err = q.state.LogQuery(stateTable, snapshotTs, respRecords)
+	if err != nil {
+		return nil, err
+	}
 
 	return &qpu_api.QueryResp{
 		RespRecord: respRecords,

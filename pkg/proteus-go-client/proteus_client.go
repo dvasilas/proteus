@@ -2,7 +2,6 @@ package proteusclient
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strconv"
 
@@ -86,7 +85,7 @@ func (c *Client) Query(queryStmt string) (*qpu_api.QueryResp, error) {
 
 	c.pool.Return(client)
 
-	return resp, nil
+	return resp, err
 }
 
 // QueryArgs ...
@@ -125,7 +124,7 @@ func (c *Client) QueryArgs() (*qpu_api.QueryResponse, error) {
 
 	c.pool.Return(client)
 
-	return resp, nil
+	return resp, err
 }
 
 // QueryNoOp ...
@@ -140,26 +139,4 @@ func (c *Client) QueryNoOp() (string, error) {
 	c.pool.Return(client)
 
 	return resp.GetStr(), err
-}
-
-func logOpToObjectState(logOp *qpu.LogOperation) map[string]string {
-	attrs := logOp.GetPayload().GetState().GetAttributes()
-	state := make(map[string]string, 0)
-	for attrKey, attrVal := range attrs {
-		state[attrKey] = valueToString(attrVal)
-	}
-	return state
-}
-
-func valueToString(val *qpu.Value) string {
-	switch val.Val.(type) {
-	case *qpu.Value_Int:
-		return strconv.Itoa(int(val.GetInt()))
-	case *qpu.Value_Flt:
-		return fmt.Sprintf("%f", val.GetFlt())
-	case *qpu.Value_Str:
-		return val.GetStr()
-	default:
-		return ""
-	}
 }

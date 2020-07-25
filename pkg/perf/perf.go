@@ -27,7 +27,6 @@ type threadRawMeasurements struct {
 type Perf struct {
 	sync.Mutex
 	measurementsBuf []threadRawMeasurements
-	runTime         time.Duration
 }
 
 // OpMetrics ...
@@ -100,7 +99,7 @@ func (p *Perf) CalculateMetrics() Metrics {
 	runTime := experimentEn.Sub(experimentSt)
 
 	for _, threadMeasurements := range aggregateMeasurements {
-		sort.Sort(durations(threadMeasurements))
+		sort.Sort(threadMeasurements)
 	}
 
 	m := Metrics{
@@ -113,8 +112,8 @@ func (p *Perf) CalculateMetrics() Metrics {
 		if aggregateOpCount[opType] > 0 {
 			opMetrics := OpMetrics{
 				OpCount:        aggregateOpCount[opType],
-				Throughput:     float64(aggregateOpCount[opType]) / float64(runTime.Seconds()),
-				ThroughputNorm: (float64(aggregateOpCount[opType]) / float64(aggregateRuntime.Seconds())) * float64(len(p.measurementsBuf)),
+				Throughput:     float64(aggregateOpCount[opType]) / runTime.Seconds(),
+				ThroughputNorm: (float64(aggregateOpCount[opType]) / aggregateRuntime.Seconds()) * float64(len(p.measurementsBuf)),
 				P50:            durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
 				P90:            durationToMillis(threadMeasurements.percentile(0.9)),
 				P95:            durationToMillis(threadMeasurements.percentile(0.95)),
@@ -125,26 +124,6 @@ func (p *Perf) CalculateMetrics() Metrics {
 	}
 
 	return m
-}
-
-func calcExperimentStart(measurements map[string][]time.Duration) time.Duration {
-	var min time.Duration
-	for _, opType := range measurements {
-		if min == 0 || opType[0] < min {
-			min = opType[0]
-		}
-	}
-	return min
-}
-
-func calcExperimentEnd(measurements map[string][]time.Duration) time.Duration {
-	var max time.Duration
-	for _, opType := range measurements {
-		if opType[len(opType)-1] > max {
-			max = opType[len(opType)-1]
-		}
-	}
-	return max
 }
 
 func durationToMillis(d time.Duration) float64 {

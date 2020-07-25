@@ -6,55 +6,36 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dvasilas/proteus/pkg/libbench/config"
+	"github.com/dvasilas/proteus/pkg/libbench/workload"
 	"github.com/dvasilas/proteus/pkg/perf"
 	log "github.com/sirupsen/logrus"
 )
 
 // Benchmark ...
 type Benchmark struct {
-	config       *benchmarkConfig
-	workload     *workload
+	config       *config.BenchmarkConfig
+	workload     *workload.Workload
 	measurements *perf.Perf
-}
-
-type operations struct {
-	config *benchmarkConfig
-	state  *benchmarkState
-	qe     queryEngine
-	ds     datastore
-}
-
-type benchmarkState struct {
-	userRecords    int
-	storyRecords   int
-	commentRecords int
-	userMutex      sync.RWMutex
-	storyMutex     sync.RWMutex
-	commentMutex   sync.RWMutex
-}
-
-type queryEngine interface {
-	query(limit int) (interface{}, error)
-	close()
 }
 
 // NewBenchmark ...
 func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Benchmark, error) {
 	rand.Seed(time.Now().UnixNano())
 
-	conf, err := getConfig(configFile)
+	conf, err := config.GetConfig(configFile)
 	if err != nil {
 		return Benchmark{}, err
 	}
-	conf.Benchmark.doPreload = preload
-	conf.Benchmark.measuredSystem = system
+	conf.Benchmark.DoPreload = preload
+	conf.Benchmark.MeasuredSystem = system
 	if threadCnt > 0 {
 		conf.Benchmark.ThreadCount = threadCnt
 	}
 
 	log.WithFields(log.Fields{"conf": conf}).Info("configuration")
 
-	workload, err := newWorkload(&conf)
+	workload, err := workload.NewWorkload(&conf)
 	if err != nil {
 		return Benchmark{}, err
 	}
@@ -68,7 +49,7 @@ func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Bench
 
 // PrintMeasurements ...
 func (b Benchmark) PrintMeasurements() {
-	b.config.print()
+	b.config.Print()
 	metrics := b.measurements.CalculateMetrics()
 
 	fmt.Printf("Runtime: %.3f\n", metrics.Runtime)
@@ -91,19 +72,19 @@ func (b Benchmark) Run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			measurements, measurementBufferSize, startTime, endTime := b.workload.run(b.config.Benchmark.OpCount)
+			measurements, measurementBufferSize, startTime, endTime := b.workload.Run(b.config.Benchmark.OpCount)
 			b.measurements.ReportMeasurements(measurements, measurementBufferSize, startTime, endTime)
 		}()
 	}
 
 	wg.Wait()
 
-	b.workload.close()
+	b.workload.Close()
 
 	return nil
 }
 
 // Preload ...
 func (b Benchmark) Preload() error {
-	return b.workload.preload()
+	return b.workload.Preload()
 }

@@ -54,7 +54,7 @@ func main() {
 	}
 
 	if *preload {
-		err := bench.Preload()
+		err = bench.Preload()
 		if err != nil {
 			log.Fatal(err)
 		}

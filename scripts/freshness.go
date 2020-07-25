@@ -45,8 +45,7 @@ const (
 	getHomepage  operType = iota
 )
 
-func freshnessVersions(writeLog, queryLog [][]string) error {
-
+func buildOpLog(writeLog, queryLog [][]string) ([]timelineRecord, error) {
 	opLog := make([]timelineRecord, 2*len(writeLog)+len(queryLog))
 
 	var ts time.Time
@@ -57,12 +56,12 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 	for _, fields := range writeLog {
 		recID, err = strconv.ParseInt(fields[0], 10, 64)
 		if err != nil {
-			return err
+			return opLog, err
 		}
 
 		ts, err = time.Parse("2006-01-02 15:04:05.000000", fields[1])
 		if err != nil {
-			return err
+			return opLog, err
 		}
 
 		opLog[i] = timelineRecord{recordWritten: recID, ts: ts, opType: vote}
@@ -70,7 +69,7 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 
 		ts, err = time.Parse("2006-01-02 15:04:05.000000", fields[2])
 		if err != nil {
-			return err
+			return opLog, err
 		}
 		opLog[i] = timelineRecord{recordWritten: recID, ts: ts, opType: mvUpdateVote}
 		i++
@@ -84,14 +83,14 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 		for j, id := range recIDs {
 			recID, err = strconv.ParseInt(id, 10, 64)
 			if err != nil {
-				return err
+				return opLog, err
 			}
 			rec.recordsRead[j] = recID
 		}
 
 		ts, err = time.Parse("2006-01-02 15:04:05.000000", fields[1])
 		if err != nil {
-			return err
+			return opLog, err
 		}
 
 		rec.ts = ts
@@ -103,11 +102,15 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 
 	sort.Sort(timeLine(opLog))
 
+	return opLog, nil
+}
+
+func postMortem(queryLog [][]string, opLog []timelineRecord) []int {
 	stateDatastore := make(map[int64]int)
 	stateQPU := make(map[int64]int)
 	stalenessLog := make([]int, len(queryLog)*limit)
 
-	i = 0
+	i := 0
 	for _, rec := range opLog {
 		switch rec.opType {
 		case vote:
@@ -136,9 +139,21 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 		}
 	}
 
+	return stalenessLog
+}
+
+func freshnessVersions(writeLog, queryLog [][]string) error {
+	opLog, err := buildOpLog(writeLog, queryLog)
+	if err != nil {
+		return err
+	}
+
+	stalenessLog := postMortem(queryLog, opLog)
+
 	stalenessMap := make(map[int]int)
 	for _, stalenessVal := range stalenessLog {
-		if _, ok := stalenessMap[stalenessVal]; ok {
+		_, found := stalenessMap[stalenessVal]
+		if found {
 			stalenessMap[stalenessVal]++
 		} else {
 			stalenessMap[stalenessVal] = 1
@@ -180,9 +195,6 @@ func freshnessVersions(writeLog, queryLog [][]string) error {
 	fmt.Printf("[%s-versions] =2: %.5f\n", opType, freshnessVersions2)
 	fmt.Printf("[%s-versions] <=5: %.5f\n", opType, freshnessVersions5)
 	fmt.Printf("[%s-versions] >5: %.5f\n", opType, freshnessVersions6)
-	// fmt.Printf("[%s] p90(ms): %.5f\n", opType, durationToMillis(freshnessDurations.percentile(0.9)))
-	// fmt.Printf("[%s] p95(ms): %.5f\n", opType, durationToMillis(freshnessDurations.percentile(0.95)))
-	// fmt.Printf("[%s] p99(ms): %.5f\n", opType, durationToMillis(freshnessDurations.percentile(0.99)))
 
 	return nil
 }
@@ -208,7 +220,7 @@ func freshnessLatency(writeLog [][]string) error {
 	}
 
 	freshnessDurations := durations(durationBuf)
-	sort.Sort(durations(freshnessDurations))
+	sort.Sort(freshnessDurations)
 
 	fmt.Printf("[%s-latency] p50(ms): %.5f\n", opType, durationToMillis(freshnessDurations[freshnessDurations.Len()/2]))
 	fmt.Printf("[%s-latency] p90(ms): %.5f\n", opType, durationToMillis(freshnessDurations.percentile(0.9)))

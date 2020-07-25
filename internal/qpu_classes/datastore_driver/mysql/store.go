@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/mysql"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/golang/protobuf/ptypes"
@@ -95,6 +96,11 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 			},
 		},
 	)
+	if err != nil {
+		errCh <- err
+		cancel()
+		return nil, nil, errCh
+	}
 
 	go ds.opConsumer(stream, logOpCh, errCh)
 
@@ -131,8 +137,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 
 	rows, err := ds.db.Query(query)
 	if err != nil {
-		libqpu.Error(err)
-		errCh <- err
+		errCh <- utils.Error(err)
 		return logOpCh, errCh
 	}
 
@@ -152,7 +157,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 			}
 
 			var recordID string
-			attributes := make(map[string]*qpu.Value, 0)
+			attributes := make(map[string]*qpu.Value)
 			for i, col := range values {
 				if i == 0 {
 					recordID = string(col)
@@ -200,7 +205,7 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 	for {
 		op, err := stream.Recv()
 		if err == io.EOF {
-			errCh <- libqpu.Error(errors.New("opConsumer received EOF"))
+			errCh <- utils.Error(errors.New("opConsumer received EOF"))
 			break
 		}
 		if err != nil {
@@ -220,7 +225,7 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 }
 
 func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (libqpu.LogOperation, error) {
-	libqpu.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
+	utils.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
 
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)

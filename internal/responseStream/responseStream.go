@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 )
 
 // This package is responsible for implementing the functionality of receiving
@@ -17,12 +18,11 @@ import (
 func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord) error, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	for {
 		respRecord, err := stream.Recv()
-		libqpu.Trace("StreamConsumer received", map[string]interface{}{"record": respRecord, "err": err})
+		utils.Trace("StreamConsumer received", map[string]interface{}{"record": respRecord, "err": err})
 		if err == io.EOF {
 			return nil
 		} else if err != nil {
-			libqpu.Error(err)
-			return err
+			return utils.Error(err)
 		}
 
 		// respRecordType, err := respRecord.GetType()
@@ -30,8 +30,7 @@ func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.Respo
 
 		err = processLogOp(respRecord, data, recordCh)
 		if err != nil {
-			libqpu.Error(err)
-			return err
+			return utils.Error(err)
 		}
 	}
 }

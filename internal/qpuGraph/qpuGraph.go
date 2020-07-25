@@ -6,6 +6,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/apiclient"
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 )
 
@@ -28,13 +29,14 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 	for i, conn := range qpu.Config.Connections {
 
 		for {
-			c, _ := net.DialTimeout("tcp", conn.Address, time.Duration(time.Second))
-			if c != nil {
+			c, err := net.DialTimeout("tcp", conn.Address, time.Second)
+			if err != nil {
+				time.Sleep(2 * time.Second)
+				utils.Trace("retying connecting to", map[string]interface{}{"conn": conn.Address})
+			} else {
 				c.Close()
 				break
 			}
-			time.Sleep(2 * time.Second)
-			libqpu.Trace("retying connecting to", map[string]interface{}{"conn": conn.Address})
 		}
 
 		qpuapiclient, err := apiclient.NewClient(conn.Address)
@@ -45,7 +47,7 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 			APIClient: qpuapiclient,
 		}
 
-		libqpu.Trace("connection established", map[string]interface{}{"conn": conn.Address})
+		utils.Trace("connection established", map[string]interface{}{"conn": conn.Address})
 	}
 	qpu.AdjacentQPUs = adjQPUs
 

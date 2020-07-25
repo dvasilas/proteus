@@ -1,4 +1,4 @@
-package libbench
+package datastore
 
 import (
 	"database/sql"
@@ -6,17 +6,19 @@ import (
 	"net"
 	"time"
 
-	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 
 	//
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type datastore struct {
-	db *sql.DB
+// Datastore ...
+type Datastore struct {
+	Db *sql.DB
 }
 
-func newDatastore(endpoint, datastoreDB, accessKeyID, secretAccessKey string) (datastore, error) {
+// NewDatastore ...
+func NewDatastore(endpoint, datastoreDB, accessKeyID, secretAccessKey string) (Datastore, error) {
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s",
 		accessKeyID,
 		secretAccessKey,
@@ -25,25 +27,26 @@ func newDatastore(endpoint, datastoreDB, accessKeyID, secretAccessKey string) (d
 	)
 
 	for {
-		c, _ := net.DialTimeout("tcp", endpoint, time.Duration(time.Second))
-		if c != nil {
+		c, err := net.DialTimeout("tcp", endpoint, time.Second)
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			fmt.Println("retying connecting to ", endpoint)
+		} else {
 			c.Close()
 			break
 		}
-		time.Sleep(1 * time.Second)
-		fmt.Println("retying connecting to ", endpoint)
 	}
 
 	db, err := sql.Open("mysql", connStr)
 	if err != nil {
-		return datastore{}, err
+		return Datastore{}, err
 	}
 
-	return datastore{db: db}, nil
+	return Datastore{Db: db}, nil
 }
 
 // Insert ...
-func (ds datastore) insert(table string, row map[string]interface{}) error {
+func (ds Datastore) Insert(table string, row map[string]interface{}) error {
 
 	insertStmtAttrs := "("
 	insertStmtAttrsValues := "("
@@ -64,9 +67,9 @@ func (ds datastore) insert(table string, row map[string]interface{}) error {
 	insertStmtAttrs += ")"
 	insertStmtAttrsValues += ")"
 
-	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, insertStmtAttrs, insertStmtAttrsValues)
-	libqpu.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
-	stmtInsert, err := ds.db.Prepare(query)
+	query := "INSERT INTO " + table + " " + insertStmtAttrs + " VALUES " + insertStmtAttrsValues
+	utils.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
+	stmtInsert, err := ds.Db.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -77,7 +80,8 @@ func (ds datastore) insert(table string, row map[string]interface{}) error {
 	return err
 }
 
-func (ds datastore) get(table, projection string, predicate map[string]interface{}) (interface{}, error) {
+// Get ...
+func (ds Datastore) Get(table, projection string, predicate map[string]interface{}) (interface{}, error) {
 
 	whereStmt := ""
 	whereValues := make([]interface{}, len(predicate))
@@ -92,9 +96,9 @@ func (ds datastore) get(table, projection string, predicate map[string]interface
 		i++
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s", projection, table, whereStmt)
-	libqpu.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
-	stmtSelect, err := ds.db.Prepare(query)
+	query := "SELECT " + projection + " FROM " + table + " WHERE " + whereStmt
+	utils.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
+	stmtSelect, err := ds.Db.Prepare(query)
 	if err != nil {
 		return nil, err
 	}

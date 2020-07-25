@@ -2,10 +2,12 @@ package datastoredriver
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
-	"math/rand"
+	"math/big"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	"github.com/opentracing/opentracing-go"
@@ -41,7 +43,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 			return &DatastoreDriverQPU{}, err
 		}
 	default:
-		return &DatastoreDriverQPU{}, libqpu.Error(errors.New("unknown datastore type"))
+		return &DatastoreDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
 	}
 
 	go func() {
@@ -64,7 +66,13 @@ func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[
 func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
-	id := rand.Int()
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		errCh <- err
+		close(logOpCh)
+		close(errCh)
+	}
+	id := int(n.Int64())
 
 	if _, found := q.persistentQueries[query.GetTable()]; !found {
 		logOpChFromStore, cancel, errChFromStore := q.datastore.SubscribeOps(query.GetTable())
@@ -82,7 +90,7 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map
 					if !ok {
 						logOpCh = nil
 					} else {
-						libqpu.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
+						utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
 						if len(q.persistentQueries[query.GetTable()]) == 0 {
 							cancel()
 							delete(q.persistentQueries, query.GetTable())

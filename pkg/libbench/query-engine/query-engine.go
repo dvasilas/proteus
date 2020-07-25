@@ -1,4 +1,4 @@
-package libbench
+package queryengine
 
 import (
 	"database/sql"
@@ -7,31 +7,41 @@ import (
 	"net"
 	"time"
 
+	"github.com/dvasilas/proteus/pkg/libbench/datastore"
 	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 
-type proteusQueryEngine struct {
+// QueryEngine ...
+type QueryEngine interface {
+	Query(limit int) (interface{}, error)
+	Close()
+}
+
+// ProteusQueryEngine ...
+type ProteusQueryEngine struct {
 	proteusClient *proteusclient.Client
 	projection    []string
 }
 
 // --------------------- Proteus --------------------
 
-func newProteusQueryEngine(tracing bool) (proteusQueryEngine, error) {
+// NewProteusQueryEngine ...
+func NewProteusQueryEngine(tracing bool) (ProteusQueryEngine, error) {
 	address := "127.0.0.1:50350"
 	for {
-		c, _ := net.DialTimeout("tcp", address, time.Duration(time.Second))
-		if c != nil {
+		c, err := net.DialTimeout("tcp", address, time.Duration(time.Second))
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			fmt.Println("retying connecting to: ", address)
+		} else {
 			c.Close()
 			break
 		}
-		time.Sleep(2 * time.Second)
-		fmt.Println("retying connecting to: ", address)
 	}
 
 	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50350}, tracing)
 	if err != nil {
-		return proteusQueryEngine{}, err
+		return ProteusQueryEngine{}, err
 	}
 
 	err = errors.New("not tried yet")
@@ -42,13 +52,14 @@ func newProteusQueryEngine(tracing bool) (proteusQueryEngine, error) {
 		fmt.Println("retying a test query", err)
 	}
 
-	return proteusQueryEngine{
+	return ProteusQueryEngine{
 		proteusClient: c,
 		projection:    []string{"title", "description", "short_id", "user_id", "vote_sum"},
 	}, nil
 }
 
-func (qe proteusQueryEngine) query(limit int) (resp interface{}, err error) {
+// Query ...
+func (qe ProteusQueryEngine) Query(limit int) (resp interface{}, err error) {
 	// resp, err := qe.proteusClient.QueryInternal("stateTableJoin", nil, nil, int64(limit), nil, false)
 
 	// resp, err := qe.proteusClient.QueryNoOp()
@@ -63,23 +74,27 @@ func (qe proteusQueryEngine) query(limit int) (resp interface{}, err error) {
 	return resp, nil
 }
 
-func (qe proteusQueryEngine) close() {
+// Close ...
+func (qe ProteusQueryEngine) Close() {
 	qe.proteusClient.Close()
 }
 
 // ------------------ MySQL (with MVs) ---------------
 
-type mySQLWithViewsQE struct {
-	ds *datastore
+// MySQLWithViewsQE ...
+type MySQLWithViewsQE struct {
+	ds *datastore.Datastore
 }
 
-func newMySQLWithViewsQE(ds *datastore) (mySQLWithViewsQE, error) {
-	return mySQLWithViewsQE{
+// NewMySQLWithViewsQE ...
+func NewMySQLWithViewsQE(ds *datastore.Datastore) MySQLWithViewsQE {
+	return MySQLWithViewsQE{
 		ds: ds,
-	}, nil
+	}
 }
 
-func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
+// Query ...
+func (qe MySQLWithViewsQE) Query(limit int) (interface{}, error) {
 	projection := []string{"title", "description", "short_id", "vote_count"}
 
 	query := fmt.Sprintf("SELECT title, description, short_id, vote_count "+
@@ -87,7 +102,7 @@ func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
 		"ORDER BY vote_count DESC "+
 		"LIMIT %d",
 		limit)
-	rows, err := qe.ds.db.Query(query)
+	rows, err := qe.ds.Db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -116,23 +131,27 @@ func (qe mySQLWithViewsQE) query(limit int) (interface{}, error) {
 	return result, nil
 }
 
-func (qe mySQLWithViewsQE) close() {
-	qe.ds.db.Close()
+// Close ...
+func (qe MySQLWithViewsQE) Close() {
+	qe.ds.Db.Close()
 }
 
 // ------------------ MySQL (no MVs) -----------------
 
-type mySQLPlainQE struct {
-	ds *datastore
+// MySQLPlainQE ...
+type MySQLPlainQE struct {
+	ds *datastore.Datastore
 }
 
-func newMySQLPlainQE(ds *datastore) (mySQLPlainQE, error) {
-	return mySQLPlainQE{
+// NewMySQLPlainQE ...
+func NewMySQLPlainQE(ds *datastore.Datastore) MySQLPlainQE {
+	return MySQLPlainQE{
 		ds: ds,
-	}, nil
+	}
 }
 
-func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
+// Query ...
+func (qe MySQLPlainQE) Query(limit int) (interface{}, error) {
 	projection := []string{"story_id", "title", "description", "short_id", "vote_count"}
 
 	query := fmt.Sprintf("SELECT story_id, s.title, s.description, s.short_id, vote_count "+
@@ -147,7 +166,7 @@ func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
 		"LIMIT %d",
 		limit)
 
-	rows, err := qe.ds.db.Query(query)
+	rows, err := qe.ds.Db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +195,7 @@ func (qe mySQLPlainQE) query(limit int) (interface{}, error) {
 	return result, nil
 }
 
-func (qe mySQLPlainQE) close() {
-	qe.ds.db.Close()
+// Close ...
+func (qe MySQLPlainQE) Close() {
+	qe.ds.Db.Close()
 }

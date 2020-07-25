@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/xwb1989/sqlparser"
@@ -44,9 +45,8 @@ type operator string
 
 func (expr operator) getType() whereExprType { return op }
 
-func (ctx *sqlParseCtx) whereExprPush(expr whereExpr) error {
+func (ctx *sqlParseCtx) whereExprPush(expr whereExpr) {
 	ctx.whereStack = append(ctx.whereStack, expr)
-	return nil
 }
 
 func (ctx *sqlParseCtx) whereExprPop() whereExpr {
@@ -67,7 +67,6 @@ const (
 	groupBy          = sqlTreeNodeType(iota)
 	orderBy          = sqlTreeNodeType(iota)
 	limit            = sqlTreeNodeType(iota)
-	sqlVal           = sqlTreeNodeType(iota)
 	comparisonExpr   = sqlTreeNodeType(iota)
 )
 
@@ -118,7 +117,7 @@ func Parse(query string) (parsedAST libqpu.ASTQuery, err error) {
 			Q: parseCtx.proteusAST,
 		}
 	default:
-		err = libqpu.Error(errors.New("only select queries are supported"))
+		err = utils.Error(errors.New("only select queries are supported"))
 	}
 
 	return
@@ -148,7 +147,7 @@ func (ctx *sqlParseCtx) parseSelect(node sqlparser.SQLNode) error {
 		case *sqlparser.Limit:
 			return false, ctx.parseLimit(node)
 		default:
-			return false, libqpu.Error(errors.New("should not have reached here"))
+			return false, utils.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 }
@@ -170,7 +169,7 @@ func (ctx *sqlParseCtx) parseSelectExprs(node sqlparser.SQLNode) error {
 		case *sqlparser.AliasedExpr:
 			return false, ctx.parseAliasedExpr(node)
 		default:
-			return false, libqpu.Error(errors.New("parseSelectExprs: should have reached here"))
+			return false, utils.Error(errors.New("parseSelectExprs: should have reached here"))
 		}
 	}, node)
 }
@@ -190,11 +189,11 @@ func (ctx *sqlParseCtx) parseTableExprs(node sqlparser.SQLNode) error {
 		case *sqlparser.AliasedTableExpr:
 			return false, ctx.parseAliasedTableExpr(node)
 		case *sqlparser.ParenTableExpr:
-			return false, libqpu.Error(errors.New("ParenTableExpr: not supported"))
+			return false, utils.Error(errors.New("ParenTableExpr: not supported"))
 		case *sqlparser.JoinTableExpr:
-			return false, libqpu.Error(errors.New("JoinTableExpr: not supported"))
+			return false, utils.Error(errors.New("JoinTableExpr: not supported"))
 		default:
-			return false, libqpu.Error(errors.New("should not have reached here"))
+			return false, utils.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 }
@@ -218,12 +217,7 @@ func (ctx *sqlParseCtx) parseGroupBy(node sqlparser.SQLNode) error {
 	ctx.statePush(groupBy)
 	defer ctx.statePop()
 
-	return sqlparser.Walk(func(node sqlparser.SQLNode) (cont bool, err error) {
-		switch node.(type) {
-		default:
-			return false, nil
-		}
-	}, node)
+	return nil
 }
 
 func (ctx *sqlParseCtx) parseOrderBy(node sqlparser.SQLNode) error {
@@ -250,7 +244,7 @@ func (ctx *sqlParseCtx) parseOrderBy(node sqlparser.SQLNode) error {
 			}
 			return false, ctx.parseExpr(node.(*sqlparser.Order).Expr)
 		default:
-			return false, libqpu.Error(errors.New("parseOrderBy: should not have reached here"))
+			return false, utils.Error(errors.New("parseOrderBy: should not have reached here"))
 		}
 	}, node)
 }
@@ -287,7 +281,7 @@ func (ctx *sqlParseCtx) parseStarExpr(node sqlparser.SQLNode) error {
 		case sqlparser.TableName:
 			return false, nil
 		default:
-			return false, libqpu.Error(errors.New("parseStarExpr: not supported"))
+			return false, utils.Error(errors.New("parseStarExpr: not supported"))
 		}
 	}, node)
 
@@ -311,7 +305,7 @@ func (ctx *sqlParseCtx) parseAliasedExpr(node sqlparser.SQLNode) error {
 		case sqlparser.ColIdent:
 			return false, nil
 		default:
-			return false, libqpu.Error(errors.New("parseAliasedExpr: should not have reached here"))
+			return false, utils.Error(errors.New("parseAliasedExpr: should not have reached here"))
 		}
 	}, node)
 }
@@ -336,7 +330,7 @@ func (ctx *sqlParseCtx) parseAliasedTableExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.IndexHints:
 			return false, nil
 		default:
-			return false, libqpu.Error(errors.New("should not have reached here"))
+			return false, utils.Error(errors.New("should not have reached here"))
 		}
 	}, node)
 
@@ -353,7 +347,7 @@ func (ctx *sqlParseCtx) parseExpr(node sqlparser.SQLNode) error {
 		case *sqlparser.SQLVal:
 			return false, ctx.parseSQLVal(node)
 		default:
-			return false, libqpu.Error(errors.New("parseExpr: not supported"))
+			return false, utils.Error(errors.New("parseExpr: not supported"))
 		}
 	}, node)
 }
@@ -422,7 +416,7 @@ func (ctx *sqlParseCtx) parseSQLVal(node sqlparser.SQLNode) (err error) {
 			ctx.whereExprPush(value{v: libqpu.ValueFlt(valFlt)})
 		}
 	default:
-		err = libqpu.Error(errors.New("parseSQLVal: value type not supported"))
+		err = utils.Error(errors.New("parseSQLVal: value type not supported"))
 	}
 
 	if ctx.walkState[0] == limit {

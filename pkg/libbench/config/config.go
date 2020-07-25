@@ -1,4 +1,4 @@
-package libbench
+package config
 
 import (
 	"fmt"
@@ -7,30 +7,9 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-type benchmarkConfig struct {
-	Connection struct {
-		Endpoint        string
-		Database        string
-		AccessKeyID     string
-		SecretAccessKey string
-	}
-	Benchmark struct {
-		doPreload      bool
-		measuredSystem string
-		OpCount        int64
-		Runtime        int
-		DoWarmup       bool
-		Warmup         int
-		ThreadCount    int
-	}
-
-	Operations struct {
-		Homepage struct {
-			StoriesLimit int
-		}
-		WriteRatio    float64
-		DownVoteRatio float64
-	}
+// BenchmarkConfig ...
+type BenchmarkConfig struct {
+	Tracing bool
 	Preload struct {
 		RecordCount struct {
 			Users      int
@@ -39,27 +18,49 @@ type benchmarkConfig struct {
 			StoryVotes int
 		}
 	}
-	Tracing bool
+	Operations struct {
+		Homepage struct {
+			StoriesLimit int
+		}
+		WriteRatio    float64
+		DownVoteRatio float64
+	}
+	Benchmark struct {
+		DoPreload      bool
+		DoWarmup       bool
+		Runtime        int
+		Warmup         int
+		ThreadCount    int
+		OpCount        int64
+		MeasuredSystem string
+	}
+	Connection struct {
+		Endpoint        string
+		Database        string
+		AccessKeyID     string
+		SecretAccessKey string
+	}
 }
 
-func getConfig(configFile string) (benchmarkConfig, error) {
-	config := benchmarkConfig{}
+// GetConfig ...
+func GetConfig(configFile string) (BenchmarkConfig, error) {
+	config := BenchmarkConfig{}
 	err := readConfigFile(configFile, &config)
 
 	return config, err
 }
 
-func readConfigFile(configFile string, conf *benchmarkConfig) error {
+func readConfigFile(configFile string, conf *BenchmarkConfig) error {
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil
 	}
-	toml.Unmarshal(configData, conf)
-	return nil
+	return toml.Unmarshal(configData, conf)
 }
 
-func (c *benchmarkConfig) print() {
-	fmt.Printf("Target system: %s\n", c.Benchmark.measuredSystem)
+// Print ...
+func (c *BenchmarkConfig) Print() {
+	fmt.Printf("Target system: %s\n", c.Benchmark.MeasuredSystem)
 	fmt.Printf("Benchmark duration(s): %d\n", c.Benchmark.Runtime)
 	fmt.Printf("Warmup(s): %d\n", c.Benchmark.Warmup)
 	fmt.Printf("Benchmark threads: %d\n", c.Benchmark.ThreadCount)

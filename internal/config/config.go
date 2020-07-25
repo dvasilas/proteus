@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	toml "github.com/pelletier/go-toml"
 )
@@ -129,46 +130,47 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	}
 
 	// DatastoreConfiguration
-	if config.QpuType == qpu_api.ConfigResponse_DATASTORE_DRIVER {
+	switch config.QpuType {
+	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
 		if err := getDatastoreConfig(inputConfig, config); err != nil {
 			return err
 		}
-	} else if config.QpuType == qpu_api.ConfigResponse_SUM {
+	case qpu_api.ConfigResponse_SUM:
 		if err := getSumConfig(inputConfig, config); err != nil {
 			return err
 		}
-	} else if config.QpuType == qpu_api.ConfigResponse_JOIN {
+	case qpu_api.ConfigResponse_JOIN:
 		if err := getJoinConfig(inputConfig, config); err != nil {
 			return err
 		}
+	}
 
-		// Evaluation
-		if err := getEvaluation(inputConfig, config); err != nil {
-			return err
-		}
+	// Evaluation
+	if err := getEvaluation(inputConfig, config); err != nil {
+		return err
+	}
 
-		// Misc
-		config.MaxWorkers = inputConfig.MaxWorkers
-		if val, isSet := os.LookupEnv("MAX_WORKERS"); isSet {
-			maxWorkers, err := strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return nil
-			}
-			config.MaxWorkers = int(maxWorkers)
+	// Misc
+	config.MaxWorkers = inputConfig.MaxWorkers
+	if val, isSet := os.LookupEnv("MAX_WORKERS"); isSet {
+		maxWorkers, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil
 		}
-		config.MaxJobQueue = inputConfig.MaxJobQueue
-		if val, isSet := os.LookupEnv("MAX_JOB_QUEUE"); isSet {
-			maxWorkers, err := strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return nil
-			}
-			config.MaxWorkers = int(maxWorkers)
+		config.MaxWorkers = int(maxWorkers)
+	}
+	config.MaxJobQueue = inputConfig.MaxJobQueue
+	if val, isSet := os.LookupEnv("MAX_JOB_QUEUE"); isSet {
+		maxWorkers, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil
 		}
+		config.MaxWorkers = int(maxWorkers)
 	}
 
 	qpu.Config = config
 	fmt.Printf("%+v\n", qpu.Config)
-	// libqpu.Trace("configuration parsed", map[string]interface{}{"config": qpu.Config})
+	// utils.Trace("configuration parsed", map[string]interface{}{"config": qpu.Config})
 
 	return nil
 }
@@ -180,8 +182,7 @@ func readConfigFile(configFile string, conf *inputQPUConfig) error {
 	if err != nil {
 		return nil
 	}
-	toml.Unmarshal(configData, conf)
-	return nil
+	return toml.Unmarshal(configData, conf)
 }
 
 func getQpuType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
@@ -193,7 +194,7 @@ func getQpuType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	case "join":
 		config.QpuType = qpu_api.ConfigResponse_JOIN
 	default:
-		return libqpu.Error(errors.New("unknown QPU type"))
+		return utils.Error(errors.New("unknown QPU type"))
 	}
 	return nil
 }
@@ -202,13 +203,15 @@ func getConnections(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	connections := make([]libqpu.QPUConnection, 0)
 	for _, conn := range inputConf.Connections {
 		var isLocal bool
-		if conn.Local == "local" {
+		switch conn.Local {
+		case "local":
 			isLocal = true
-		} else if conn.Local == "remote" {
+		case "remote":
 			isLocal = false
-		} else {
-			return libqpu.Error(errors.New("connection should be either 'local' or 'remote'"))
+		default:
+			return utils.Error(errors.New("connection should be either 'local' or 'remote'"))
 		}
+
 		connections = append(connections, libqpu.QPUConnection{
 			Address: conn.Address,
 			Local:   isLocal,
@@ -220,9 +223,9 @@ func getConnections(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 }
 
 func getSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
-	qpu.Schema = make(map[string]map[string]libqpu.DatastoreAttributeType, 0)
+	qpu.Schema = make(map[string]map[string]libqpu.DatastoreAttributeType)
 	for _, table := range inputConf.Schema {
-		qpu.Schema[table.Table] = make(map[string]libqpu.DatastoreAttributeType, 0)
+		qpu.Schema[table.Table] = make(map[string]libqpu.DatastoreAttributeType)
 		for _, attribute := range table.Attributes {
 			switch attribute.Type {
 			case "int":
@@ -232,7 +235,7 @@ func getSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
 			case "float":
 				qpu.Schema[table.Table][attribute.Key] = libqpu.FLT
 			default:
-				return libqpu.Error(fmt.Errorf("invalid attribute type %s in schema", attribute.Type))
+				return utils.Error(fmt.Errorf("invalid attribute type %s in schema", attribute.Type))
 			}
 		}
 	}
@@ -252,7 +255,7 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 	case "mysql":
 		config.DatastoreConfig.Type = libqpu.MYSQL
 	default:
-		return libqpu.Error(errors.New("unknown datastore type"))
+		return utils.Error(errors.New("unknown datastore type"))
 	}
 	config.DatastoreConfig.DBName = inputConf.DatastoreConfig.DBName
 	config.DatastoreConfig.Endpoint = inputConf.DatastoreConfig.Endpoint
