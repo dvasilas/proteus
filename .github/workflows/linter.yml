@@ -18,7 +18,7 @@ jobs:
       - name: Lint Code Base
         uses: docker://github/super-linter:v3
         env:
-          VALIDATE_ALL_CODEBASE: true
+          VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: master
           VALIDATE_GO: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
