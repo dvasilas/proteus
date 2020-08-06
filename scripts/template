@@ -1,0 +1,32 @@
+Target system
+Benchmark duration(s)
+Warmup(s)
+Benchmark threads
+[workload] Q/W ratio(%)
+[workload] U/D vote ratio(%)
+[preload] Users
+[preload] Stories
+[preload] Comments
+[preload] Votes-stories
+Runtime
+[vote] Operation count
+[vote] Throughput
+[vote] p50(ms)
+[vote] p90(ms)
+[vote] p95(ms)
+[vote] p99(ms)
+[getHomepage] Operation count
+[getHomepage] Throughput
+[getHomepage] p50(ms)
+[getHomepage] p90(ms)
+[getHomepage] p95(ms)
+[getHomepage] p99(ms)
+[freshness-latency] p50(ms)
+[freshness-latency] p90(ms)
+[freshness-latency] p95(ms)
+[freshness-latency] p99(ms)
+[freshness-versions] =0
+[freshness-versions] =1
+[freshness-versions] =2
+[freshness-versions] <=5
+[freshness-versions] >5

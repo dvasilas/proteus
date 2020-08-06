@@ -8,13 +8,13 @@ secretAccessKey  = "verySecretPwd"
 
 [Benchmark]
 opCount = 1000000
-runtime = 300
+runtime = 120
 doWarmup = true
-warmup = 60
+warmup = 30
 threadCount = 1
 
 [Operations]
-writeRatio = 0.1
+writeRatio = 0.0
 downVoteRatio = 0.2
 
 [Operations.Homepage]
@@ -23,5 +23,5 @@ storiesLimit = 5
 [Preload.RecordCount]
 users = 10
 stories = 1000
-comments = 100
-StoryVotes = 10000
+comments = 10
+storyVotes = 1000

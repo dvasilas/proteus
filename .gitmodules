@@ -1,0 +1,3 @@
+[submodule "scripts/utils"]
+	path = scripts/utils
+	url = git@github.com:dvasilas/systems-evaluation-utils.git
