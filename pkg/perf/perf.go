@@ -111,13 +111,12 @@ func (p *Perf) CalculateMetrics() Metrics {
 	for opType, threadMeasurements := range aggregateMeasurements {
 		if aggregateOpCount[opType] > 0 {
 			opMetrics := OpMetrics{
-				OpCount:        aggregateOpCount[opType],
-				Throughput:     float64(aggregateOpCount[opType]) / runTime.Seconds(),
-				ThroughputNorm: (float64(aggregateOpCount[opType]) / aggregateRuntime.Seconds()) * float64(len(p.measurementsBuf)),
-				P50:            durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
-				P90:            durationToMillis(threadMeasurements.percentile(0.9)),
-				P95:            durationToMillis(threadMeasurements.percentile(0.95)),
-				P99:            durationToMillis(threadMeasurements.percentile(0.99)),
+				OpCount:    aggregateOpCount[opType],
+				Throughput: (float64(aggregateOpCount[opType]) / aggregateRuntime.Seconds()) * float64(len(p.measurementsBuf)),
+				P50:        durationToMillis(threadMeasurements[threadMeasurements.Len()/2]),
+				P90:        durationToMillis(threadMeasurements.percentile(0.9)),
+				P95:        durationToMillis(threadMeasurements.percentile(0.95)),
+				P99:        durationToMillis(threadMeasurements.percentile(0.99)),
 			}
 			m.PerOpMetrics[opType] = opMetrics
 		}

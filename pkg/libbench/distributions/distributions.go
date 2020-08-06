@@ -11,7 +11,7 @@ func SelectUser(userCount int) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	return int(n.Int64()), nil
+	return int(n.Int64()) + 1, nil
 }
 
 // SelectStory ...
@@ -20,7 +20,7 @@ func SelectStory(storyCount int) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	return int(n.Int64()), nil
+	return int(n.Int64()) + 1, nil
 }
 
 // SelectComment ...
@@ -29,5 +29,5 @@ func SelectComment(commentCount int) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	return int(n.Int64()), nil
+	return int(n.Int64()) + 1, nil
 }

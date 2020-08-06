@@ -31,7 +31,7 @@ func NewWorkload(conf *config.BenchmarkConfig) (*Workload, error) {
 		return nil, err
 	}
 
-	storySemPhs := make([]*semaphore.Weighted, conf.Preload.RecordCount.Stories)
+	storySemPhs := make([]*semaphore.Weighted, conf.Preload.RecordCount.Stories+1)
 	for i := range storySemPhs {
 		storySemPhs[i] = semaphore.NewWeighted(1)
 	}

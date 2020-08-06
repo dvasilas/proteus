@@ -22,7 +22,7 @@ func main() {
 	preload := flag.Bool("p", false, "preload")
 
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stdout, "usage:  -c config_file -s system [-p]")
+		fmt.Fprintln(os.Stdout, "usage: -c config_file -s system [-p]")
 		w := new(tabwriter.Writer)
 		w.Init(os.Stdout, 0, 10, 0, '\t', 0)
 		flag.VisitAll(func(f *flag.Flag) {

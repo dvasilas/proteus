@@ -207,7 +207,7 @@ func (op *Operations) AddStory(userID int) error {
 			"user_id":     userID,
 			"title":       title,
 			"description": description,
-			"short_id":    shortID,
+			"short_id":    shortID[0:4],
 		},
 	); err != nil {
 		return err
