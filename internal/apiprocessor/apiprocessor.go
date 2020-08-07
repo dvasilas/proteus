@@ -196,7 +196,12 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 	// }
 
 	// return s.qpuClass.ClientQuery(astQuery, parentSpan)
-	return s.qpuClass.ClientQuery(libqpu.ASTQuery{}, parentSpan)
+	astQuery, err := sqlparser.Parse(req.GetSQLStr())
+	if err != nil {
+		return nil, err
+	}
+
+	return s.qpuClass.ClientQuery(astQuery, parentSpan)
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
