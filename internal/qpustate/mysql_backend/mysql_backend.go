@@ -126,9 +126,9 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 	}
 
 	// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
-	//db.SetMaxIdleConns(256)
-	//db.SetMaxOpenConns(256)
-	//db.SetConnMaxLifetime(10 * time.Minute)
+	db.SetMaxIdleConns(1024)
+	db.SetMaxOpenConns(1024)
+	db.SetConnMaxLifetime(10 * time.Minute)
 
 	s.db = db
 
