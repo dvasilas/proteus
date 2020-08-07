@@ -1,26 +1,19 @@
-FROM golang AS stage0
+FROM golang as stage0
+ARG MYSQL_PASSWORD
+RUN set -xe && \
+    apt-get update -y && apt-get install -y git mariadb-server netcat && \
+    /usr/bin/install -m 755 -o mysql -g root -d /var/run/mysqld && \
+    /usr/bin/mysql_install_db -u mysql
+
+WORKDIR /app/
 RUN set -x \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends git
+    && git clone https://github.com/dvasilas/proteus.git
 
 FROM stage0 as stage1
-RUN set -x \
-  && mkdir -p $GOPATH/src/github.com/dvasilas \
-  && cd $GOPATH/src/github.com/dvasilas \
-  && git clone https://github.com/dvasilas/proteus.git
-
-FROM stage1 as stage2
 ENV GO111MODULE=on
-WORKDIR $GOPATH/src/github.com/dvasilas/proteus/
+WORKDIR /app/proteus/
 RUN set -x \
-  && go mod download \
-  && make qpu \
-  && cp -r bin/. /app/ \
-  && cp -r configs/. /etc/
+    && go mod download \
+    && make qpu
 
-FROM scratch
-WORKDIR /app/
-COPY --from=stage2 /app/ .
-COPY --from=stage2 /etc/ .
-
-ENTRYPOINT ["./qpu"]
+ENTRYPOINT ["/app/proteus/build/proteus/localdev/start-mysql.sh"]

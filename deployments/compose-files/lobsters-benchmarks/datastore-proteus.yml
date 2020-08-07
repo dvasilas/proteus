@@ -11,6 +11,8 @@ services:
     ports:
       - 3307:3306
       - 50000:50000
+    cap_add:
+      - SYS_NICE
     deploy:
       restart_policy:
         condition: none
