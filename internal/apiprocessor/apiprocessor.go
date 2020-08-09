@@ -27,17 +27,6 @@ type APIProcessor struct {
 	sqlCache *sqlToASTCache
 }
 
-type sqlToASTCache struct {
-	sync.RWMutex
-	cache map[string]libqpu.ASTQuery
-}
-
-func newSQLToASTCache() *sqlToASTCache {
-	return &sqlToASTCache{
-		cache: make(map[string]libqpu.ASTQuery),
-	}
-}
-
 // ---------------- API Functions -------------------
 
 // NewProcessor creates an instance of APIProcessor.
@@ -196,9 +185,16 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 	// }
 
 	// return s.qpuClass.ClientQuery(astQuery, parentSpan)
-	astQuery, err := sqlparser.Parse(req.GetSQLStr())
-	if err != nil {
-		return nil, err
+
+	astQuery, found := s.sqlCache.get(req.GetSQLStr())
+
+	if !found {
+		astQuery, err := sqlparser.Parse(req.GetSQLStr())
+		if err != nil {
+			return nil, err
+		}
+
+		s.sqlCache.put(req.GetSQLStr(), astQuery)
 	}
 
 	return s.qpuClass.ClientQuery(astQuery, parentSpan)
@@ -222,4 +218,33 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 	default:
 		return nil, utils.Error(errors.New("Unknown QPU class"))
 	}
+}
+
+type sqlToASTCache struct {
+	sync.RWMutex
+	m map[string]libqpu.ASTQuery
+}
+
+func newSQLToASTCache() *sqlToASTCache {
+	return &sqlToASTCache{
+		m: make(map[string]libqpu.ASTQuery),
+	}
+}
+
+func (c *sqlToASTCache) put(sqlStmt string, ast libqpu.ASTQuery) {
+	c.Lock()
+	if _, ok := c.m[sqlStmt]; ok {
+		c.Unlock()
+		return
+	}
+	c.m[sqlStmt] = ast
+	c.Unlock()
+}
+
+func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool) {
+	c.RLock()
+	ast, found := c.m[sqlStmt]
+	c.RUnlock()
+
+	return ast, found
 }
