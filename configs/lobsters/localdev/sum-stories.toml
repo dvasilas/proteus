@@ -11,11 +11,11 @@ tracing = false
 logTimestamps = false
 
 [[connections]]
-address = "docker.for.mac.localhost:50150"
+address = "127.0.0.1:50150"
 local = "local"
 
 [StateBackend]
-endpoint = "127.0.0.1:3306"
+endpoint = "127.0.0.1:3308"
 
 [StateBackend.Credentials]
 accessKeyID = "root"
