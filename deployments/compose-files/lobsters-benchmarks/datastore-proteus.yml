@@ -17,7 +17,9 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.datastore == true ]
+        constraints:
+          - node.labels.dc==eu
+          - node.labels.placement_datastore==true
 
 networks:
   proteus_net:

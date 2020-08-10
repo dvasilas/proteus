@@ -14,7 +14,10 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.queryengine == true ]
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_dsdriver == true
+
   sum:
     image: dvasilas/proteus:${TAG_QPU}
     networks:
@@ -28,7 +31,10 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.queryengine == true ]
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_sum == true
+
   join:
     image: dvasilas/proteus:${TAG_QPU}
     networks:
@@ -44,7 +50,9 @@ services:
       restart_policy:
         condition: none
       placement:
-        constraints: [ node.labels.queryengine-join == true ]
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_join == true
 
 networks:
   qpu_graph:

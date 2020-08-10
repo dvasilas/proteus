@@ -37,9 +37,11 @@ docker stack rm datastore-proteus
 
 pull
 build
-sync proteus02 proteus03 proteus04
+sync proteus04 proteus-eu02 proteus-eu03 proteus-na01 proteus-na02
 
-threads=(64 128)
+docker network create -d overlay --attachable proteus_net || true
+
+threads=(1 2 4 8 16 32 64 128 256)
 
 rowID=0
 ./format-and-import.py -r $rowID --desc template
