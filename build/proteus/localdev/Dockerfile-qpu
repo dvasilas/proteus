@@ -18,5 +18,6 @@ COPY . .
 RUN make qpu
 
 COPY build/proteus/localdev/ /
+COPY scripts/freshness.sh /
 
 ENTRYPOINT ["/start-mysql.sh"]

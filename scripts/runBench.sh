@@ -32,14 +32,31 @@ sync() {
 	done
 }
 
+remote() {
+	scp $PROTEUS_DIR/configs/benchmark/config.toml proteus-na-01:$PROTEUS_DIR/configs/benchmark/config.toml
+	ssh -t proteus-na-01 "$@"
+}
+
+freshness() {
+	NODE_HOST=$($PROTEUS_DIR/scripts/utils/service-exec.sh -s qpu-graph_join /freshness.sh)
+	scp $NODE_HOST:/mount/configs/query-log.txt /tmp/
+	scp $NODE_HOST:/mount/configs/write-log.txt /tmp/
+	go run $PROTEUS_DIR/scripts/freshness.go /tmp/write-log.txt /tmp/query-log.txt >> /tmp/$i.out
+	ssh -t $NODE_HOST rm -f /mount/configs/query-log.txt; rm -f /mount/configs/write-log.txt
+}
+
 docker stack rm qpu-graph
 docker stack rm datastore-proteus
 
 pull
 build
-sync proteus04 proteus-eu02 proteus-eu03 proteus-na01 proteus-na02
 
-docker network create -d overlay --attachable proteus_net || true
+remote GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull origin master
+remote cd $PROTEUS_DIR; build
+
+sync proteus04 proteus-eu02 proteus-eu03 proteus-na-02
+
+#docker network create -d overlay --attachable proteus_net || true
 
 threads=(1 2 4 8 16 32 64 128 256)
 
@@ -50,24 +67,21 @@ rowID=$((rowID+1))
 for i in "${threads[@]}"
 do
 	env TAG_DATASTORE=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/datastore-proteus.yml datastore-proteus
- 	$PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -p
+	$PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -p
+
+	sleep 5
+	
+	env TAG_QPU=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/qpu-graph.yml qpu-graph
 	
 	sleep 5
 
-	env TAG_QPU=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/qpu-graph.yml qpu-graph
+	remote $PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -s $SYSTEM -t $i > /tmp/$i.out
+	# $PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -s $SYSTEM -t $i > /tmp/$i.out
 
-	sleep 5
+	freshness
 
-	/home/scality/go/proteus/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -s $SYSTEM -t $i > /tmp/$i.out
-
-#     	/home/scality/go/proteus/scripts/service-exec.sh qpu-graph_join ./scripts/freshness.sh
-#     	scp proteus03.novalocal:/mount/configs/query-log.txt ./
-#     	scp proteus03.novalocal:/mount/configs/write-log.txt ./
-#     	go run /home/scality/go/proteus/scripts/freshness.go ./write-log.txt ./query-log.txt >> $i.out
-#     	ssh -t proteus03.novalocal rm -f /mount/configs/query-log.txt
-#     	ssh -t proteus03.novalocal rm -f /mount/configs/write-log.txt
 	./format-and-import.py -r $rowID template /tmp/$i.out
-   
+
 	docker stack rm qpu-graph
 	docker stack rm datastore-proteus
 
