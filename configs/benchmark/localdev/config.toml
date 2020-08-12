@@ -12,6 +12,7 @@ runtime = 20
 doWarmup = false
 warmup = 10
 threadCount = 1
+measuredSystem = "proteus"
 
 [Operations]
 writeRatio = 0.5

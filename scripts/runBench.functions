@@ -1,0 +1,60 @@
+
+pull() {
+	GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull origin master
+}
+
+build() {
+	cd $PROTEUS_DIR
+	make bench
+	cd -
+}
+
+remote() {
+	scp $PROTEUS_DIR/configs/benchmark/config.toml proteus-na-01:$PROTEUS_DIR/configs/benchmark/config.toml
+	ssh -t proteus-na-01 "$@"
+}
+
+sync() {
+	set +x
+	for host in "$@"
+	do
+		ssh $host 'sudo rm -r /mount/; sudo mkdir -p /mount/; mkdir -p mount'
+		scp -r $PROTEUS_DIR/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/* $host:~/mount
+		scp -r $PROTEUS_DIR/configs $host:~/mount
+		scp -r $PROTEUS_DIR/scripts $host:~/mount
+		ssh $host 'sudo mv ~/mount/* /mount/'
+	done
+	set -x
+}
+
+timestamp() {
+	date +"%a %d %b %Y %H.%M.%S"
+}
+
+timestamp_filename() {
+	date +"%d_%m_%Y_%H_%M_%S"
+}
+
+get_service_status() {
+	docker service ps --format '{{ .CurrentState }}' $1
+}
+
+wait_service_running() {
+	while :
+	do
+		sleep 1
+		status=$(get_service_status $1)
+		echo $status
+		if [[ $status == Running* ]] 
+		then
+			break
+		fi
+	done
+}
+
+wait_services_running() {
+	for service in $(docker service ls --format '{{ .Name }}')
+	do
+		wait_service_running $service
+	done
+}

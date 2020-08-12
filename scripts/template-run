@@ -1,14 +1,7 @@
-Target system
-Benchmark duration(s)
-Warmup(s)
-Benchmark threads
-[workload] Q/W ratio(%)
-[workload] U/D vote ratio(%)
-[preload] Users
-[preload] Stories
-[preload] Comments
-[preload] Votes-stories
+Timestamp
+Logfile
 Runtime
+Benchmark threads
 [vote] Operation count
 [vote] Throughput
 [vote] p50(ms)

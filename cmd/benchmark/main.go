@@ -14,12 +14,12 @@ func main() {
 
 	// log.SetLevel(log.TraceLevel)
 
-	var configFile, system string
+	var configFile string
 	var threads int
 	flag.StringVar(&configFile, "c", "noArg", "configuration file")
-	flag.StringVar(&system, "s", "noArg", "system to be used as the query engine")
 	flag.IntVar(&threads, "t", 0, "number of client threads to be used")
 	preload := flag.Bool("p", false, "preload")
+	dryRun := flag.Bool("d", false, "dryRun: print configuration and exit")
 
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stdout, "usage: -c config_file -s system [-p]")
@@ -43,14 +43,13 @@ func main() {
 		return
 	}
 
-	if !(*preload) && system == "noArg" {
-		flag.Usage()
-		return
-	}
-
-	bench, err := libbench.NewBenchmark(configFile, system, *preload, threads)
+	bench, err := libbench.NewBenchmark(configFile, *preload, threads, *dryRun)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *dryRun {
+		return
 	}
 
 	if *preload {

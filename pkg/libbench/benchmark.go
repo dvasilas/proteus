@@ -20,7 +20,7 @@ type Benchmark struct {
 }
 
 // NewBenchmark ...
-func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Benchmark, error) {
+func NewBenchmark(configFile string, preload bool, threadCnt int, dryRun bool) (Benchmark, error) {
 	rand.Seed(time.Now().UnixNano())
 
 	conf, err := config.GetConfig(configFile)
@@ -28,12 +28,16 @@ func NewBenchmark(configFile, system string, preload bool, threadCnt int) (Bench
 		return Benchmark{}, err
 	}
 	conf.Benchmark.DoPreload = preload
-	conf.Benchmark.MeasuredSystem = system
 	if threadCnt > 0 {
 		conf.Benchmark.ThreadCount = threadCnt
 	}
 
 	log.WithFields(log.Fields{"conf": conf}).Info("configuration")
+
+	if dryRun {
+		conf.Print()
+		return Benchmark{}, nil
+	}
 
 	workload, err := workload.NewWorkload(&conf)
 	if err != nil {
@@ -75,6 +79,7 @@ func (b Benchmark) Run() error {
 // PrintMeasurements ...
 func (b Benchmark) PrintMeasurements() {
 	b.config.Print()
+
 	metrics := b.measurements.CalculateMetrics()
 
 	fmt.Printf("Runtime(s): %.3f\n", metrics.Runtime)
