@@ -15,7 +15,7 @@ threadCount = 1
 measuredSystem = "proteus"
 
 [Operations]
-writeRatio = 1.0
+writeRatio = 0.0
 downVoteRatio = 0.2
 
 [Operations.Homepage]

@@ -1,4 +1,4 @@
-package libbench
+package benchmark
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dvasilas/proteus/pkg/libbench/config"
-	"github.com/dvasilas/proteus/pkg/libbench/workload"
-	"github.com/dvasilas/proteus/pkg/perf"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/config"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/perf"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/workload"
 	log "github.com/sirupsen/logrus"
 )
 

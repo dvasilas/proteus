@@ -6,7 +6,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/dvasilas/proteus/pkg/libbench"
+	benchmark "github.com/dvasilas/proteus-lobsters-bench/internal"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,7 +43,7 @@ func main() {
 		return
 	}
 
-	bench, err := libbench.NewBenchmark(configFile, *preload, threads, *dryRun)
+	bench, err := benchmark.NewBenchmark(configFile, *preload, threads, *dryRun)
 	if err != nil {
 		log.Fatal(err)
 	}

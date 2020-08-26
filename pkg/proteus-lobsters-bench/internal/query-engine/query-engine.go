@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/dvasilas/proteus/pkg/libbench/datastore"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/datastore"
 	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 

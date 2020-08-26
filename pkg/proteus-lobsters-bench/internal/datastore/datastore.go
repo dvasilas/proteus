@@ -6,8 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/dvasilas/proteus/internal/libqpu/utils"
-
 	//
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -68,7 +66,6 @@ func (ds Datastore) Insert(table string, row map[string]interface{}) error {
 	insertStmtAttrsValues += ")"
 
 	query := "INSERT INTO " + table + " " + insertStmtAttrs + " VALUES " + insertStmtAttrsValues
-	utils.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
 	stmtInsert, err := ds.Db.Prepare(query)
 	if err != nil {
 		return err
@@ -97,7 +94,6 @@ func (ds Datastore) Get(table, projection string, predicate map[string]interface
 	}
 
 	query := "SELECT " + projection + " FROM " + table + " WHERE " + whereStmt
-	utils.Trace("get", map[string]interface{}{"query": query, "values": whereValues})
 	stmtSelect, err := ds.Db.Prepare(query)
 	if err != nil {
 		return nil, err

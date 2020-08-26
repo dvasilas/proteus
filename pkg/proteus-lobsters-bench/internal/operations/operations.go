@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dvasilas/proteus/pkg/libbench/config"
-	"github.com/dvasilas/proteus/pkg/libbench/datastore"
-	queryengine "github.com/dvasilas/proteus/pkg/libbench/query-engine"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/config"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/datastore"
+	queryengine "github.com/dvasilas/proteus-lobsters-bench/internal/query-engine"
 )
 
 // Operations ...

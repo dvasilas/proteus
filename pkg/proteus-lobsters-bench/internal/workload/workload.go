@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dvasilas/proteus/pkg/libbench/config"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/config"
+	"github.com/dvasilas/proteus-lobsters-bench/internal/operations"
 	"github.com/dvasilas/proteus/pkg/libbench/distributions"
-	"github.com/dvasilas/proteus/pkg/libbench/operations"
 	"github.com/dvasilas/proteus/pkg/perf"
 	"golang.org/x/sync/semaphore"
 )
