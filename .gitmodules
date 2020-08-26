@@ -1,3 +1,6 @@
 [submodule "scripts/utils"]
 	path = scripts/utils
 	url = https://github.com/dvasilas/systems-evaluation-utils.git
+[submodule "pkg/lobsters-bench"]
+	path = pkg/lobsters-bench
+	url = https://github.com/dvasilas/proteus-lobsters-bench.git
