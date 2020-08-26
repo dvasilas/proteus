@@ -5,7 +5,6 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
@@ -86,57 +85,4 @@ func (c *Client) Query(queryStmt string) (*qpu_api.QueryResp, error) {
 	c.pool.Return(client)
 
 	return resp, err
-}
-
-// QueryArgs ...
-func (c *Client) QueryArgs() (*qpu_api.QueryResponse, error) {
-	client, err := c.pool.Get()
-	if err != nil {
-		return nil, err
-	}
-
-	req := &qpu_api.QueryRequest{
-		Query: &qpu_api.Query{
-			Query: &qpu_api.Query_QueryAst{
-				QueryAst: &qpu_api.ASTQuery{
-					Table:      "table",
-					Projection: []string{"a", "b", "c"},
-					Predicate: []*qpu.AttributePredicate{
-						&qpu.AttributePredicate{
-							Attr:   &qpu.Attribute{AttrKey: "attr"},
-							Lbound: &qpu.Value{Val: &qpu.Value_Int{Int: 0}},
-							Ubound: &qpu.Value{Val: &qpu.Value_Int{Int: 100}},
-						},
-					},
-					TsPredicate: &qpu.SnapshotTimePredicate{
-						Lbound: &qpu.SnapshotTime{Type: qpu.SnapshotTime_LATEST},
-						Ubound: &qpu.SnapshotTime{Type: qpu.SnapshotTime_INF},
-					},
-					Limit: 10,
-				},
-			},
-		},
-		Metadata: nil,
-		Sync:     false,
-	}
-
-	resp, err := client.Cli.QueryArgs(context.TODO(), req)
-
-	c.pool.Return(client)
-
-	return resp, err
-}
-
-// QueryNoOp ...
-func (c *Client) QueryNoOp() (string, error) {
-	client, err := c.pool.Get()
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := client.Cli.QueryNoOp(context.TODO(), &qpu_api.NoOpReq{Str: "hey"})
-
-	c.pool.Return(client)
-
-	return resp.GetStr(), err
 }

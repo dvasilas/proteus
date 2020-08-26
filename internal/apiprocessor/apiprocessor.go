@@ -160,36 +160,10 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 
 // QueryUnary ...
 func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
-	// var astQuery libqpu.ASTQuery
-	// var err error
-	// var ok bool
-
-	// switch req.QueryType() {
-	// case libqpu.ASTQueryT:
-	// 	astQuery = req.GetQueryI()
-	// case libqpu.SQLQueryT:
-	// 	s.sqlCache.RLock()
-	// 	astQuery, ok = s.sqlCache.cache[req.GetSQLStr()]
-	// 	s.sqlCache.RUnlock()
-
-	// 	if !ok {
-	// 		astQuery, err = sqlparser.Parse(req.GetSQLStr())
-	// 		if err != nil {
-	// 			utils.Error(err)
-	// 			return nil, err
-	// 		}
-	// 		s.sqlCache.Lock()
-	// 		s.sqlCache.cache[req.GetSQLStr()] = astQuery
-	// 		s.sqlCache.Unlock()
-	// 	}
-	// }
-
-	// return s.qpuClass.ClientQuery(astQuery, parentSpan)
-
 	astQuery, found := s.sqlCache.get(req.GetSQLStr())
-
 	if !found {
-		astQuery, err := sqlparser.Parse(req.GetSQLStr())
+		var err error
+		astQuery, err = sqlparser.Parse(req.GetSQLStr())
 		if err != nil {
 			return nil, err
 		}

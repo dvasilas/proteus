@@ -155,7 +155,6 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 
 // ProcessQuerySnapshot ...
 func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
-	utils.Trace("Join QPU ProcessQuerySnapshot", map[string]interface{}{"query": query})
 	// var tracer opentracing.Tracer
 	// tracer = nil
 	// if parentSpan != nil {
@@ -254,8 +253,13 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
 	snapshotTs := time.Now()
 
-	respRecords := make([]*qpu_api.QueryRespRecord, 5)
-	stateCh, err := q.state.Scan("stateTableJoin", []string{"joinID", "title", "description", "short_id", "user_id", "vote_sum"}, 5, nil)
+	respRecords := make([]*qpu_api.QueryRespRecord, query.GetLimit())
+
+	stateCh, err := q.state.Scan(
+		"stateTableJoin",
+		append(query.GetProjection(), "joinID"),
+		query.GetLimit(),
+		nil)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +294,9 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		i++
 	}
 
+	// we always call state.LogQuery here and have
+	// if s.logTimestamps { .. }
+	// inside state.LogQuery
 	err = q.state.LogQuery(stateTable, snapshotTs, respRecords)
 	if err != nil {
 		return nil, err

@@ -7,7 +7,7 @@ maxJobQueue = 10000
 
 [Evaluation]
 tracing = false
-logTimestamps = true
+logTimestamps = false
 
 [[connections]]
 address = "127.0.0.1:50150"

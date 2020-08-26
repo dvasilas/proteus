@@ -7,7 +7,7 @@ accessKeyID = "root"
 secretAccessKey  = "verySecretPwd"
 
 [Benchmark]
-opCount = 40
+opCount = 1
 runtime = 20
 doWarmup = false
 warmup = 10
@@ -15,7 +15,7 @@ threadCount = 1
 measuredSystem = "proteus"
 
 [Operations]
-writeRatio = 0.5
+writeRatio = 1.0
 downVoteRatio = 0.2
 
 [Operations.Homepage]
