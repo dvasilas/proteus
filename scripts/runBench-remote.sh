@@ -43,6 +43,10 @@ do
 	touch /tmp/$logfile
 	echo "Logfile: $logfile" >> /tmp/$i.out
 
+
+	ssh -t proteus-eu02 sudo rm -r /opt/lobsters-dataset
+	ssh -t proteus-eu02 sudo cp -r /opt/lobsters-dataset-init-small /opt/lobsters-dataset
+
 	env TAG_DATASTORE=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/datastore-proteus.yml datastore-proteus
 	wait_services_running
 
