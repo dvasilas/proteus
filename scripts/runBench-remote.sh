@@ -2,73 +2,65 @@
 
 set -ex
 
+. runBench.functions
+
 PROTEUS_DIR=$1
 TAG=$2
 SHEET_ID=$3
-SYSTEM=$4
+ROW=$4
 
 export CREDENTIAL_FILE=
 export SPREADSHEET_ID=1OeeBC0vOM5qecenPMiiYH-2zCmaWz9BmJVEvCgtHnVc
 export SHEET_ID=$SHEET_ID
 
-pull() {
-	GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull origin master
-}
-
-build() {
-	cd $PROTEUS_DIR
-	make bench
-	cd -
-}
-
-sync() {
-	for host in "$@"
-	do
-		ssh $host 'sudo rm -r /mount/; sudo mkdir -p /mount/; mkdir -p mount'
-		scp -r $PROTEUS_DIR/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/* $host:~/mount
-		scp -r $PROTEUS_DIR/configs $host:~/mount
-		scp -r $PROTEUS_DIR/scripts $host:~/mount
-		ssh $host 'sudo mv ~/mount/* /mount/'
-	done
-}
-
-remote() {
-	scp $PROTEUS_DIR/configs/benchmark/config.toml proteus-na-01:$PROTEUS_DIR/configs/benchmark/config.toml
-	ssh -t proteus-na-01 "$@"
-}
 
 docker stack rm qpu-graph
 docker stack rm datastore-proteus
 
-remote GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull origin master
+remote GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull --recurse-submodules
 remote cd $PROTEUS_DIR; build
-
-sync proteus04 proteus-eu02 proteus-eu03 proteus-na-02
 
 docker network create -d overlay --attachable proteus_net || true
 
+echo "Proteus image tag: $TAG" > /tmp/bench-config
+
+./format-and-import.py -r $ROW --desc template-config
+ROW=$((ROW+1))
+$PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -d >> /tmp/bench-config
+./format-and-import.py -r $ROW template-config /tmp/bench-config
+ROW=$((ROW+1))
+
 threads=(1 2 4 8 16 32 64 128 256)
 
-rowID=0
-./format-and-import.py -r $rowID --desc template
-rowID=$((rowID+1))
+./format-and-import.py -r $ROW --desc template-run
+ROW=$((ROW+1))
 
 for i in "${threads[@]}"
 do
+
+	echo "Timestamp: $(timestamp)" > /tmp/$i.out
+	logfile=$(timestamp_filename).txt
+	touch /tmp/$logfile
+	echo "Logfile: $logfile" >> /tmp/$i.out
+
 	env TAG_DATASTORE=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/datastore-proteus.yml datastore-proteus
-	$PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -p
-	sleep 5
+	wait_services_running
+
+	$PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -p
 	
 	env TAG_QPU=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/qpu-graph.yml qpu-graph
-	sleep 5
+	wait_services_running
 
-	remote $PROTEUS_DIR/bin/benchmark -c $PROTEUS_DIR/configs/benchmark/config.toml -s $SYSTEM -t $i > /tmp/$i.out
+	$PROTEUS_DIR/scripts/utils/getPlacement.sh >> $logfile
 
-	./format-and-import.py -r $rowID template /tmp/$i.out
+	remote $PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -t $i >> /tmp/$i.out
+
+	curl -u $NUAGE_LIP6_U:$NUAGE_LIP6_P -T $logfile https://nuage.lip6.fr/remote.php/dav/files/$NUAGE_LIP6_U/proteus_bench_logs/$logfile
+	./format-and-import.py -r $ROW template-run /tmp/$i.out
 
 	docker stack rm qpu-graph
 	docker stack rm datastore-proteus
 
 	sleep 10
-	rowID=$((rowID+1))
+	ROW=$((ROW+1))
 done

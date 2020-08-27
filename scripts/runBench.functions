@@ -1,17 +1,17 @@
 
 pull() {
-	GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull origin master
+	GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull --recurse-submodules
 }
 
 build() {
-	cd $PROTEUS_DIR
+	cd $PROTEUS_DIR/pkg/lobsters-bench
 	make bench
 	cd -
 }
 
 remote() {
-	scp $PROTEUS_DIR/configs/benchmark/config.toml proteus-na-01:$PROTEUS_DIR/configs/benchmark/config.toml
-	ssh -t proteus-na-01 "$@"
+	scp $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml proteus-na-01:$PROTEUS_DIR/pkg/lobsters-bench/config/config.toml
+	ssh -A -t proteus-na-01 "$@"
 }
 
 sync() {
