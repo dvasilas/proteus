@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -71,7 +72,8 @@ func main() {
 		}()
 	}
 
-	s.Serve(lis)
+	fmt.Println("Notification server: serving")
+	log.Fatal(s.Serve(lis))
 }
 
 // SubscribeToUpdates ...
