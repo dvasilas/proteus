@@ -17,4 +17,5 @@ RUN set -xe && \
     cp lib_sys_exec.so /usr/lib/mysql/plugin/ && \
     /usr/local/go/bin/go build server.go && \
     mkdir /opt/proteus-lobsters/votes && chown -R mysql:mysql /opt/proteus-lobsters/votes && \
-    mkdir /opt/proteus-lobsters/stories && chown -R mysql:mysql /opt/proteus-lobsters/stories
+    mkdir /opt/proteus-lobsters/stories && chown -R mysql:mysql /opt/proteus-lobsters/stories && \
+    mkdir /opt/proteus-lobsters/comments && chown -R mysql:mysql /opt/proteus-lobsters/comments

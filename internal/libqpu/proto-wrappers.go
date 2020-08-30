@@ -234,28 +234,6 @@ func ConfigRequest() *qpu_api.ConfigRequest {
 	return &qpu_api.ConfigRequest{}
 }
 
-//ConfigRespοnse ...
-func ConfigRespοnse(typ qpu_api.ConfigResponse_QPUType, attrs []*qpu.AttributePredicate) *qpu_api.ConfigResponse {
-	return &qpu_api.ConfigResponse{
-		QpuType:          typ,
-		SupportedQueries: attrs,
-		// Dataset:          ds,
-	}
-}
-
-//DataSet creates a protos/utils/Dataset object
-// func DataSet(dbMap map[string]map[string][]string) *qpu_api.DataSet {
-// 	dbs := make(map[string]*qpu_api.DataSet_DB)
-// 	for dbID, dcMap := range dbMap {
-// 		dcs := make(map[string]*qpu_api.DataSet_DC)
-// 		for dcID, shards := range dcMap {
-// 			dcs[dcID] = &qpu_api.DataSet_DC{Shards: shards}
-// 		}
-// 		dbs[dbID] = &qpu_api.DataSet_DB{Datacenters: dcs}
-// 	}
-// 	return &qpu_api.DataSet{Databases: dbs}
-// }
-
 //AttributePredicate create a protos/utils/AttributePredicate object
 func AttributePredicate(attr *qpu.Attribute, lb *qpu.Value, ub *qpu.Value) *qpu.AttributePredicate {
 	return &qpu.AttributePredicate{

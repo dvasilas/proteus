@@ -153,10 +153,6 @@ func QueryType(query libqpu.ASTQuery) (bool, bool) {
 
 // SatisfiesPredicate ...
 func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool, error) {
-	if query.GetTable() != logOp.GetTable() {
-		return false, nil
-	}
-
 	for _, pred := range query.GetPredicate() {
 		attributes := logOp.GetAttributes()
 		if attributes == nil {

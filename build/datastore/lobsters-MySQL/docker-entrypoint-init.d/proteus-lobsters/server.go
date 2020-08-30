@@ -38,7 +38,7 @@ func main() {
 		port = "50000"
 	}
 
-	tables := []string{"stories", "votes"}
+	tables := []string{"stories", "comments", "votes"}
 
 	server := &datastoreGRPCServer{
 		activeConnections: make(map[string]chan string),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -20,7 +19,7 @@ type QPUService interface {
 type QPU struct {
 	Class        QPUClass
 	Config       *QPUConfig
-	Schema       Schema
+	InputSchema  Schema
 	AdjacentQPUs []*AdjacentQPU
 	State        QPUState
 }
@@ -39,11 +38,13 @@ type QPUClass interface {
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
+	GetConfig() *qpu_api.ConfigResponse
 }
 
 // AdjacentQPU ...
 type AdjacentQPU struct {
-	APIClient APIClient
+	APIClient    APIClient
+	OutputSchema []string
 }
 
 // APIClient ...
@@ -52,6 +53,7 @@ type APIClient interface {
 	QueryUnary(QueryRequest) (*qpu_api.QueryResponse, error)
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
 	CloseConnection() error
+	GetConfig() (*qpu_api.ConfigResponse, error)
 }
 
 // QPUState ...
@@ -59,16 +61,38 @@ type QPUState interface {
 	Init(string, string, string) error
 	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
 	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
-	Get(string, string, map[string]*qpu.Value) (interface{}, error)
-	Scan(string, []string, int64, opentracing.Span) (<-chan map[string]string, error)
+	Get(string, []string, map[string]interface{}, string, int64, opentracing.Span) (<-chan map[string]interface{}, error)
 	SeparateTS(string) error
 	LogQuery(string, time.Time, []*qpu_api.QueryRespRecord) error
 	Cleanup()
 }
 
+// OperatorType ...
+type OperatorType int
+
+const (
+	// DBDriver ...
+	DBDriver OperatorType = iota
+	// Aggregation ...
+	Aggregation OperatorType = iota
+	// Join ...
+	Join OperatorType = iota
+)
+
+// StateType ...
+type StateType int
+
+const (
+	// Stateless ...
+	Stateless StateType = iota
+	// MaterializedView ...
+	MaterializedView StateType = iota
+)
+
 // QPUConfig specifies the configuration structure of a QPU
 type QPUConfig struct {
-	QpuType      qpu_api.ConfigResponse_QPUType
+	Operator     OperatorType
+	State        StateType
 	Port         string
 	Connections  []QPUConnection
 	StateBackend struct {
@@ -88,21 +112,13 @@ type QPUConfig struct {
 			SecretAccessKey string
 		}
 	}
-	SumConfig struct {
-		SourceTable       string
-		RecordIDAttribute []string
-		AttributeToSum    string
-		Query             struct {
-			Projection []string
-			IsNull     []string
-			IsNotNull  []string
-		}
+	AggregationConfig struct {
+		AggregationFunc      AggregationType
+		GroupBy              string
+		AggregationAttribute string
 	}
 	JoinConfig struct {
-		Source []struct {
-			Table      string
-			Projection []string
-		}
+		JoinAttribute map[string]string
 	}
 	Evaluation struct {
 		Tracing       bool
@@ -124,4 +140,12 @@ type DatastoreType int
 const (
 	// MYSQL is the enum value for an MySQL backend data store
 	MYSQL DatastoreType = iota
+)
+
+// AggregationType ...
+type AggregationType int
+
+const (
+	// Sum ...
+	Sum AggregationType = iota
 )

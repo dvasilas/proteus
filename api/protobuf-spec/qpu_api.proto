@@ -154,7 +154,8 @@ message ConfigResponse {
     JOIN = 2;
   }
   QPUType qpu_type = 1;
-  repeated qpu.AttributePredicate supportedQueries = 2;
+  repeated string schema = 2;
+  repeated qpu.AttributePredicate supportedQueries = 3;
 }
 
 message AckMsg {

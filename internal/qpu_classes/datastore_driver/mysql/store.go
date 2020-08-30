@@ -24,7 +24,7 @@ import (
 type MySQLDataStore struct {
 	subscriptionEndpoint string
 	cli                  mysql.PublishUpdatesClient
-	schema               libqpu.Schema
+	inputSchema          libqpu.Schema
 	conn                 *grpc.ClientConn
 	db                   *sql.DB
 }
@@ -44,7 +44,7 @@ type MySQLUpdate struct {
 //---------------- API Functions -------------------
 
 // NewDatastore ...
-func NewDatastore(conf *libqpu.QPUConfig, schema libqpu.Schema) (MySQLDataStore, error) {
+func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataStore, error) {
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s",
 		conf.DatastoreConfig.Credentials.AccessKeyID,
 		conf.DatastoreConfig.Credentials.SecretAccessKey,
@@ -64,7 +64,7 @@ func NewDatastore(conf *libqpu.QPUConfig, schema libqpu.Schema) (MySQLDataStore,
 	s := MySQLDataStore{
 		subscriptionEndpoint: conf.DatastoreConfig.LogStreamEndpoint,
 		cli:                  mysql.NewPublishUpdatesClient(conn),
-		schema:               schema,
+		inputSchema:          inputSchema,
 		conn:                 conn,
 		db:                   db,
 	}
@@ -163,7 +163,7 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 					recordID = string(col)
 				}
 				if col != nil {
-					value, err := ds.schema.StrToValue(table, projection[i], string(col))
+					value, err := ds.inputSchema.StrToValue(table, projection[i], string(col))
 					if err != nil {
 						errCh <- err
 						break
@@ -231,14 +231,14 @@ func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (
 	attributesNew := make(map[string]*qpu.Value)
 	for _, attribute := range notificationMsg.Attributes {
 		if attribute.ValueOld != "" {
-			value, err := ds.schema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
+			value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
 			if err != nil {
 				return libqpu.LogOperation{}, err
 			}
 			attributesOld[attribute.Key] = value
 		}
 		if attribute.ValueNew != "" {
-			value, err := ds.schema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
+			value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
 			if err != nil {
 				return libqpu.LogOperation{}, err
 			}

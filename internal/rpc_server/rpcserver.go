@@ -116,27 +116,6 @@ type jobResult struct {
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_api.QueryResp, error) {
-	// 	var querySp opentracing.Span
-	// 	querySp = nil
-	// 	if parent := opentracing.SpanFromContext(ctx); parent != nil {
-	// 		pCtx := parent.Context()
-	// 		if tracer := opentracing.GlobalTracer(); tracer != nil {
-	// 			querySp = tracer.StartSpan("qpu/query", opentracing.ChildOf(pCtx))
-	// 			defer querySp.Finish()
-	// 		}
-	// 	}
-
-	// 	resp, err := s.api.QueryUnary(libqpu.QueryRequest{Req: req}, querySp)
-
-	// 	results := make([]*qpu.LogOperation, len(resp))
-	// 	for i, entry := range resp {
-	// 		results[i] = entry.Op
-	// 	}
-
-	// 	return &qpu_api.QueryResponse{
-	// 		Results: results,
-	// 	}, err
-
 	work := &Job{
 		server: s,
 		ctx:    ctx,

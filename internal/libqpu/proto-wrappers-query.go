@@ -85,3 +85,8 @@ func (q ASTQuery) GetTsPredicate() *qpu.SnapshotTimePredicate {
 func (q ASTQuery) GetLimit() int64 {
 	return q.Q.GetLimit()
 }
+
+// GetOrderBy ...
+func (q ASTQuery) GetOrderBy() *qpu_api.OrderBy {
+	return q.Q.GetOrderBy()
+}

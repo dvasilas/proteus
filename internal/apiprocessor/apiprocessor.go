@@ -61,7 +61,7 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 		return utils.Error(errors.New("apiProcessor:Query:default"))
 	}
 
-	utils.Trace("internalQuery received", map[string]interface{}{"internalQuery": astQuery})
+	// utils.Trace("internalQuery received", map[string]interface{}{"internalQuery": astQuery})
 	var logOpSubscribeCh, logOpSnapshotCh <-chan libqpu.LogOperation
 	var errSubscribeCh, errSnapshotCh <-chan error
 	queryID := -1
@@ -88,12 +88,12 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 			if !ok {
 				logOpSubscribeCh = nil
 			} else {
-				utils.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				// utils.Trace("api processor received", map[string]interface{}{"logOp": logOp})
 				ok, err := queries.SatisfiesPredicate(logOp, astQuery)
+				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if err != nil {
 					return utils.Error(err)
 				}
-				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
 					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
 						utils.Warn(err)
@@ -107,12 +107,12 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 			if !ok {
 				logOpSnapshotCh = nil
 			} else {
-				utils.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				// utils.Trace("api processor received", map[string]interface{}{"logOp": logOp})
 				ok, err := queries.SatisfiesPredicate(logOp, astQuery)
+				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if err != nil {
 					return utils.Error(err)
 				}
-				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
 				if ok {
 					if err := stream.Send(seqID, libqpu.State, logOp); err != nil {
 						return utils.Error(err)
@@ -167,7 +167,6 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 		if err != nil {
 			return nil, err
 		}
-
 		s.sqlCache.put(req.GetSQLStr(), astQuery)
 	}
 
@@ -176,18 +175,18 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
 func (s *APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
-	return nil, utils.Error(errors.New("not implemented"))
+	return s.qpuClass.GetConfig(), nil
 }
 
 // ---------------- Internal Functions --------------
 
 func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, error) {
-	switch qpu.Config.QpuType {
-	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
+	switch qpu.Config.Operator {
+	case libqpu.DBDriver:
 		return datastoredriver.InitClass(qpu, catchUpDoneCh)
-	case qpu_api.ConfigResponse_SUM:
+	case libqpu.Aggregation:
 		return sumqpu.InitClass(qpu, catchUpDoneCh)
-	case qpu_api.ConfigResponse_JOIN:
+	case libqpu.Join:
 		return joinqpu.InitClass(qpu, catchUpDoneCh)
 	default:
 		return nil, utils.Error(errors.New("Unknown QPU class"))

@@ -17,6 +17,7 @@ import (
 type DatastoreDriverQPU struct {
 	datastore         dataStore
 	persistentQueries map[string]map[int]respChannels
+	inputSchema       libqpu.Schema
 }
 
 type respChannels struct {
@@ -38,7 +39,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 	var err error
 	switch qpu.Config.DatastoreConfig.Type {
 	case libqpu.MYSQL:
-		ds, err = mysqldriver.NewDatastore(qpu.Config, qpu.Schema)
+		ds, err = mysqldriver.NewDatastore(qpu.Config, qpu.InputSchema)
 		if err != nil {
 			return &DatastoreDriverQPU{}, err
 		}
@@ -53,6 +54,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 	return &DatastoreDriverQPU{
 		datastore:         ds,
 		persistentQueries: make(map[string]map[int]respChannels),
+		inputSchema:       qpu.InputSchema,
 	}, nil
 }
 
@@ -148,5 +150,18 @@ func (q *DatastoreDriverQPU) RemovePersistentQuery(table string, queryID int) {
 		close(q.persistentQueries[table][queryID].logOpCh)
 		close(q.persistentQueries[table][queryID].errCh)
 		delete(q.persistentQueries[table], queryID)
+	}
+}
+
+// GetConfig ...
+func (q *DatastoreDriverQPU) GetConfig() *qpu_api.ConfigResponse {
+	schemaTables := make([]string, len(q.inputSchema))
+	i := 0
+	for table := range q.inputSchema {
+		schemaTables[i] = table
+		i++
+	}
+	return &qpu_api.ConfigResponse{
+		Schema: schemaTables,
 	}
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	toml "github.com/pelletier/go-toml"
 )
 
@@ -17,17 +16,22 @@ import (
 // by a TOML file and populating libqpu.QPUConfig struct
 
 type inputQPUConfig struct {
-	QpuType     string
+	Operator    string
+	State       string
 	Port        string
 	Connections []struct {
 		Address string
 		Local   string
 	}
-	Schema []struct {
+	InputSchema []struct {
 		Table      string
 		Attributes []struct {
 			Key  string
 			Type string
+		}
+		DownstreamQuery struct {
+			IsNull    []string
+			IsNotNull []string
 		}
 	}
 	StateBackend struct {
@@ -47,20 +51,15 @@ type inputQPUConfig struct {
 			SecretAccessKey string
 		}
 	}
-	SumConfig struct {
-		SourceTable       string
-		RecordIDAttribute []string
-		AttributeToSum    string
-		Query             struct {
-			Projection []string
-			IsNull     []string
-			IsNotNull  []string
-		}
+	AggregationConfig struct {
+		AggregationFunc      string
+		AggregationAttribute string
+		GroupBy              string
 	}
 	JoinConfig struct {
 		Source []struct {
-			Table      string
-			Projection []string
+			Table         string
+			JoinAttribute string
 		}
 	}
 	IndexConfig struct {
@@ -106,8 +105,13 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 
 	config := &libqpu.QPUConfig{}
 
-	// QpuType
-	if err := getQpuType(inputConfig, config); err != nil {
+	// OperatorType
+	if err := getOperatorType(inputConfig, config); err != nil {
+		return err
+	}
+
+	// StateType
+	if err := getStateType(inputConfig, config); err != nil {
 		return err
 	}
 
@@ -120,7 +124,7 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	}
 
 	// Schema
-	if err := getSchema(inputConfig, qpu); err != nil {
+	if err := getInputSchema(inputConfig, qpu); err != nil {
 		return err
 	}
 
@@ -130,16 +134,16 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	}
 
 	// DatastoreConfiguration
-	switch config.QpuType {
-	case qpu_api.ConfigResponse_DATASTORE_DRIVER:
+	switch config.Operator {
+	case libqpu.DBDriver:
 		if err := getDatastoreConfig(inputConfig, config); err != nil {
 			return err
 		}
-	case qpu_api.ConfigResponse_SUM:
-		if err := getSumConfig(inputConfig, config); err != nil {
+	case libqpu.Aggregation:
+		if err := getAggregationConfig(inputConfig, config); err != nil {
 			return err
 		}
-	case qpu_api.ConfigResponse_JOIN:
+	case libqpu.Join:
 		if err := getJoinConfig(inputConfig, config); err != nil {
 			return err
 		}
@@ -185,16 +189,28 @@ func readConfigFile(configFile string, conf *inputQPUConfig) error {
 	return toml.Unmarshal(configData, conf)
 }
 
-func getQpuType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
-	switch inputConf.QpuType {
-	case "datastore_driver":
-		config.QpuType = qpu_api.ConfigResponse_DATASTORE_DRIVER
-	case "sum":
-		config.QpuType = qpu_api.ConfigResponse_SUM
+func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	switch inputConf.Operator {
+	case "db_driver":
+		config.Operator = libqpu.DBDriver
+	case "aggregation":
+		config.Operator = libqpu.Aggregation
 	case "join":
-		config.QpuType = qpu_api.ConfigResponse_JOIN
+		config.Operator = libqpu.Join
 	default:
-		return utils.Error(errors.New("unknown QPU type"))
+		return utils.Error(errors.New("unknown operator type"))
+	}
+	return nil
+}
+
+func getStateType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	switch inputConf.State {
+	case "stateless":
+		config.State = libqpu.Stateless
+	case "materialized_view":
+		config.State = libqpu.MaterializedView
+	default:
+		return utils.Error(errors.New("unknown state type"))
 	}
 	return nil
 }
@@ -222,23 +238,31 @@ func getConnections(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	return nil
 }
 
-func getSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
-	qpu.Schema = make(map[string]map[string]libqpu.DatastoreAttributeType)
-	for _, table := range inputConf.Schema {
-		qpu.Schema[table.Table] = make(map[string]libqpu.DatastoreAttributeType)
+func getInputSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
+	qpu.InputSchema = make(libqpu.Schema)
+	for _, table := range inputConf.InputSchema {
+		qpu.InputSchema[table.Table] = libqpu.SchemaTable{
+			Attributes: make(map[string]libqpu.DatastoreAttributeType),
+			DownstreamQuery: libqpu.DownstreamQueryConf{
+				IsNull:    table.DownstreamQuery.IsNull,
+				IsNotNull: table.DownstreamQuery.IsNotNull,
+			},
+		}
+
 		for _, attribute := range table.Attributes {
 			switch attribute.Type {
 			case "int":
-				qpu.Schema[table.Table][attribute.Key] = libqpu.INT
+				qpu.InputSchema[table.Table].Attributes[attribute.Key] = libqpu.INT
 			case "string":
-				qpu.Schema[table.Table][attribute.Key] = libqpu.STR
+				qpu.InputSchema[table.Table].Attributes[attribute.Key] = libqpu.STR
 			case "float":
-				qpu.Schema[table.Table][attribute.Key] = libqpu.FLT
+				qpu.InputSchema[table.Table].Attributes[attribute.Key] = libqpu.FLT
 			default:
 				return utils.Error(fmt.Errorf("invalid attribute type %s in schema", attribute.Type))
 			}
 		}
 	}
+	fmt.Println("config/getInputSchema/qpu.InputSchema: ", qpu.InputSchema)
 	return nil
 }
 
@@ -266,34 +290,26 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 	return nil
 }
 
-func getSumConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
-	config.SumConfig.SourceTable = inputConf.SumConfig.SourceTable
-	config.SumConfig.RecordIDAttribute = inputConf.SumConfig.RecordIDAttribute
-	config.SumConfig.AttributeToSum = inputConf.SumConfig.AttributeToSum
-
-	config.SumConfig.Query.Projection = inputConf.SumConfig.Query.Projection
-	config.SumConfig.Query.IsNull = inputConf.SumConfig.Query.IsNull
-	config.SumConfig.Query.IsNotNull = inputConf.SumConfig.Query.IsNotNull
+func getAggregationConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	switch inputConf.AggregationConfig.AggregationFunc {
+	case "sum":
+		config.AggregationConfig.AggregationFunc = libqpu.Sum
+	default:
+		return utils.Error(errors.New("unknown aggregation type"))
+	}
+	config.AggregationConfig.AggregationAttribute = inputConf.AggregationConfig.AggregationAttribute
+	config.AggregationConfig.GroupBy = inputConf.AggregationConfig.GroupBy
 
 	return nil
 }
 
 func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
-	joinConfig := make([]struct {
-		Table      string
-		Projection []string
-	}, len(inputConf.JoinConfig.Source))
-	for i, src := range inputConf.JoinConfig.Source {
-		joinConfig[i] = struct {
-			Table      string
-			Projection []string
-		}{
-			Table:      src.Table,
-			Projection: src.Projection,
-		}
+	joinConfig := make(map[string]string)
+	for _, src := range inputConf.JoinConfig.Source {
+		joinConfig[src.Table] = src.JoinAttribute
 	}
 
-	config.JoinConfig.Source = joinConfig
+	config.JoinConfig.JoinAttribute = joinConfig
 
 	return nil
 }

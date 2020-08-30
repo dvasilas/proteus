@@ -1,8 +1,25 @@
-qpuType = "sum"
+operator = "aggregation"
+state = "materialized_view"
 port = "50250"
 
 maxWorkers = 4
 maxJobQueue = 10000
+
+[[InputSchema]]
+table = "votes"
+[InputSchema.DownstreamQuery]
+isNull = ["comment_id"]
+[[InputSchema.Attributes]]
+key = "story_id"
+type = "int"
+[[InputSchema.Attributes]]
+key = "vote"
+type = "int"
+
+[AggregationConfig]
+AggregationFunc = "sum"
+AggregationAttribute = "vote"
+GroupBy = "story_id"
 
 [Evaluation]
 tracing = false
@@ -10,8 +27,6 @@ logTimestamps = false
 
 [[connections]]
 address = "dsdriver:50150"
-# address = "docker.for.mac.localhost:50150"
-# address = "127.0.0.1:50150"
 local = "local"
 
 [StateBackend]
@@ -20,11 +35,3 @@ endpoint = "127.0.0.1:3306"
 [StateBackend.Credentials]
 accessKeyID = "root"
 secretAccessKey = "verySecrectQPUPwd"
-
-[SumConfig]
-SourceTable = "votes"
-RecordIDAttribute = ["story_id"]
-AttributeToSum = "vote"
-[SumConfig.Query]
-Projection = ["id", "story_id", "vote"]
-IsNull = ["comment_id"]

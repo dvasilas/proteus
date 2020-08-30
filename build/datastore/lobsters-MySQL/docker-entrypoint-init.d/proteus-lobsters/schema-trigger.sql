@@ -71,5 +71,15 @@ BEGIN
       SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'stories ', New.id, ' "', New.ts, '" id:', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
       SET result = sys_exec(cmd);
 END;
+DROP TRIGGER IF EXISTS `comments_trigger` $
+CREATE TRIGGER `comments_trigger`
+AFTER INSERT ON `comments`
+FOR EACH ROW
+BEGIN
+  DECLARE cmd CHAR(255);
+  DECLARE result int(10);
+      SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'comments ', New.id, ' "', New.ts, '" id:', New.id, ' user_id:', New.user_id, ' story_id:', New.story_id, ' comment:"', New.comment, '"');
+      SET result = sys_exec(cmd);
+END;
 $
 DELIMITER ;

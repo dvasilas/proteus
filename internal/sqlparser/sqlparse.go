@@ -398,6 +398,10 @@ func (ctx *sqlParseCtx) parseSQLVal(node sqlparser.SQLNode) (err error) {
 	var valFlt float64
 
 	switch node.(*sqlparser.SQLVal).Type {
+	case sqlparser.StrVal:
+		if ctx.walkState[0] == where {
+			ctx.whereExprPush(value{v: libqpu.ValueStr(string(node.(*sqlparser.SQLVal).Val))})
+		}
 	case sqlparser.IntVal:
 		valInt, err = strconv.ParseInt(string(node.(*sqlparser.SQLVal).Val), 10, 64)
 		if err != nil {
@@ -436,22 +440,20 @@ func (ctx *sqlParseCtx) buildProteusAST() error {
 	}
 
 	var optr string
-	var pred *qpu.AttributePredicate
+
+	pred := qpu.AttributePredicate{}
+	pred.Attr = &qpu.Attribute{}
 
 	for len(ctx.whereStack) > 0 {
 		expr := ctx.whereExprPop()
 
 		switch expr.getType() {
 		case collName:
-			pred.Attr = &qpu.Attribute{
-				AttrKey: string(expr.(colName)),
-			}
+			pred.Attr.AttrKey = string(expr.(colName))
 		case val:
 			if optr == "=" {
-				pred = &qpu.AttributePredicate{
-					Lbound: expr.(value).v,
-					Ubound: expr.(value).v,
-				}
+				pred.Lbound = expr.(value).v
+				pred.Ubound = expr.(value).v
 			}
 		case op:
 			optr = string(expr.(operator))
@@ -459,7 +461,7 @@ func (ctx *sqlParseCtx) buildProteusAST() error {
 		}
 	}
 
-	ctx.proteusAST.Predicate = append(ctx.proteusAST.Predicate, pred)
+	ctx.proteusAST.Predicate = append(ctx.proteusAST.Predicate, &pred)
 	ctx.proteusAST.TsPredicate = libqpu.SnapshotTimePredicate(
 		libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),
 		libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),

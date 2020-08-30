@@ -43,11 +43,16 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 		if err != nil {
 			return err
 		}
-		adjQPUs[i] = &libqpu.AdjacentQPU{
-			APIClient: qpuapiclient,
+
+		adjQPUConf, err := qpuapiclient.GetConfig()
+		if err != nil {
+			return err
 		}
 
-		utils.Trace("connection established", map[string]interface{}{"conn": conn.Address})
+		adjQPUs[i] = &libqpu.AdjacentQPU{
+			APIClient:    qpuapiclient,
+			OutputSchema: adjQPUConf.Schema,
+		}
 	}
 	qpu.AdjacentQPUs = adjQPUs
 
