@@ -45,7 +45,7 @@ services:
       - /mount/configs:/configs
     ports:
       - 50350:50350
-    command: /configs/lobsters/join.toml error
+    command: /configs/lobsters/join-stories.toml error
     deploy:
       restart_policy:
         condition: none
