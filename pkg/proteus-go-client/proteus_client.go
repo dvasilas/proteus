@@ -8,6 +8,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 )
@@ -67,7 +68,7 @@ func (c *Client) Close() error {
 }
 
 // Query ...
-func (c *Client) Query(queryStmt string) (*qpu_api.QueryResp, error) {
+func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
@@ -84,5 +85,16 @@ func (c *Client) Query(queryStmt string) (*qpu_api.QueryResp, error) {
 
 	c.pool.Return(client)
 
-	return resp, err
+	response := make([]*pb.QueryRespRecord, len(resp.GetRespRecord()))
+	for i, rec := range resp.GetRespRecord() {
+		response[i] = &pb.QueryRespRecord{
+			RecordId:   rec.GetRecordId(),
+			Attributes: rec.GetAttributes(),
+			Timestamp:  rec.GetTimestamp(),
+		}
+	}
+
+	return &pb.QueryResp{
+		RespRecord: response,
+	}, err
 }

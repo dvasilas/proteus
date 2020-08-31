@@ -3,9 +3,7 @@ module github.com/dvasilas/proteus
 go 1.14
 
 require (
-	github.com/BurntSushi/toml v0.3.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dvasilas/proteus-lobsters-bench v0.0.0-20200826202438-fe42c98252df // indirect
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang/protobuf v1.4.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
@@ -22,7 +20,6 @@ require (
 	go.uber.org/atomic v1.6.0 // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20200806125547-5acd03effb82 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/tools v0.0.0-20200331025713-a30bf2db82d4 // indirect
