@@ -113,7 +113,7 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 
 	db.Close()
 
-	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s",
+	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
 		s.accessKeyID,
 		s.secretAccessKey,
 		s.endpoint,
@@ -271,7 +271,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 // Get retrieves state records based on a given query.
 // It returns a channel that can be used to iteratively return the retrieved records.
 // The channel returns records of type map[<attributeName>]<string_value>.
-func (s *MySQLStateBackend) Get(from string, projection []string, where map[string]interface{}, orderby string, limit int64, parentSpan opentracing.Span) (<-chan map[string]interface{}, error) {
+func (s *MySQLStateBackend) Get(from string, projection []string, where map[string]interface{}, orderby string, limit int64, getBytes bool, parentSpan opentracing.Span) (<-chan map[string]interface{}, error) {
 	// tracing
 	var tracer opentracing.Tracer
 	var dbQuerySp opentracing.Span
@@ -347,14 +347,43 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 	}
 
 	columns, _ := rows.Columns()
-	values := make([]interface{}, len(columns))
+	if getBytes == false {
+		values := make([]interface{}, len(columns))
+		scanArgs := make([]interface{}, len(columns))
+		for i := range values {
+			scanArgs[i] = &values[i]
+		}
+
+		resultCh := make(chan map[string]interface{})
+
+		go func() {
+			defer rows.Close()
+			for rows.Next() {
+				err = rows.Scan(scanArgs...)
+				if err != nil {
+					panic(err)
+				}
+				row := make(map[string]interface{})
+				for i, col := range values {
+					if col != nil {
+						row[columns[i]] = col
+					}
+				}
+				resultCh <- row
+			}
+			close(resultCh)
+		}()
+		return resultCh, nil
+	}
+
+	values := make([]sql.RawBytes, len(columns)-1)
 	scanArgs := make([]interface{}, len(columns))
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
-
+	var ts time.Time
+	scanArgs[len(scanArgs)-1] = &ts
 	resultCh := make(chan map[string]interface{})
-
 	go func() {
 		defer rows.Close()
 		for rows.Next() {
@@ -365,9 +394,10 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 			row := make(map[string]interface{})
 			for i, col := range values {
 				if col != nil {
-					row[columns[i]] = col
+					row[columns[i]] = string(col)
 				}
 			}
+			row["ts"] = ts
 			resultCh <- row
 		}
 		close(resultCh)

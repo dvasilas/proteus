@@ -175,6 +175,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 		predicate,
 		orderBy,
 		query.GetLimit(),
+		false,
 		nil)
 	if err != nil {
 		errCh <- utils.Error(err)
@@ -185,15 +186,16 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 		for record := range stateCh {
 			// process timestamp
 			vectorClockKey := string(record["ts_key"].([]byte))
-			var ts time.Time
-			ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-			if err != nil {
-				ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-				if err != nil {
-					errCh <- utils.Error(err)
-					break
-				}
-			}
+			// var ts time.Time
+			ts := record["ts"].(time.Time)
+			// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
+			// if err != nil {
+			// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
+			// 	if err != nil {
+			// 		errCh <- utils.Error(err)
+			// 		break
+			// 	}
+			// }
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
 				errCh <- utils.Error(err)
@@ -255,10 +257,11 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 
 	stateCh, err := q.state.Get(
 		q.stateTable+q.port,
-		append(query.GetProjection(), q.joinAttributeKey, "ts", "ts_key"),
+		append(query.GetProjection(), q.joinAttributeKey, "ts_key", "ts"),
 		predicate,
 		orderBy,
 		query.GetLimit(),
+		true,
 		nil)
 	if err != nil {
 		return nil, err
@@ -267,15 +270,16 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	respRecords = make([]*qpu_api.QueryRespRecord, 0)
 	for record := range stateCh {
 		// process timestamp
-		vectorClockKey := string(record["ts_key"].([]byte))
-		var ts time.Time
-		ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-		if err != nil {
-			ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-			if err != nil {
-				return nil, utils.Error(err)
-			}
-		}
+		vectorClockKey := record["ts_key"].(string)
+		ts := record["ts"].(time.Time)
+		// var ts time.Time
+		// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
+		// if err != nil {
+		// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
+		// 	if err != nil {
+		// 		return nil, utils.Error(err)
+		// 	}
+		// }
 		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
 			return nil, err
@@ -284,14 +288,18 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		delete(record, "ts_key")
 
 		// process the rest of the attributes
-		attrs, err := q.outputSchema.InterfaceToString(q.stateTable, record)
-		if err != nil {
-			return nil, err
+		// attrs, err := q.outputSchema.InterfaceToString(q.stateTable, record)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		attribs := make(map[string][]byte)
+		for k, v := range record {
+			attribs[k] = []byte(v.(string))
 		}
 
 		respRecords = append(respRecords, &qpu_api.QueryRespRecord{
-			RecordId:   string(attrs[q.joinAttributeKey]),
-			Attributes: attrs,
+			RecordId:   string(attribs[q.joinAttributeKey]),
+			Attributes: attribs,
 			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
 		})
 	}
@@ -410,7 +418,7 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 		q.stateTable+q.port,
 		[]string{q.joinAttributeKey},
 		map[string]interface{}{q.joinAttributeKey: joinID},
-		"", 0, nil,
+		"", 0, false, nil,
 	)
 	if err != nil {
 		return nil, err

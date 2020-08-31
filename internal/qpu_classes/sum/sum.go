@@ -162,6 +162,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 		[]string{"*"},
 		nil, "",
 		query.GetLimit(),
+		false,
 		nil,
 	)
 	if err != nil {
@@ -173,15 +174,15 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 		for record := range stateCh {
 			// prepare timestamp
 			vectorClockKey := string(record["ts_key"].([]byte))
-			var ts time.Time
-			ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-			if err != nil {
-				ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-				if err != nil {
-					errCh <- utils.Error(err)
-					break
-				}
-			}
+			ts := record["ts"].(time.Time)
+			// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
+			// if err != nil {
+			// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
+			// 	if err != nil {
+			// 		errCh <- utils.Error(err)
+			// 		break
+			// 	}
+			// }
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
 				errCh <- err
@@ -343,7 +344,7 @@ func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qp
 	stateCh, err := q.state.Get(q.schemaTable+q.port,
 		[]string{q.aggregationAttribute + "_sum"},
 		map[string]interface{}{q.groupBy: groupByVal},
-		"", 0, nil,
+		"", 0, false, nil,
 	)
 	if err != nil {
 		return -1, err
