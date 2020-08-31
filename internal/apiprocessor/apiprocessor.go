@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
+	router "github.com/dvasilas/proteus/internal/qpu_classes/router"
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
@@ -134,7 +135,6 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 			if !ok {
 				errSnapshotCh = nil
 			} else {
-				utils.Trace("api processor received error", map[string]interface{}{"error": err})
 				// 			if cancel != nil {
 				// 				cancel()
 				// 			}
@@ -188,6 +188,8 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 		return sumqpu.InitClass(qpu, catchUpDoneCh)
 	case libqpu.Join:
 		return joinqpu.InitClass(qpu, catchUpDoneCh)
+	case libqpu.Router:
+		return router.InitClass(qpu, catchUpDoneCh)
 	default:
 		return nil, utils.Error(errors.New("Unknown QPU class"))
 	}

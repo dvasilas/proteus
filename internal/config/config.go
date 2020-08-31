@@ -57,7 +57,9 @@ type inputQPUConfig struct {
 		GroupBy              string
 	}
 	JoinConfig struct {
-		Source []struct {
+		OutputTableAlias     string
+		JoinedAttributeAlias string
+		Source               []struct {
 			Table         string
 			JoinAttribute string
 		}
@@ -197,6 +199,8 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.Operator = libqpu.Aggregation
 	case "join":
 		config.Operator = libqpu.Join
+	case "router":
+		config.Operator = libqpu.Router
 	default:
 		return utils.Error(errors.New("unknown operator type"))
 	}
@@ -262,7 +266,6 @@ func getInputSchema(inputConf inputQPUConfig, qpu *libqpu.QPU) error {
 			}
 		}
 	}
-	fmt.Println("config/getInputSchema/qpu.InputSchema: ", qpu.InputSchema)
 	return nil
 }
 
@@ -308,6 +311,8 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	for _, src := range inputConf.JoinConfig.Source {
 		joinConfig[src.Table] = src.JoinAttribute
 	}
+	config.JoinConfig.OutputTableAlias = inputConf.JoinConfig.OutputTableAlias
+	config.JoinConfig.JoinedAttributeAlias = inputConf.JoinConfig.JoinedAttributeAlias
 
 	config.JoinConfig.JoinAttribute = joinConfig
 

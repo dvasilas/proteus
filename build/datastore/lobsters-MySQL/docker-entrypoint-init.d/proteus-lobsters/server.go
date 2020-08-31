@@ -102,9 +102,13 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 			}
 		}
 
-		ts, err := time.Parse("2006-01-02 15:04:05.000000", update.Timestamp)
+		var ts time.Time
+		ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Timestamp)
 		if err != nil {
-			return err
+			ts, err = time.Parse("2006-01-02 15:04:05", update.Timestamp)
+			if err != nil {
+				return err
+			}
 		}
 		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {

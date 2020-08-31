@@ -35,6 +35,23 @@ services:
           - node.labels.dc == eu
           - node.labels.placement_sum == true
 
+  sum-comments:
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - qpu_graph
+    environment:
+      - MYSQL_PASSWORD=verySecrectQPUPwd
+    volumes:
+      - /mount/configs:/configs
+    command: /configs/lobsters/sum-comments.toml error
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_sum == true
+
   join-stories:
     image: dvasilas/proteus:${TAG_QPU}
     networks:
@@ -43,9 +60,43 @@ services:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
       - /mount/configs:/configs
-    ports:
-      - 50350:50350
     command: /configs/lobsters/join-stories.toml error
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_join == true
+
+  join-comments:
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - qpu_graph
+    environment:
+      - MYSQL_PASSWORD=verySecrectQPUPwd
+    volumes:
+      - /mount/configs:/configs
+    command: /configs/lobsters/join-comments.toml error
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.labels.dc == eu
+          - node.labels.placement_join == true
+
+  router:
+    image: dvasilas/proteus:${TAG_QPU}
+    networks:
+      - qpu_graph
+    environment:
+      - MYSQL_PASSWORD=verySecrectQPUPwd
+    volumes:
+      - /mount/configs:/configs
+    ports:
+      - 50450:50450
+    command: /configs/lobsters/router.toml error
     deploy:
       restart_policy:
         condition: none

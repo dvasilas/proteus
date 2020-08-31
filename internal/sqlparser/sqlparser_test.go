@@ -25,7 +25,12 @@ var filterTests = []struct {
 			Projection: []string{"*"},
 			Table:      "t",
 			Predicate: []*qpu.AttributePredicate{
-				libqpu.AttributePredicate(libqpu.Attribute("x", nil), libqpu.ValueInt(42), libqpu.ValueInt(42)),
+				&qpu.AttributePredicate{
+					Attr:   libqpu.Attribute("x", nil),
+					Type:   qpu.AttributePredicate_RANGE,
+					Lbound: libqpu.ValueInt(42),
+					Ubound: libqpu.ValueInt(42),
+				},
 			},
 			TsPredicate: libqpu.SnapshotTimePredicate(
 				libqpu.SnapshotTime(qpu.SnapshotTime_LATEST, nil, true),

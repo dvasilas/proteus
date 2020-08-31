@@ -155,7 +155,7 @@ func (s Schema) InterfaceToStr(table, attributeKey string, val interface{}) ([]b
 func (s Schema) InterfaceToValue(table, attributeKey string, val interface{}) (*qpu.Value, error) {
 	switch s[table].Attributes[attributeKey] {
 	case STR:
-		return ValueStr((val.(string))), nil
+		return ValueStr(string(val.([]byte))), nil
 	case INT:
 		return ValueInt(val.(int64)), nil
 	case FLT:

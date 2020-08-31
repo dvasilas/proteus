@@ -77,6 +77,8 @@ const (
 	Aggregation OperatorType = iota
 	// Join ...
 	Join OperatorType = iota
+	// Router ...
+	Router OperatorType = iota
 )
 
 // StateType ...
@@ -118,7 +120,9 @@ type QPUConfig struct {
 		AggregationAttribute string
 	}
 	JoinConfig struct {
-		JoinAttribute map[string]string
+		OutputTableAlias     string
+		JoinedAttributeAlias string
+		JoinAttribute        map[string]string
 	}
 	Evaluation struct {
 		Tracing       bool

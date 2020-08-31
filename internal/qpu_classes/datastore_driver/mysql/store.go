@@ -172,10 +172,14 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 				}
 			}
 
-			ts, err := time.Parse("2006-01-02 15:04:05.000000", attributes["ts"].GetStr())
+			var ts time.Time
+			ts, err = time.Parse("2006-01-02 15:04:05.000000", attributes["ts"].GetStr())
 			if err != nil {
-				errCh <- err
-				break
+				ts, err = time.Parse("2006-01-02 15:04:05", attributes["ts"].GetStr())
+				if err != nil {
+					errCh <- utils.Error(err)
+					break
+				}
 			}
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {

@@ -39,6 +39,9 @@ type = "int"
 # - the order of JoinConfig.Source entries match the order of connecions
 # - i.e. the 1st entry of source is used to construct queries that are then sent to
 #   the 1st connection, etc.
+[JoinConfig]
+outputTableAlias = "stories"
+joinedAttributeAlias = "story_id"
 [[JoinConfig.Source]]
 table = "stories"
 joinAttribute = "id"

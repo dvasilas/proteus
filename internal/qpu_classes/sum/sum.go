@@ -165,7 +165,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 		nil,
 	)
 	if err != nil {
-		errCh <- err
+		errCh <- utils.Error(err)
 		return logOpCh, errCh
 	}
 
@@ -173,10 +173,14 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 		for record := range stateCh {
 			// prepare timestamp
 			vectorClockKey := string(record["ts_key"].([]byte))
-			ts, err := time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
+			var ts time.Time
+			ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
 			if err != nil {
-				errCh <- err
-				break
+				ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
+				if err != nil {
+					errCh <- utils.Error(err)
+					break
+				}
 			}
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
