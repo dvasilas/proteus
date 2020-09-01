@@ -10,8 +10,8 @@ tracing = false
 logTimestamps = false
 
 [[connections]]
-address = "sum-stories:50350"
+address = "join-stories:50350"
 local = "local"
 [[connections]]
-address = "sum-comments:50360"
+address = "join-comments:50360"
 local = "local"
