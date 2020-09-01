@@ -20,6 +20,8 @@ docker stack rm datastore-proteus
 pull
 build
 
+sync proteus04 proteus-eu02 proteus-eu03 proteus-na-02
+
 docker network create -d overlay --attachable proteus_net || true
 
 echo "Proteus image tag: $TAG" > /tmp/bench-config
@@ -49,14 +51,18 @@ do
 	env TAG_DATASTORE=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/datastore-proteus.yml datastore-proteus
 	wait_services_running
 
+	sleep 10
+
 	env TAG_QPU=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/qpu-graph.yml qpu-graph
 	wait_services_running
 
-	$PROTEUS_DIR/scripts/utils/getPlacement.sh >> $logfile
+	$PROTEUS_DIR/scripts/utils/getPlacement.sh >> /tmp/$logfile
+
+	sleep 10
 
 	$PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -t $i >> /tmp/$i.out
 
-	curl -u $NUAGE_LIP6_U:$NUAGE_LIP6_P -T $logfile https://nuage.lip6.fr/remote.php/dav/files/$NUAGE_LIP6_U/proteus_bench_logs/$logfile
+	curl -u $NUAGE_LIP6_U:$NUAGE_LIP6_P -T /tmp/$logfile https://nuage.lip6.fr/remote.php/dav/files/$NUAGE_LIP6_U/proteus_bench_logs/$logfile
 	./format-and-import.py -r $ROW template-run /tmp/$i.out
 
 	docker stack rm qpu-graph

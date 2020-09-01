@@ -53,6 +53,7 @@ services:
         constraints:
           - node.labels.dc == eu
           - node.labels.placement_join == true
+          - node.labels.cluster == 0
 
 networks:
   qpu_graph:
