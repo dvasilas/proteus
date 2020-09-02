@@ -92,7 +92,7 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map
 					if !ok {
 						logOpCh = nil
 					} else {
-						utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
+						// utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
 						if len(q.persistentQueries[query.GetTable()]) == 0 {
 							cancel()
 							delete(q.persistentQueries, query.GetTable())

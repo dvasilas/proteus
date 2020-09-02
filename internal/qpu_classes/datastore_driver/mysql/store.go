@@ -229,7 +229,7 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 }
 
 func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (libqpu.LogOperation, error) {
-	utils.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
+	// utils.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
 
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)
