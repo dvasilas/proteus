@@ -1,19 +1,22 @@
 Timestamp
 Logfile
 Runtime
+Target load
 Benchmark threads
-[vote] Operation count
-[vote] Throughput
-[vote] p50(ms)
-[vote] p90(ms)
-[vote] p95(ms)
-[vote] p99(ms)
-[getHomepage] Operation count
-[getHomepage] Throughput
-[getHomepage] p50(ms)
-[getHomepage] p90(ms)
-[getHomepage] p95(ms)
-[getHomepage] p99(ms)
+Max in flight
+Conn pool size
+Load offered
+Total throughput
+[read] Throughput
+[read] p50(ms)
+[read] p90(ms)
+[read] p95(ms)
+[read] p99(ms)
+[write] Throughput
+[write] p50(ms)
+[write] p90(ms)
+[write] p95(ms)
+[write] p99(ms)
 [freshness-latency] p50(ms)
 [freshness-latency] p90(ms)
 [freshness-latency] p95(ms)

@@ -18,7 +18,9 @@ docker stack rm qpu-graph
 docker stack rm datastore-proteus
 
 remote GIT_DIR=$PROTEUS_DIR/.git GIT_WORK_TREE=$PROTEUS_DIR git pull --recurse-submodules
-remote cd $PROTEUS_DIR; build
+remote cd $PROTEUS_DIR/pkg/lobsters-bench; build
+
+sync proteus04 proteus-eu02 proteus-eu03 proteus-na-02
 
 docker network create -d overlay --attachable proteus_net || true
 
@@ -30,37 +32,36 @@ $PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench
 ./format-and-import.py -r $ROW template-config /tmp/bench-config
 ROW=$((ROW+1))
 
-threads=(1 2 4 8 16 32 64 128 256)
-
 ./format-and-import.py -r $ROW --desc template-run
 ROW=$((ROW+1))
 
-for i in "${threads[@]}"
+#for i in "500 32 1" "1000 32 1" "1500 32 1" "2000 16 2" "2500 64 2" "2500 16 4" "2500 32 4" "3000 128 1" "3000 64 2" "3000 64 4" "3500 256 1"
+for i in "1000 64 1" "1000 128 1" "1000 256 1" 
 do
 
-	echo "Timestamp: $(timestamp)" > /tmp/$i.out
+	set -- $i
+
+	echo "Timestamp: $(timestamp)" > /tmp/$1_$2_$3.out
 	logfile=$(timestamp_filename).txt
 	touch /tmp/$logfile
-	echo "Logfile: $logfile" >> /tmp/$i.out
-
-
-	ssh -t proteus-eu02 sudo rm -r /opt/lobsters-dataset
-	ssh -t proteus-eu02 sudo cp -r /opt/lobsters-dataset-init-small /opt/lobsters-dataset
+	echo "Logfile: $logfile" >> /tmp/$1_$2_$3.out
 
 	env TAG_DATASTORE=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/datastore-proteus.yml datastore-proteus
 	wait_services_running
 
-	$PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -p
-	
+	sleep 10
+
 	env TAG_QPU=$TAG docker stack deploy --compose-file $PROTEUS_DIR/deployments/compose-files/lobsters-benchmarks/qpu-graph.yml qpu-graph
 	wait_services_running
 
 	$PROTEUS_DIR/scripts/utils/getPlacement.sh >> $logfile
 
-	remote $PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -t $i >> /tmp/$i.out
+	sleep 10
+
+	remote $PROTEUS_DIR/pkg/lobsters-bench/bin/benchmark -c $PROTEUS_DIR/pkg/lobsters-bench/config/config.toml -l $1 -f $2 -t $3 >> /tmp/$1_$2_$3.out
 
 	curl -u $NUAGE_LIP6_U:$NUAGE_LIP6_P -T $logfile https://nuage.lip6.fr/remote.php/dav/files/$NUAGE_LIP6_U/proteus_bench_logs/$logfile
-	./format-and-import.py -r $ROW template-run /tmp/$i.out
+	./format-and-import.py -r $ROW template-run /tmp/$1_$2_$3.out
 
 	docker stack rm qpu-graph
 	docker stack rm datastore-proteus
