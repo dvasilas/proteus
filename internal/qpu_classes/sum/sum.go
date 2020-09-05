@@ -14,6 +14,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -237,7 +238,7 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]stri
 }
 
 // ClientQuery ...
-func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	return nil, errors.New("not implemented")
 }
 

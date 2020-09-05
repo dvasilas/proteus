@@ -8,6 +8,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
@@ -41,7 +42,7 @@ func (q *RouterQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]st
 }
 
 // ClientQuery ...
-func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	var forwardTo *libqpu.AdjacentQPU
 	found := false
 	for _, adjQPU := range q.adjacentQPUs {
@@ -70,7 +71,7 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 		}
 	}()
 
-	respRecords := make([]*qpu_api.QueryRespRecord, 0)
+	respRecords := make([]*pb.QueryRespRecord, 0)
 
 	for record := range respCh {
 		attributes := make(map[string][]byte)
@@ -82,14 +83,14 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 			attributes[k] = []byte(valStr)
 		}
 
-		respRecords = append(respRecords, &qpu_api.QueryRespRecord{
+		respRecords = append(respRecords, &pb.QueryRespRecord{
 			RecordId:   record.GetRecordID(),
 			Attributes: attributes,
 			Timestamp:  record.GetLogOp().GetTimestamp().GetVc(),
 		})
 	}
 
-	return &qpu_api.QueryResp{
+	return &pb.QueryResp{
 		RespRecord: respRecords,
 	}, nil
 }

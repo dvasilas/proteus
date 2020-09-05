@@ -12,6 +12,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -110,12 +111,12 @@ func (j *Job) do(ctx context.Context, s *Server, req libqpu.QueryRequest) {
 }
 
 type jobResult struct {
-	response *qpu_api.QueryResp
+	response *pb.QueryResp
 	err      error
 }
 
 // QueryUnary ...
-func (s *Server) QueryUnary(ctx context.Context, req *qpu_api.QueryReq) (*qpu_api.QueryResp, error) {
+func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryResp, error) {
 	work := &Job{
 		server: s,
 		ctx:    ctx,

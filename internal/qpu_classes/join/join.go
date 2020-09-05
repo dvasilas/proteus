@@ -12,6 +12,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -229,8 +230,8 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 }
 
 // ClientQuery ...
-func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
-	var respRecords []*qpu_api.QueryRespRecord
+func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
+	var respRecords []*pb.QueryRespRecord
 
 	// first, log the query
 	snapshotTs := time.Now()
@@ -267,7 +268,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		return nil, err
 	}
 
-	respRecords = make([]*qpu_api.QueryRespRecord, 0)
+	respRecords = make([]*pb.QueryRespRecord, 0)
 	for record := range stateCh {
 		// process timestamp
 		vectorClockKey := record["ts_key"].(string)
@@ -297,14 +298,14 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 			attribs[k] = []byte(v.(string))
 		}
 
-		respRecords = append(respRecords, &qpu_api.QueryRespRecord{
+		respRecords = append(respRecords, &pb.QueryRespRecord{
 			RecordId:   string(attribs[q.joinAttributeKey]),
 			Attributes: attribs,
 			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
 		})
 	}
 
-	return &qpu_api.QueryResp{
+	return &pb.QueryResp{
 		RespRecord: respRecords,
 	}, nil
 }

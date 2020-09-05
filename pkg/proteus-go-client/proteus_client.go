@@ -5,7 +5,6 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
@@ -71,7 +70,7 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 		return nil, err
 	}
 
-	r := &qpu_api.QueryReq{
+	r := &pb.QueryReq{
 		QueryStr: queryStmt,
 	}
 
@@ -82,16 +81,5 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 
 	c.pool.Return(client)
 
-	response := make([]*pb.QueryRespRecord, len(resp.GetRespRecord()))
-	for i, rec := range resp.GetRespRecord() {
-		response[i] = &pb.QueryRespRecord{
-			RecordId:   rec.GetRecordId(),
-			Attributes: rec.GetAttributes(),
-			Timestamp:  rec.GetTimestamp(),
-		}
-	}
-
-	return &pb.QueryResp{
-		RespRecord: response,
-	}, err
+	return resp, err
 }

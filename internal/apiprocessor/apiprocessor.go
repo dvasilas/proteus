@@ -14,6 +14,7 @@ import (
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -159,7 +160,7 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 }
 
 // QueryUnary ...
-func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	astQuery, found := s.sqlCache.get(req.GetSQLStr())
 	if !found {
 		var err error

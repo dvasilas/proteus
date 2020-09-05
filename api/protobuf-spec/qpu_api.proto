@@ -3,7 +3,7 @@ syntax = "proto3";
 option go_package = "github.com/dvasilas/proteus/internal/proto/qpu_api";
 
 import "api/protobuf-spec/qpu.proto";
-import "google/protobuf/timestamp.proto";
+import "api/protobuf-spec/client_api.proto";
 
 service QPUAPI {
   // The QPU Query API.
@@ -13,7 +13,7 @@ service QPUAPI {
   // It is used to simplify the client code for clients that have queries
   // that look like SELECT .. FROM .. WHERE .. LIMIT N
   // and so do not care about streaming anyways.
-  rpc QueryUnary(QueryReq) returns (QueryResp) {}
+  rpc QueryUnary(pb.QueryReq) returns (pb.QueryResp) {}
   // The QPU GetConfig API.
   // Used by a 'parent' QPU to request the configuration and query processing
   // capabilities of a 'child` QPU.
@@ -25,20 +25,6 @@ service QPUAPI {
   // rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
   // rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
   // rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
-}
-
-message QueryReq {
-  string queryStr = 1;
-}
-
-message QueryResp {
-  repeated QueryRespRecord respRecord = 1;
-}
-
-message QueryRespRecord {
-  string record_id = 1;
-  map<string, bytes> attributes = 3;
-  map<string, google.protobuf.Timestamp> timestamp = 4;
 }
 
 message NoOpReq {

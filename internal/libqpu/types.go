@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 )
@@ -27,14 +28,14 @@ type QPU struct {
 // APIProcessor ...
 type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
-	QueryUnary(QueryRequest, opentracing.Span) (*qpu_api.QueryResp, error)
+	QueryUnary(QueryRequest, opentracing.Span) (*pb.QueryResp, error)
 	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
 	// GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
 }
 
 // QPUClass ...
 type QPUClass interface {
-	ClientQuery(ASTQuery, opentracing.Span) (*qpu_api.QueryResp, error)
+	ClientQuery(ASTQuery, opentracing.Span) (*pb.QueryResp, error)
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
@@ -63,7 +64,7 @@ type QPUState interface {
 	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
 	Get(string, []string, map[string]interface{}, string, int64, bool, opentracing.Span) (<-chan map[string]interface{}, error)
 	SeparateTS(string) error
-	LogQuery(string, time.Time, []*qpu_api.QueryRespRecord) error
+	LogQuery(string, time.Time, []*pb.QueryRespRecord) error
 	Cleanup()
 }
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -429,7 +429,7 @@ func (s *MySQLStateBackend) SeparateTS(table string) error {
 }
 
 // LogQuery ...
-func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*qpu_api.QueryRespRecord) error {
+func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*pb.QueryRespRecord) error {
 	if s.logTimestamps {
 		go func() {
 			rowID := ""

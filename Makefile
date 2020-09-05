@@ -87,9 +87,9 @@ docker-prepare:
 proto: $(PROTOC_CMD)
 	# go get ./vendor/github.com/golang/protobuf/protoc-gen-go
 	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
+	protoc api/protobuf-spec/client_api.proto --go_out=plugins=grpc:$(GOPATH)/src/
 	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	protoc api/protobuf-spec/client_api.proto --go_out=plugins=grpc:$(GOPATH)/src/
 
 .PHONY: image-build
 ## image-build:

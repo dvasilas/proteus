@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -140,7 +141,7 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map
 }
 
 // ClientQuery ...
-func (q *DatastoreDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpu_api.QueryResp, error) {
+func (q *DatastoreDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	return nil, nil
 }
 
