@@ -34,14 +34,11 @@ type ResponseRecord struct {
 	Timestamp  Vectorclock
 }
 
-var poolSize = 64
-var poolOverflow = 16
-
 // Vectorclock ...
 type Vectorclock map[string]*tspb.Timestamp
 
 // NewClient creates a new Proteus client connected to the given QPU server.
-func NewClient(host Host, tracing bool) (*Client, error) {
+func NewClient(host Host, poolSize, poolOverflow int, tracing bool) (*Client, error) {
 	var closer io.Closer
 	closer = nil
 	if tracing {

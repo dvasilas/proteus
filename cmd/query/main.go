@@ -40,7 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: connection[0], Port: int(port)}, false)
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: connection[0], Port: int(port)}, 64, 64, false)
 	if err != nil {
 		log.Fatal(err)
 	}
