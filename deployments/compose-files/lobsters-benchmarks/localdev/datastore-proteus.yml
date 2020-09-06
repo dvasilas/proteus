@@ -7,7 +7,7 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup.sh:/docker-entrypoint-initdb.d/setup.sh
+      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup-proteus.sh:/docker-entrypoint-initdb.d/setup.sh
       - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
     ports:
       - 3307:3306

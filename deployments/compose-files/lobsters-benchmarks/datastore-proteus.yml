@@ -7,7 +7,7 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      - /mount/setup.sh:/docker-entrypoint-initdb.d/setup.sh
+      - /mount/setup-proteus.sh:/docker-entrypoint-initdb.d/setup.sh
       - /mount/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
     ports:
       - 3307:3306
