@@ -45,7 +45,7 @@ type MySQLUpdate struct {
 
 // NewDatastore ...
 func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataStore, error) {
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s",
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
 		conf.DatastoreConfig.Credentials.AccessKeyID,
 		conf.DatastoreConfig.Credentials.SecretAccessKey,
 		conf.DatastoreConfig.Endpoint,
@@ -80,9 +80,9 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := ds.cli.SubscribeToUpdates(ctx)
 	if err != nil {
-		errCh <- err
+		errCh <- utils.Error(err)
 		cancel()
-		return nil, nil, errCh
+		return logOpCh, nil, errCh
 	}
 
 	err = stream.Send(
@@ -96,10 +96,11 @@ func (ds MySQLDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 			},
 		},
 	)
+
 	if err != nil {
-		errCh <- err
+		errCh <- utils.Error(err)
 		cancel()
-		return nil, nil, errCh
+		return logOpCh, nil, errCh
 	}
 
 	go ds.opConsumer(stream, logOpCh, errCh)
@@ -135,59 +136,59 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 
 	query := fmt.Sprintf("SELECT %s FROM %s %s", projectionStmt, table, whereStmt)
 
-	rows, err := ds.db.Query(query)
+	stmt, err := ds.db.Prepare(query)
+	if err != nil {
+		errCh <- utils.Error(err)
+		return logOpCh, errCh
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
 	if err != nil {
 		errCh <- utils.Error(err)
 		return logOpCh, errCh
 	}
 
-	values := make([]sql.RawBytes, len(projection))
-	scanArgs := make([]interface{}, len(projection))
+	columns, _ := rows.Columns()
+
+	values := make([]interface{}, len(columns))
+	scanArgs := make([]interface{}, len(columns))
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
+	var ts time.Time
 
 	go func() {
 		defer rows.Close()
 		for rows.Next() {
 			err = rows.Scan(scanArgs...)
 			if err != nil {
-				errCh <- err
+				errCh <- utils.Error(err)
 				break
 			}
-
 			var recordID string
 			attributes := make(map[string]*qpu.Value)
+
 			for i, col := range values {
-				if i == 0 {
-					recordID = string(col)
-				}
 				if col != nil {
-					value, err := ds.inputSchema.StrToValue(table, projection[i], string(col))
-					if err != nil {
-						errCh <- err
-						break
+					if columns[i] == "ts" {
+						ts = col.(time.Time)
+					} else {
+						value, err := ds.inputSchema.InterfaceToValue(table, columns[i], col)
+						if err != nil {
+							errCh <- err
+							break
+						}
+						attributes[projection[i]] = value
 					}
-					attributes[projection[i]] = value
 				}
 			}
 
-			var ts time.Time
-			ts, err = time.Parse("2006-01-02 15:04:05.000000", attributes["ts"].GetStr())
-			if err != nil {
-				ts, err = time.Parse("2006-01-02 15:04:05", attributes["ts"].GetStr())
-				if err != nil {
-					errCh <- utils.Error(err)
-					break
-				}
-			}
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
 				errCh <- err
 				break
 			}
-
-			delete(attributes, "ts")
 
 			logOpCh <- libqpu.LogOperationState(
 				recordID,
@@ -229,8 +230,6 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 }
 
 func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (libqpu.LogOperation, error) {
-	// utils.Trace("store received", map[string]interface{}{"notificationMsg": notificationMsg})
-
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)
 	for _, attribute := range notificationMsg.Attributes {

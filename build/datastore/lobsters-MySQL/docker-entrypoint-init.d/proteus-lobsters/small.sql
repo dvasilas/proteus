@@ -27,22 +27,22 @@ USE `proteus_lobsters_db`;
 -- Table structure for table `comments`
 --
 
-DROP TABLE IF EXISTS `comments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `comments` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `story_id` bigint unsigned NOT NULL,
-  `user_id` bigint unsigned NOT NULL,
-  `comment` mediumtext NOT NULL,
-  `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`id`),
-  KEY `comments_story_id_fk` (`story_id`),
-  KEY `comments_user_id_fk` (`user_id`),
-  CONSTRAINT `comments_story_id_fk` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`),
-  CONSTRAINT `comments_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+-- DROP TABLE IF EXISTS `comments`;
+-- /*!40101 SET @saved_cs_client     = @@character_set_client */;
+-- /*!50503 SET character_set_client = utf8mb4 */;
+-- CREATE TABLE `comments` (
+--   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+--   `story_id` bigint unsigned NOT NULL,
+--   `user_id` bigint unsigned NOT NULL,
+--   `comment` mediumtext NOT NULL,
+--   `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+--   PRIMARY KEY (`id`),
+--   KEY `comments_story_id_fk` (`story_id`),
+--   KEY `comments_user_id_fk` (`user_id`),
+--   CONSTRAINT `comments_story_id_fk` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`),
+--   CONSTRAINT `comments_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+-- ) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Dumping data for table `comments`
@@ -62,12 +62,6 @@ UNLOCK TABLES;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `comments_trigger` AFTER INSERT ON `comments` FOR EACH ROW BEGIN
-  DECLARE cmd CHAR(255);
-  DECLARE result int(10);
-      SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'comments ', New.id, ' "', New.ts, '" id:', New.id, ' user_id:', New.user_id, ' story_id:', New.story_id, ' comment:"', New.comment, '"');
-      SET result = sys_exec(cmd);
-END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
@@ -78,21 +72,21 @@ DELIMITER ;
 -- Table structure for table `stories`
 --
 
-DROP TABLE IF EXISTS `stories`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `stories` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` bigint unsigned NOT NULL,
-  `title` varchar(150) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `short_id` varchar(6) NOT NULL DEFAULT '',
-  `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`id`),
-  KEY `stories_user_id_fk` (`user_id`),
-  CONSTRAINT `stories_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+-- DROP TABLE IF EXISTS `stories`;
+-- /*!40101 SET @saved_cs_client     = @@character_set_client */;
+-- /*!50503 SET character_set_client = utf8mb4 */;
+-- CREATE TABLE `stories` (
+--   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+--   `user_id` bigint unsigned NOT NULL,
+--   `title` varchar(150) NOT NULL DEFAULT '',
+--   `description` mediumtext NOT NULL,
+--   `short_id` varchar(6) NOT NULL DEFAULT '',
+--   `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+--   PRIMARY KEY (`id`),
+--   KEY `stories_user_id_fk` (`user_id`),
+--   CONSTRAINT `stories_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+-- ) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Dumping data for table `stories`
@@ -112,12 +106,6 @@ UNLOCK TABLES;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `stories_trigger` AFTER INSERT ON `stories` FOR EACH ROW BEGIN
-  DECLARE cmd CHAR(255);
-  DECLARE result int(10);
-      SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'stories ', New.id, ' "', New.ts, '" id:', New.id, ' user_id:', New.user_id, ' title:"', New.title, '" description:"', New.description, '" short_id:', New.short_id);
-      SET result = sys_exec(cmd);
-END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
@@ -128,15 +116,15 @@ DELIMITER ;
 -- Table structure for table `users`
 --
 
-DROP TABLE IF EXISTS `users`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `users` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `username` varchar(50) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+-- DROP TABLE IF EXISTS `users`;
+-- /*!40101 SET @saved_cs_client     = @@character_set_client */;
+-- /*!50503 SET character_set_client = utf8mb4 */;
+-- CREATE TABLE `users` (
+--   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+--   `username` varchar(50) DEFAULT NULL,
+--   PRIMARY KEY (`id`)
+-- ) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Dumping data for table `users`
@@ -152,25 +140,25 @@ UNLOCK TABLES;
 -- Table structure for table `votes`
 --
 
-DROP TABLE IF EXISTS `votes`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `votes` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` bigint unsigned NOT NULL,
-  `story_id` bigint unsigned NOT NULL,
-  `comment_id` bigint unsigned DEFAULT NULL,
-  `vote` tinyint NOT NULL,
-  `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`id`),
-  KEY `votes_comment_id_fk` (`comment_id`),
-  KEY `votes_story_id_fk` (`story_id`),
-  KEY `votes_user_id_fk` (`user_id`),
-  CONSTRAINT `votes_comment_id_fk` FOREIGN KEY (`comment_id`) REFERENCES `comments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `votes_story_id_fk` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`),
-  CONSTRAINT `votes_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+-- DROP TABLE IF EXISTS `votes`;
+-- /*!40101 SET @saved_cs_client     = @@character_set_client */;
+-- /*!50503 SET character_set_client = utf8mb4 */;
+-- CREATE TABLE `votes` (
+--   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+--   `user_id` bigint unsigned NOT NULL,
+--   `story_id` bigint unsigned NOT NULL,
+--   `comment_id` bigint unsigned DEFAULT NULL,
+--   `vote` tinyint NOT NULL,
+--   `ts` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+--   PRIMARY KEY (`id`),
+--   KEY `votes_comment_id_fk` (`comment_id`),
+--   KEY `votes_story_id_fk` (`story_id`),
+--   KEY `votes_user_id_fk` (`user_id`),
+--   CONSTRAINT `votes_comment_id_fk` FOREIGN KEY (`comment_id`) REFERENCES `comments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+--   CONSTRAINT `votes_story_id_fk` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`),
+--   CONSTRAINT `votes_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Dumping data for table `votes`
@@ -189,17 +177,6 @@ UNLOCK TABLES;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `votes_trigger` AFTER INSERT ON `votes` FOR EACH ROW BEGIN
-  DECLARE cmd CHAR(255);
-  DECLARE result int(10);
-      IF NEW.comment_id IS NULL THEN
-          SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'votes ', New.id, ' "', New.ts, '" story_id:', New.story_id, ' vote:', New.vote);
-          SET result = sys_exec(cmd);
-      ELSE
-          SET cmd = CONCAT('python /opt/proteus-lobsters/trigger.py ', 'votes ', New.id, ' "', New.ts, '" story_id:', New.story_id, ' comment_id:', New.comment_id, ' vote:', New.vote);
-          SET result = sys_exec(cmd);
-      END IF;
-END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;

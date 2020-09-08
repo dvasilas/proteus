@@ -1,79 +1,145 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
-	mysql "github.com/dvasilas/proteus-lobsters/proto"
 	pb "github.com/dvasilas/proteus-lobsters/proto"
-	"github.com/fsnotify/fsnotify"
-	ptypes "github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-// MySQLUpdate ...
-type MySQLUpdate struct {
-	RecordID   string
-	Table      string
-	Timestamp  string
-	Attributes []struct {
-		Key      string
-		ValueOld string
-		ValueNew string
-	}
+// MsgTable ...
+type MsgTable struct {
+	Table string
 }
+
+// VotesUpdate ...
+type VotesUpdate struct {
+	Table      string
+	Ts         string
+	Vote       string
+	Story_id   string
+	Comment_id string
+}
+
+// StoriesUpdate ...
+type StoriesUpdate struct {
+	Table       string
+	Ts          string
+	Story_id    string
+	User_id     string
+	Title       string
+	Description string
+	Short_id    string
+}
+
+// CommentsUpdate ...
+type CommentsUpdate struct {
+	Table      string
+	Ts         string
+	Comment_id string
+	User_id    string
+	Story_id   string
+	Comment    string
+}
+
+var socketPort = 2048
 
 type datastoreGRPCServer struct {
 	activeConnections map[string]chan string
 }
 
 func main() {
-	port, ok := os.LookupEnv("PROTEUS_PUBLISH_PORT")
+	publishPort, ok := os.LookupEnv("PROTEUS_PUBLISH_PORT")
 	if !ok {
-		port = "50000"
+		publishPort = "50000"
 	}
 
-	tables := []string{"stories", "comments", "votes"}
+	notificationServer, grpcServer, lis := notificationServer(publishPort)
 
+	go socketServer(socketPort, notificationServer)
+
+	log.Fatal(grpcServer.Serve(lis))
+}
+
+func notificationServer(port string) (*datastoreGRPCServer, *grpc.Server, net.Listener) {
 	server := &datastoreGRPCServer{
 		activeConnections: make(map[string]chan string),
 	}
 
 	s := grpc.NewServer()
-	mysql.RegisterPublishUpdatesServer(s, server)
+	pb.RegisterPublishUpdatesServer(s, server)
 	reflection.Register(s)
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
-	var errCh chan error
-	var updateCh chan string
-	for _, table := range tables {
-		errCh = make(chan error)
-		updateCh = make(chan string)
+	return server, s, lis
+}
 
-		// go server.publishUpdates(table, updateCh, errCh)
-		go server.subscribeUpdatesFS("/opt/proteus-lobsters/"+table, table, updateCh, errCh)
+func socketServer(port int, s *datastoreGRPCServer) {
+	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
+	if err != nil {
+		log.Fatalf("Socket listen port %d failed,%s", port, err)
+		os.Exit(1)
+	}
 
-		go func() {
-			for err := range errCh {
-				if err != nil {
-					log.Fatal(err)
-				}
+	defer listen.Close()
+
+	log.Printf("Begin listen port: %d", port)
+
+	for {
+		conn, err := listen.Accept()
+		if err != nil {
+			log.Fatalln(err)
+			continue
+		}
+		go handler(conn, s)
+	}
+}
+
+func handler(conn net.Conn, s *datastoreGRPCServer) {
+	defer conn.Close()
+
+	var (
+		buf = make([]byte, 1024)
+		r   = bufio.NewReader(conn)
+	)
+
+ILOOP:
+	for {
+		n, err := r.Read(buf)
+		data := string(buf[:n])
+
+		switch err {
+		case io.EOF:
+			break ILOOP
+		case nil:
+			var msg MsgTable
+			if err := json.Unmarshal([]byte(data), &msg); err != nil {
+				log.Fatalf("json.Unmarshal:%s", err)
+				os.Exit(1)
 			}
-		}()
-	}
+			if ch, f := s.activeConnections[msg.Table]; f {
+				ch <- data
+			}
+		default:
+			log.Fatalf("Receive data failed:%s", err)
+			os.Exit(1)
+		}
 
-	fmt.Println("Notification server: serving")
-	log.Fatal(s.Serve(lis))
+	}
 }
 
 // SubscribeToUpdates ...
@@ -90,35 +156,154 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 	s.activeConnections[table] = notificationCh
 
 	for updateMsg := range s.activeConnections[table] {
-		var update MySQLUpdate
-		if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-			return err
-		}
-		attributes := make([]*pb.Attributes, len(update.Attributes))
-		for i, entry := range update.Attributes {
-			attributes[i] = &pb.Attributes{
-				Key:      entry.Key,
-				ValueNew: entry.ValueNew,
-			}
-		}
-
+		attributes := make([]*pb.Attributes, 0)
 		var ts time.Time
-		ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Timestamp)
-		if err != nil {
-			ts, err = time.Parse("2006-01-02 15:04:05", update.Timestamp)
-			if err != nil {
+
+		switch table {
+		case "votes":
+			var update VotesUpdate
+			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
+				log.Fatalf("json.Unmarshal failed:%s", err)
 				return err
 			}
+
+			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
+			if err != nil {
+				ts, err = time.Parse("2006-01-02 15:04:05", update.Ts)
+				if err != nil {
+					log.Fatalf("time.Parse failed:%s", err)
+					return err
+				}
+			}
+
+			attributes = append(attributes,
+				&pb.Attributes{
+					Key:      "vote",
+					ValueNew: update.Vote,
+				})
+
+			attributes = append(attributes,
+				&pb.Attributes{
+					Key:      "story_id",
+					ValueNew: update.Story_id,
+				})
+
+			if len(update.Comment_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "comment_id",
+						ValueNew: update.Comment_id,
+					})
+			}
+		case "stories":
+			var update StoriesUpdate
+			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
+				log.Fatalf("json.Unmarshal failed:%s", err)
+				return err
+			}
+
+			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
+			if err != nil {
+				ts, err = time.Parse("2006-01-02 15:04:05", update.Ts)
+				if err != nil {
+					log.Fatalf("time.Parse failed:%s", err)
+					return err
+				}
+			}
+
+			if len(update.Story_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "id",
+						ValueNew: update.Story_id,
+					})
+			}
+
+			if len(update.Title) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "title",
+						ValueNew: update.Title,
+					})
+			}
+
+			if len(update.Description) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "description",
+						ValueNew: update.Description,
+					})
+			}
+
+			if len(update.Short_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "short_id",
+						ValueNew: update.Short_id,
+					})
+			}
+
+		case "comments":
+			var update CommentsUpdate
+			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
+				log.Fatalf("json.Unmarshal failed:%s", err)
+				return err
+			}
+
+			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
+			if err != nil {
+				ts, err = time.Parse("2006-01-02 15:04:05", update.Ts)
+				if err != nil {
+					log.Fatalf("time.Parse failed:%s", err)
+					return err
+				}
+			}
+
+			if len(update.Comment_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "id",
+						ValueNew: update.Comment_id,
+					})
+			}
+
+			if len(update.User_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "user_id",
+						ValueNew: update.User_id,
+					})
+			}
+
+			if len(update.Story_id) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "story_id",
+						ValueNew: update.Story_id,
+					})
+			}
+
+			if len(update.Comment) > 0 {
+				attributes = append(attributes,
+					&pb.Attributes{
+						Key:      "comment",
+						ValueNew: update.Comment,
+					})
+			}
+
+		default:
+			continue
 		}
+
 		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
+			log.Fatalf("ptypes.TimestampProto failed:%s", err)
 			return err
 		}
 
 		err = stream.Send(&pb.UpdateRecord{
 			SequenceId: seqID,
-			RecordID:   update.RecordID,
-			Table:      update.Table,
+			Table:      table,
 			Attributes: attributes,
 			Timestamp:  timestamp,
 		})
@@ -131,46 +316,4 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 	}
 
 	return nil
-}
-
-func (s *datastoreGRPCServer) subscribeUpdatesFS(logPath, table string, updateCh chan string, errCh chan error) {
-	_, err := os.Stat(logPath)
-	if os.IsNotExist(err) {
-		os.Mkdir(logPath, os.ModeDir)
-	} else if err != nil {
-		errCh <- err
-		return
-	}
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		errCh <- err
-		return
-	}
-
-	err = watcher.Add(logPath)
-	if err != nil {
-		errCh <- err
-		return
-	}
-
-	for {
-		select {
-		case event := <-watcher.Events:
-			if event.Op.String() == "WRITE" {
-				data, err := ioutil.ReadFile(event.Name)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				if ch, found := s.activeConnections[table]; found {
-					ch <- string(data)
-				}
-			}
-		case err := <-watcher.Errors:
-			errCh <- err
-			return
-		}
-	}
-
 }
