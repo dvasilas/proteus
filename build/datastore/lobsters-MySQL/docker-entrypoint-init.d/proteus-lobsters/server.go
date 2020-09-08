@@ -163,8 +163,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "votes":
 			var update VotesUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Fatalf("json.Unmarshal failed:%s", err)
-				return err
+				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
+				continue
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
@@ -198,8 +198,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "stories":
 			var update StoriesUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Fatalf("json.Unmarshal failed:%s", err)
-				return err
+				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
+				continue
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
@@ -246,8 +246,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "comments":
 			var update CommentsUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Fatalf("json.Unmarshal failed:%s", err)
-				return err
+				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
+				continue
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
