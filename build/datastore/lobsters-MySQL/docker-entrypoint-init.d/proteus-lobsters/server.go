@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	pb "github.com/dvasilas/proteus-lobsters/proto"
@@ -126,13 +127,19 @@ ILOOP:
 		case io.EOF:
 			break ILOOP
 		case nil:
-			var msg MsgTable
-			if err := json.Unmarshal([]byte(data), &msg); err != nil {
-				log.Fatalf("json.Unmarshal:%s", err)
-				os.Exit(1)
-			}
-			if ch, f := s.activeConnections[msg.Table]; f {
-				ch <- data
+			idx := strings.Index(data, "}")
+			for idx != len(data)-1 {
+				chunk := data[:idx+1]
+				var msg MsgTable
+				if err := json.Unmarshal([]byte(chunk), &msg); err != nil {
+					log.Printf("json.Unmarshal failed:%s %s\n", err, chunk)
+					os.Exit(1)
+				}
+				if ch, f := s.activeConnections[msg.Table]; f {
+					ch <- chunk
+				}
+				data = data[idx+1:]
+				idx = strings.Index(data, "}")
 			}
 		default:
 			log.Fatalf("Receive data failed:%s", err)
@@ -163,8 +170,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "votes":
 			var update VotesUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
-				continue
+				log.Printf("json.Unmarshal failed:%s %s\n", err, updateMsg)
+				return err
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
@@ -198,8 +205,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "stories":
 			var update StoriesUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
-				continue
+				log.Printf("json.Unmarshal failed:%s %s\n", err, updateMsg)
+				return err
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
@@ -246,8 +253,8 @@ func (s *datastoreGRPCServer) SubscribeToUpdates(stream pb.PublishUpdates_Subscr
 		case "comments":
 			var update CommentsUpdate
 			if err := json.Unmarshal([]byte(updateMsg), &update); err != nil {
-				log.Printf("json.Unmarshal failed:%s %s\n", updateMsg, err)
-				continue
+				log.Printf("json.Unmarshal failed:%s %s\n", err, updateMsg)
+				return err
 			}
 
 			ts, err = time.Parse("2006-01-02 15:04:05.000000", update.Ts)
