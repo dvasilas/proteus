@@ -3,7 +3,8 @@ Logfile
 Runtime
 Target load
 Benchmark threads
-Max in flight
+Max in flight read
+Max in flight write
 Conn pool size
 Load offered
 Total throughput

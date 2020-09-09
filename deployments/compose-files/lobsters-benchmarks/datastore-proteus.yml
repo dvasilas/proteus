@@ -20,8 +20,8 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc==eu
-          - node.labels.placement_datastore==true
+          - node.labels.dc == na
+          - node.labels.placement_datastore == true
 
 networks:
   proteus_net:
