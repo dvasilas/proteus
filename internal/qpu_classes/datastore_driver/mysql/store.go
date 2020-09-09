@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -45,6 +46,29 @@ type MySQLUpdate struct {
 
 // NewDatastore ...
 func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataStore, error) {
+
+	for {
+		c, err := net.DialTimeout("tcp", conf.DatastoreConfig.Endpoint, time.Duration(time.Second))
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			fmt.Println("retying connecting to: ", conf.DatastoreConfig.Endpoint)
+		} else {
+			c.Close()
+			break
+		}
+	}
+
+	for {
+		c, err := net.DialTimeout("tcp", conf.DatastoreConfig.LogStreamEndpoint, time.Duration(time.Second))
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			fmt.Println("retying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
+		} else {
+			c.Close()
+			break
+		}
+	}
+
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
 		conf.DatastoreConfig.Credentials.AccessKeyID,
 		conf.DatastoreConfig.Credentials.SecretAccessKey,
@@ -67,6 +91,15 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 		inputSchema:          inputSchema,
 		conn:                 conn,
 		db:                   db,
+	}
+
+	err = errors.New("not tried yet")
+	for err != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		_, err = s.cli.SubscribeToUpdates(ctx)
+		time.Sleep(2 * time.Second)
+		cancel()
+		fmt.Println("retying a test query", err)
 	}
 
 	return s, nil
