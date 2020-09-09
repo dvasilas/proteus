@@ -128,7 +128,7 @@ ILOOP:
 			break ILOOP
 		case nil:
 			idx := strings.Index(data, "}")
-			for idx != len(data)-1 {
+			for {
 				chunk := data[:idx+1]
 				var msg MsgTable
 				if err := json.Unmarshal([]byte(chunk), &msg); err != nil {
@@ -137,6 +137,9 @@ ILOOP:
 				}
 				if ch, f := s.activeConnections[msg.Table]; f {
 					ch <- chunk
+				}
+				if idx == len(data)-1 {
+					break
 				}
 				data = data[idx+1:]
 				idx = strings.Index(data, "}")
