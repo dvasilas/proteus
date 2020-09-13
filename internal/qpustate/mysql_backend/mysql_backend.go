@@ -330,13 +330,13 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 		dbQuerySp = tracer.StartSpan("db_query", opentracing.ChildOf(parentSpan.Context()))
 	}
 
-	stmt, err := s.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
+	// stmt, err := s.db.Prepare(query)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer stmt.Close()
 
-	rows, err := stmt.Query(whereValues...)
+	rows, err := s.db.Query(query, whereValues...)
 	if err != nil {
 		return nil, err
 	}
