@@ -143,8 +143,10 @@ type QPUConnection struct {
 type DatastoreType int
 
 const (
-	// MYSQL is the enum value for an MySQL backend data store
+	// MYSQL is the enum value for a MySQL storage tier
 	MYSQL DatastoreType = iota
+	// S3 is the enum value for a S3 storage tier
+	S3 DatastoreType = iota
 )
 
 // AggregationType ...

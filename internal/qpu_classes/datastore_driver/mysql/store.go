@@ -265,6 +265,7 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (libqpu.LogOperation, error) {
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)
+
 	for _, attribute := range notificationMsg.Attributes {
 		if attribute.ValueOld != "" {
 			value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
@@ -273,6 +274,7 @@ func (ds MySQLDataStore) formatLogOpDelta(notificationMsg *mysql.UpdateRecord) (
 			}
 			attributesOld[attribute.Key] = value
 		}
+
 		if attribute.ValueNew != "" {
 			value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
 			if err != nil {

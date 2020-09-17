@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
+	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 )
@@ -41,6 +42,11 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, er
 	switch qpu.Config.DatastoreConfig.Type {
 	case libqpu.MYSQL:
 		ds, err = mysqldriver.NewDatastore(qpu.Config, qpu.InputSchema)
+		if err != nil {
+			return &DatastoreDriverQPU{}, err
+		}
+	case libqpu.S3:
+		ds, err = s3driver.NewDatastore(qpu.Config, qpu.InputSchema)
 		if err != nil {
 			return &DatastoreDriverQPU{}, err
 		}

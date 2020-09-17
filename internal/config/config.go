@@ -281,6 +281,8 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 	switch inputConf.DatastoreConfig.Type {
 	case "mysql":
 		config.DatastoreConfig.Type = libqpu.MYSQL
+	case "s3":
+		config.DatastoreConfig.Type = libqpu.S3
 	default:
 		return utils.Error(errors.New("unknown datastore type"))
 	}

@@ -90,6 +90,7 @@ proto: $(PROTOC_CMD)
 	protoc api/protobuf-spec/client_api.proto --go_out=plugins=grpc:$(GOPATH)/src/
 	protoc api/protobuf-spec/qpu_api.proto --go_out=plugins=grpc:${GOPATH}/src/
 	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
+	protoc api/protobuf-spec/s3.proto --go_out=plugins=grpc:$(GOPATH)/src/
 
 .PHONY: image-build
 ## image-build:
