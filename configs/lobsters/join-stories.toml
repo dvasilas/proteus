@@ -29,7 +29,7 @@ table = "votes_sum"
 key = "story_id"
 type = "int"
 [[InputSchema.Attributes]]
-key = "vote_sum"
+key = "vote_count"
 type = "int"
 
 

@@ -39,12 +39,12 @@ var filterTests = []struct {
 		},
 	},
 	{
-		"SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5",
+		"SELECT title, description, short_id, user_id, vote_count FROM qpu ORDER BY vote_count DESC LIMIT 5",
 		&qpu_api.ASTQuery{
-			Projection: []string{"title", "description", "short_id", "user_id", "vote_sum"},
+			Projection: []string{"title", "description", "short_id", "user_id", "vote_count"},
 			Table:      "qpu",
 			OrderBy: &qpu_api.OrderBy{
-				AttributeName: "vote_sum",
+				AttributeName: "vote_count",
 				Direction:     qpu_api.OrderBy_DESC,
 			},
 			Limit: int64(5),

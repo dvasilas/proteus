@@ -311,7 +311,7 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 
 	// prepare order-by
 	orderbyStmt := ""
-	// vote_sum DESC
+	// vote_count DESC
 	if len(orderby) > 0 {
 		whereStmt = "ORDER BY " + orderby
 	}

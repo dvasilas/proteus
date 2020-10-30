@@ -138,7 +138,7 @@ func (q *JoinQPU) initializeState() error {
 		stateDatabase,
 		q.stateTable+q.port,
 		fmt.Sprintf(
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), PRIMARY KEY (%s), INDEX i (vote_sum) )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), PRIMARY KEY (%s), INDEX i (vote_count) )",
 			q.stateTable+q.port,
 			createSchemaStmt,
 			q.joinAttributeKey,
