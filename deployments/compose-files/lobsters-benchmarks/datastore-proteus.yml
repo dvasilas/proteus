@@ -20,7 +20,7 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc == na
+          - node.labels.dc == 2
           - node.labels.placement_datastore == true
 
 networks:

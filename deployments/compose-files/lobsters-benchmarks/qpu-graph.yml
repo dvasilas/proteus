@@ -15,7 +15,7 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc == na
+          - node.labels.dc == 2
           - node.labels.placement_dsdriver == true
 
   sum-stories:
@@ -32,7 +32,7 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc == na
+          - node.labels.dc == 2
           - node.labels.placement_sum == true
 
   join-stories:
@@ -51,7 +51,7 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc == na
+          - node.labels.dc == 2
           - node.labels.placement_join == true
 
 networks:
