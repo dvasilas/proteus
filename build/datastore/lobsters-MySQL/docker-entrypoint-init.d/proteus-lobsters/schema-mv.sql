@@ -45,22 +45,22 @@ CREATE TABLE IF NOT EXISTS `votes` (
   CONSTRAINT `votes_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB;
 
-delimiter #
-DROP TRIGGER IF EXISTS `stories_votecount`;
-CREATE TRIGGER `stories_votecount`
-AFTER INSERT ON `votes`
-FOR EACH ROW
-BEGIN
-  DECLARE oldVC integer;
-  DECLARE newVC integer;
-  IF NEW.comment_id IS NULL THEN
-    SET oldVC = (SELECT `vote_count` from `stories` where `id` = NEW.story_id);
-    SET newVC = oldVC + NEW.vote;
-    UPDATE `stories` SET `vote_count` = newVC  where `id` = NEW.story_id;
-  ELSE
-    SET oldVC = (SELECT `vote_count` from `comments` where `id` = NEW.comment_id);
-    SET newVC = oldVC + NEW.vote;
-    UPDATE `comments` SET `vote_count` = newVC  where `id` = NEW.comment_id;
-  END IF;
-END#
-delimiter ;
+-- delimiter #
+-- DROP TRIGGER IF EXISTS `stories_votecount`;
+-- CREATE TRIGGER `stories_votecount`
+-- AFTER INSERT ON `votes`
+-- FOR EACH ROW
+-- BEGIN
+--   DECLARE oldVC integer;
+--   DECLARE newVC integer;
+--   IF NEW.comment_id IS NULL THEN
+--     SET oldVC = (SELECT `vote_count` from `stories` where `id` = NEW.story_id);
+--     SET newVC = oldVC + NEW.vote;
+--     UPDATE `stories` SET `vote_count` = newVC  where `id` = NEW.story_id;
+--   ELSE
+--     SET oldVC = (SELECT `vote_count` from `comments` where `id` = NEW.comment_id);
+--     SET newVC = oldVC + NEW.vote;
+--     UPDATE `comments` SET `vote_count` = newVC  where `id` = NEW.comment_id;
+--   END IF;
+-- END#
+-- delimiter ;
