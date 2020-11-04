@@ -19,8 +19,8 @@ sync() {
 	for host in "$@"
 	do
 		rsync -a $PROTEUS_DIR/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/ $host:~/volume
-		rsync -a $PROTEUS_DIR/configs $host:~/volume/configs
-		rsync -a $PROTEUS_DIR/scripts $host:~/volume/scripts
+		rsync -a $PROTEUS_DIR/configs $host:~/volume
+		rsync -a $PROTEUS_DIR/scripts $host:~/volume
 	done
 	set -x
 }

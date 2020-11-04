@@ -5,10 +5,10 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=verySecretPwd
     volumes:
-      - /mount/setup-plain.sh:/docker-entrypoint-initdb.d/setup.sh
-      - /mount/proteus-lobsters/small.sql:/opt/proteus-lobsters/small-plain.sql
-      - /mount/proteus-lobsters/schema-plain.sql:/opt/proteus-lobsters/schema-plain.sql
-      - /mount/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
+      - ${HOME}/volume/setup-plain.sh:/docker-entrypoint-initdb.d/setup.sh
+      - ${HOME}/volume/proteus-lobsters/small.sql:/opt/proteus-lobsters/small-plain.sql
+      - ${HOME}/volume/proteus-lobsters/schema-plain.sql:/opt/proteus-lobsters/schema-plain.sql
+      - ${HOME}/volume/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
     ports:
       - 3307:3306
     deploy:
