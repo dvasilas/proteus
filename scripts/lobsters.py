@@ -82,7 +82,7 @@ class DB(object):
         self.execute(
             "SELECT * "
             " FROM stories_with_votecount "
-            " ORDER BY `vote_count` DESC "
+            " ORDER BY `vote_sum` DESC "
             " LIMIT 2 "
         )
         stories = self.cursor.fetchall()
@@ -96,7 +96,7 @@ class DB(object):
         story = self.cursor.fetchall()
 
         self.execute(
-            "SELECT `*` FROM `comments_with_votecount` WHERE `story_id` = %s ORDER BY `vote_count` DESC LIMIT 2 ",
+            "SELECT `*` FROM `comments_with_votecount` WHERE `story_id` = %s ORDER BY `vote_sum` DESC LIMIT 2 ",
             (story[0][0],),
         )
 
@@ -180,14 +180,14 @@ class DB(object):
             )
 
     def stories_votecount(self):
-        for (story_id, vote_count, ts) in self.cursor:
-            print("story_id: {}, vote_count: {}, ts: {}".format(story_id, vote_count, ts))
+        for (story_id, vote_sum, ts) in self.cursor:
+            print("story_id: {}, vote_sum: {}, ts: {}".format(story_id, vote_sum, ts))
 
     def comments_votecount(self):
-        for (story_id, comment_id, vote_count, ts) in self.cursor:
+        for (story_id, comment_id, vote_sum, ts) in self.cursor:
             print(
-                "story_id: {}, comment_id: {}, vote_count: {}, ts: {}".format(
-                    story_id, comment_id, vote_count, ts
+                "story_id: {}, comment_id: {}, vote_sum: {}, ts: {}".format(
+                    story_id, comment_id, vote_sum, ts
                 )
             )
 
@@ -198,20 +198,20 @@ class DB(object):
             title,
             description,
             short_id,
-            vote_count,
+            vote_sum,
             ts,
         ) in self.cursor:
             print(
-                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}, vote_count: {}, ts: {}".format(
-                    story_id, user_id, title, description, short_id, vote_count, ts
+                "story_id: {}, user_id: {}, title: {}, description: {}, short_id: {}, vote_sum: {}, ts: {}".format(
+                    story_id, user_id, title, description, short_id, vote_sum, ts
                 )
             )
 
     def comments_with_votecount(self):
-        for (comment_id, story_id, user_id, comment, vote_count, ts) in self.cursor:
+        for (comment_id, story_id, user_id, comment, vote_sum, ts) in self.cursor:
             print(
-                "comment_id: {}, story_id: {}, user_id: {}, comment: {}, vote_count: {}, ts: {}".format(
-                    comment_id, story_id, user_id, comment, vote_count, ts
+                "comment_id: {}, story_id: {}, user_id: {}, comment: {}, vote_sum: {}, ts: {}".format(
+                    comment_id, story_id, user_id, comment, vote_sum, ts
                 )
             )
 

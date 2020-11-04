@@ -35,7 +35,7 @@ USE `proteus_lobsters_db`;
 --   `story_id` bigint unsigned NOT NULL,
 --   `user_id` bigint unsigned NOT NULL,
 --   `comment` mediumtext NOT NULL,
---   `vote_count` bigint DEFAULT '0',
+--   `vote_sum` bigint DEFAULT '0',
 --   `ts` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 --   PRIMARY KEY (`id`),
 --   KEY `comments_story_id_fk` (`story_id`),
@@ -68,7 +68,7 @@ UNLOCK TABLES;
 --   `title` varchar(150) NOT NULL DEFAULT '',
 --   `description` mediumtext NOT NULL,
 --   `short_id` varchar(6) NOT NULL DEFAULT '',
---   `vote_count` bigint DEFAULT '0',
+--   `vote_sum` bigint DEFAULT '0',
 --   `ts` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 --   PRIMARY KEY (`id`),
 --   KEY `stories_user_id_fk` (`user_id`),
@@ -155,13 +155,13 @@ UNLOCK TABLES;
 --   DECLARE oldVC integer;
 --   DECLARE newVC integer;
 --   IF NEW.comment_id IS NULL THEN
---     SET oldVC = (SELECT `vote_count` from `stories` where `id` = NEW.story_id);
+--     SET oldVC = (SELECT `vote_sum` from `stories` where `id` = NEW.story_id);
 --     SET newVC = oldVC + NEW.vote;
---     UPDATE `stories` SET `vote_count` = newVC  where `id` = NEW.story_id;
+--     UPDATE `stories` SET `vote_sum` = newVC  where `id` = NEW.story_id;
 --   ELSE
---     SET oldVC = (SELECT `vote_count` from `comments` where `id` = NEW.comment_id);
+--     SET oldVC = (SELECT `vote_sum` from `comments` where `id` = NEW.comment_id);
 --     SET newVC = oldVC + NEW.vote;
---     UPDATE `comments` SET `vote_count` = newVC  where `id` = NEW.comment_id;
+--     UPDATE `comments` SET `vote_sum` = newVC  where `id` = NEW.comment_id;
 --   END IF;
 -- END */;;
 -- DELIMITER ;

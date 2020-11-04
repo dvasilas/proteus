@@ -1,6 +1,7 @@
 package joinqpu
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -138,7 +139,7 @@ func (q *JoinQPU) initializeState() error {
 		stateDatabase,
 		q.stateTable+q.port,
 		fmt.Sprintf(
-			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), PRIMARY KEY (%s), INDEX i (vote_count) )",
+			"CREATE TABLE %s (%s %s int NOT NULL, ts_key varchar(30), ts datetime(6), PRIMARY KEY (%s), INDEX i (vote_sum) )",
 			q.stateTable+q.port,
 			createSchemaStmt,
 			q.joinAttributeKey,
@@ -157,74 +158,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	// prepare the state.Get predicate
-	var predicate map[string]interface{}
-	predicate = nil
-	if query.GetPredicate() != nil {
-		predicate = map[string]interface{}{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetStr()}
-	}
-
-	// prepare the state.Get orderBy clause
-	orderBy := ""
-	if query.GetOrderBy() != nil {
-		orderBy += query.GetOrderBy().GetAttributeName() + " " + query.GetOrderBy().GetDirection().String()
-	}
-
-	stateCh, err := q.state.Get(
-		q.stateTable+q.port,
-		append(query.GetProjection(), q.joinAttributeKey, "ts", "ts_key"),
-		predicate,
-		orderBy,
-		query.GetLimit(),
-		false,
-		nil)
-	if err != nil {
-		errCh <- utils.Error(err)
-		return logOpCh, errCh
-	}
-
-	go func() {
-		for record := range stateCh {
-			// process timestamp
-			vectorClockKey := string(record["ts_key"].([]byte))
-			// var ts time.Time
-			ts := record["ts"].(time.Time)
-			// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-			// if err != nil {
-			// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-			// 	if err != nil {
-			// 		errCh <- utils.Error(err)
-			// 		break
-			// 	}
-			// }
-			timestamp, err := ptypes.TimestampProto(ts)
-			if err != nil {
-				errCh <- utils.Error(err)
-				break
-			}
-			delete(record, "ts")
-			delete(record, "ts_key")
-
-			// process the rest of the attributes
-			attrs, err := q.outputSchema.InterfaceToAttributes(q.stateTable, record)
-			if err != nil {
-				errCh <- utils.Error(err)
-				break
-			}
-
-			logOp := libqpu.LogOperationState(
-				strconv.FormatInt(record[q.joinAttributeKey].(int64), 10),
-				q.stateTable,
-				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
-				attrs,
-			)
-
-			logOpCh <- logOp
-
-		}
-		close(logOpCh)
-		close(errCh)
-	}()
+	errCh <- errors.New("not implemented")
 
 	return logOpCh, errCh
 }
@@ -244,10 +178,10 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	}
 
 	// prepare the state.Get predicate
-	var predicate map[string]interface{}
+	var predicate []string
 	predicate = nil
 	if query.GetPredicate() != nil {
-		predicate = map[string]interface{}{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetStr()}
+		predicate = []string{fmt.Sprintf("%s = %s", query.GetPredicate()[0].GetAttr().GetAttrKey(), query.GetPredicate()[0].GetLbound().GetStr())}
 	}
 
 	// prepare the state.Get orderBy clause
@@ -262,7 +196,6 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		predicate,
 		orderBy,
 		query.GetLimit(),
-		true,
 		nil)
 	if err != nil {
 		return nil, err
@@ -273,14 +206,9 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		// process timestamp
 		vectorClockKey := record["ts_key"].(string)
 		ts := record["ts"].(time.Time)
-		// var ts time.Time
-		// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-		// if err != nil {
-		// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-		// 	if err != nil {
-		// 		return nil, utils.Error(err)
-		// 	}
-		// }
+		if err != nil {
+			return nil, utils.Error(err)
+		}
 		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
 			return nil, err
@@ -289,13 +217,9 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		delete(record, "ts_key")
 
 		// process the rest of the attributes
-		// attrs, err := q.outputSchema.InterfaceToString(q.stateTable, record)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		attribs := make(map[string][]byte)
+		attribs := make(map[string]string)
 		for k, v := range record {
-			attribs[k] = []byte(v.(string))
+			attribs[k] = v.(string)
 		}
 
 		respRecords = append(respRecords, &pb.QueryRespRecord{
@@ -337,9 +261,7 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 			go func() {
 				q.catchUpDoneCh <- 0
 			}()
-			// return nil
 		}
-		// return nil
 	} else if respRecordType == libqpu.State {
 		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
 			return err
@@ -397,14 +319,9 @@ func (q *JoinQPU) flushState() error {
 		}
 	}
 	return q.state.SeparateTS(q.stateTable)
-
-	// return nil
 }
 
 func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
-	// for _, joinAttribute := range q.joinAttributes {
-	// 	delete(values, joinAttribute)
-	// }
 
 	row := make(map[string]interface{})
 	for attributeKey := range values {
@@ -415,22 +332,18 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 		row[attributeKey] = val
 	}
 
-	stateCh, err := q.state.Get(
+	res := q.state.GetRow(
 		q.stateTable+q.port,
 		[]string{q.joinAttributeKey},
-		map[string]interface{}{q.joinAttributeKey: joinID},
-		"", 0, false, nil,
+		[]string{fmt.Sprintf("%s = %s", q.joinAttributeKey, strconv.FormatInt(joinID, 10))},
+		nil,
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	found := false
-	for range stateCh {
-		found = true
-	}
+	var t int64
+	errScan := res.Scan(&t)
+	var err error
 
-	if !found {
+	if errScan == sql.ErrNoRows {
 		row[q.joinAttributeKey] = joinID
 		err = q.state.Insert(q.stateTable+q.port, row, vc, joinID)
 	} else {

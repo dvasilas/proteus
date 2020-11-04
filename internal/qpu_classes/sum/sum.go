@@ -1,6 +1,7 @@
 package sumqpu
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -163,7 +164,6 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 		[]string{"*"},
 		nil, "",
 		query.GetLimit(),
-		false,
 		nil,
 	)
 	if err != nil {
@@ -174,16 +174,12 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 	go func() {
 		for record := range stateCh {
 			// prepare timestamp
-			vectorClockKey := string(record["ts_key"].([]byte))
+			vectorClockKey := record["ts_key"].(string)
 			ts := record["ts"].(time.Time)
-			// ts, err = time.Parse("2006-01-02 15:04:05.000000", string(record["ts"].([]byte)))
-			// if err != nil {
-			// 	ts, err = time.Parse("2006-01-02 15:04:05", string(record["ts"].([]byte)))
-			// 	if err != nil {
-			// 		errCh <- utils.Error(err)
-			// 		break
-			// 	}
-			// }
+			if err != nil {
+				errCh <- utils.Error(err)
+				break
+			}
 			timestamp, err := ptypes.TimestampProto(ts)
 			if err != nil {
 				errCh <- err
@@ -194,23 +190,20 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 
 			// prepare attributes
 			attributes := make(map[string]*qpu.Value)
-			attributes[q.groupBy] = libqpu.ValueInt(record[q.groupBy].(int64))
-			attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(record[q.aggregationAttribute+"_sum"].(int64))
-
 			// prepare record ID
-			recordID := strconv.FormatInt(record[q.groupBy].(int64), 10)
-
-			// convert any remaining attributes and and add to 'attributes' mup
-			delete(record, q.groupBy)
-			delete(record, q.aggregationAttribute+"_sum")
-			attrs, err := q.inputSchema.InterfaceToAttributes(q.schemaTable, record)
+			recordID := record[q.groupBy].(string)
+			n, err := strconv.ParseInt(record[q.groupBy].(string), 10, 64)
 			if err != nil {
 				errCh <- err
 				break
 			}
-			for k, v := range attrs {
-				attributes[k] = v
+			attributes[q.groupBy] = libqpu.ValueInt(n)
+			n, err = strconv.ParseInt(record[q.aggregationAttribute+"_sum"].(string), 10, 64)
+			if err != nil {
+				errCh <- err
+				break
 			}
+			attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(n)
 
 			logOpCh <- libqpu.LogOperationState(
 				recordID,
@@ -218,8 +211,8 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
 				attributes,
 			)
-
 		}
+
 		close(logOpCh)
 		close(errCh)
 	}()
@@ -342,20 +335,16 @@ func (q *SumQPU) flushState() error {
 // if yes, it updates the entry with the new sumVal
 // it returns the new sumVal
 func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (int64, error) {
-	stateCh, err := q.state.Get(q.schemaTable+q.port,
+	res := q.state.GetRow(q.schemaTable+q.port,
 		[]string{q.aggregationAttribute + "_sum"},
-		map[string]interface{}{q.groupBy: groupByVal},
-		"", 0, false, nil,
+		[]string{fmt.Sprintf("%s = %s", q.groupBy, strconv.FormatInt(groupByVal, 10))},
+		nil,
 	)
-	if err != nil {
-		return -1, err
-	}
 
 	var storedSumValue int64
-	found := false
-	for record := range stateCh {
-		found = true
-		storedSumValue = record[q.aggregationAttribute+"_sum"].(int64)
+	errScan := res.Scan(&storedSumValue)
+	if errScan != nil && errScan != sql.ErrNoRows {
+		return -1, errScan
 	}
 
 	// prepare the row to be inserted / updated
@@ -372,7 +361,8 @@ func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qp
 	}
 
 	var newSumValue int64
-	if !found {
+	var err error
+	if errScan == sql.ErrNoRows {
 		// insert the new value
 		row[q.aggregationAttribute+"_sum"] = sumVal
 		err = q.state.Insert(q.schemaTable+q.port, row, vc, sumVal)

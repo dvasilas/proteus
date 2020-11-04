@@ -12,7 +12,7 @@ services:
       - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
       # - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/proteus-lobsters:/opt/proteus-lobsters
     ports:
-      - 3307:3306
+      - 3309:3306
     deploy:
       restart_policy:
         condition: none

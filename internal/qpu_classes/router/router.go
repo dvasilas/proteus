@@ -74,13 +74,13 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 	respRecords := make([]*pb.QueryRespRecord, 0)
 
 	for record := range respCh {
-		attributes := make(map[string][]byte)
+		attributes := make(map[string]string)
 		for k, v := range record.GetAttributes() {
 			valStr, err := utils.ValueToStr(v)
 			if err != nil {
 				return nil, err
 			}
-			attributes[k] = []byte(valStr)
+			attributes[k] = valStr
 		}
 
 		respRecords = append(respRecords, &pb.QueryRespRecord{

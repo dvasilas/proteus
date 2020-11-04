@@ -99,7 +99,7 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 		_, err = s.cli.SubscribeToUpdates(ctx)
 		time.Sleep(2 * time.Second)
 		cancel()
-		fmt.Println("retying a test query", err)
+		fmt.Println("retrying a test query", err)
 	}
 
 	return s, nil

@@ -47,6 +47,8 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 
 // Query is responsible for the top-level processing of invocation of the Query API.
 func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.RequestStream) error {
+	// utils.Trace("query received", map[string]interface{}{"queryReq": queryReq})
+
 	var astQuery libqpu.ASTQuery
 	switch queryReq.QueryType() {
 	case libqpu.ASTQueryT:
@@ -63,7 +65,6 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 		return utils.Error(errors.New("apiProcessor:Query:default"))
 	}
 
-	// utils.Trace("internalQuery received", map[string]interface{}{"internalQuery": astQuery})
 	var logOpSubscribeCh, logOpSnapshotCh <-chan libqpu.LogOperation
 	var errSubscribeCh, errSnapshotCh <-chan error
 	queryID := -1

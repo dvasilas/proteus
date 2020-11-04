@@ -113,7 +113,7 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 
 	db.Close()
 
-	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
+	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
 		s.accessKeyID,
 		s.secretAccessKey,
 		s.endpoint,
@@ -169,6 +169,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 
 	query := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, insertStmtAttrs, insertStmtAttrsValues)
 	// utils.Trace("insert", map[string]interface{}{"query": query, "insertValues": insertValues})
+
 	stmtInsert, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -240,6 +241,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, updateStmt, whereStmt)
 	// utils.Trace("update", map[string]interface{}{"query": query, "updateValues": updateValues})
+
 	stmtUpdate, err := s.db.Prepare(query)
 	if err != nil {
 		return err
@@ -268,18 +270,49 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	return err
 }
 
+// GetRow ...
+func (s *MySQLStateBackend) GetRow(from string, projection []string, where []string, parentSpan opentracing.Span) *sql.Row {
+	projectionStmt := ""
+	for i, col := range projection {
+		projectionStmt += col
+		if i < len(projection)-1 {
+			projectionStmt += ", "
+		}
+	}
+
+	// prepare predicate
+	whereStmt := ""
+	if where != nil && len(where) > 0 {
+		whereStmt += "WHERE "
+		i := 0
+
+		for _, wherePred := range where {
+			whereStmt += wherePred
+			if len(where) > 1 && i < len(where)-1 {
+				whereStmt += "AND "
+			}
+			i++
+		}
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s %s", projectionStmt, from, whereStmt)
+	// utils.Trace("QueryRow", map[string]interface{}{"query": query})
+
+	return s.db.QueryRow(query)
+}
+
 // Get retrieves state records based on a given query.
 // It returns a channel that can be used to iteratively return the retrieved records.
 // The channel returns records of type map[<attributeName>]<string_value>.
-func (s *MySQLStateBackend) Get(from string, projection []string, where map[string]interface{}, orderby string, limit int64, getBytes bool, parentSpan opentracing.Span) (<-chan map[string]interface{}, error) {
+func (s *MySQLStateBackend) Get(from string, projection []string, where []string, orderby string, limit int64, parentSpan opentracing.Span) (<-chan map[string]interface{}, error) {
 	// tracing
-	var tracer opentracing.Tracer
-	var dbQuerySp opentracing.Span
-	dbQuerySp = nil
-	tracer = nil
-	if parentSpan != nil {
-		tracer = opentracing.GlobalTracer()
-	}
+	// var tracer opentracing.Tracer
+	// var dbQuerySp opentracing.Span
+	// dbQuerySp = nil
+	// tracer = nil
+	// if parentSpan != nil {
+	// 	tracer = opentracing.GlobalTracer()
+	// }
 
 	// prepare projection
 	projectionStmt := ""
@@ -292,26 +325,21 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 
 	// prepare predicate
 	whereStmt := ""
-	var whereValues []interface{}
-	whereValues = nil
 	if where != nil && len(where) > 0 {
 		whereStmt += "WHERE "
-		whereValues = make([]interface{}, len(where))
 		i := 0
 
-		for attrKey, val := range where {
-			whereStmt += fmt.Sprintf("%s = ? ", attrKey)
+		for _, wherePred := range where {
+			whereStmt += wherePred
 			if len(where) > 1 && i < len(where)-1 {
 				whereStmt += "AND "
 			}
-			whereValues[i] = val
 			i++
 		}
 	}
 
 	// prepare order-by
 	orderbyStmt := ""
-	// vote_count DESC
 	if len(orderby) > 0 {
 		whereStmt = "ORDER BY " + orderby
 	}
@@ -323,86 +351,66 @@ func (s *MySQLStateBackend) Get(from string, projection []string, where map[stri
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s %s %s %s", projectionStmt, from, whereStmt, orderbyStmt, limitStmt)
-	// utils.Trace("scan", map[string]interface{}{"query": query, "whereValues": whereValues})
+	// utils.Trace("query", map[string]interface{}{"query": query})
 
 	// tracing
-	if tracer != nil {
-		dbQuerySp = tracer.StartSpan("db_query", opentracing.ChildOf(parentSpan.Context()))
-	}
-
-	// stmt, err := s.db.Prepare(query)
-	// if err != nil {
-	// 	return nil, err
+	// if tracer != nil {
+	// 	dbQuerySp = tracer.StartSpan("db_query", opentracing.ChildOf(parentSpan.Context()))
 	// }
-	// defer stmt.Close()
 
-	rows, err := s.db.Query(query, whereValues...)
+	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	// tracing
-	if dbQuerySp != nil {
-		dbQuerySp.Finish()
-	}
-
 	columns, _ := rows.Columns()
-	if getBytes == false {
-		values := make([]interface{}, len(columns))
-		scanArgs := make([]interface{}, len(columns))
-		for i := range values {
-			scanArgs[i] = &values[i]
-		}
 
-		resultCh := make(chan map[string]interface{})
+	count := len(columns)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
 
-		go func() {
-			defer rows.Close()
-			for rows.Next() {
-				err = rows.Scan(scanArgs...)
-				if err != nil {
-					panic(err)
-				}
-				row := make(map[string]interface{})
-				for i, col := range values {
-					if col != nil {
-						row[columns[i]] = col
-					}
-				}
-				resultCh <- row
-			}
-			close(resultCh)
-		}()
-		return resultCh, nil
-	}
-
-	values := make([]sql.RawBytes, len(columns)-1)
-	scanArgs := make([]interface{}, len(columns))
-	for i := range values {
-		scanArgs[i] = &values[i]
-	}
-	var ts time.Time
-	scanArgs[len(scanArgs)-1] = &ts
 	resultCh := make(chan map[string]interface{})
+
 	go func() {
 		defer rows.Close()
+		defer close(resultCh)
 		for rows.Next() {
-			err = rows.Scan(scanArgs...)
-			if err != nil {
-				panic(err)
+			for i := range columns {
+				valuePtrs[i] = &values[i]
 			}
+
+			rows.Scan(valuePtrs...)
+
 			row := make(map[string]interface{})
 			for i, col := range values {
 				if col != nil {
-					row[columns[i]] = string(col)
+					row[columns[i]] = col
 				}
 			}
-			row["ts"] = ts
+
+			for i, col := range columns {
+				val := values[i]
+
+				b, ok := val.([]byte)
+				var v interface{}
+				if ok {
+					v = string(b)
+				} else {
+					v = val
+				}
+				row[col] = v
+			}
+
 			resultCh <- row
 		}
-		close(resultCh)
 	}()
-	return resultCh, nil
+
+	return resultCh, err
+
+	// // tracing
+	// if dbQuerySp != nil {
+	// 	dbQuerySp.Finish()
+	// }
 }
 
 // Cleanup closes the connection to the MySQL instance
