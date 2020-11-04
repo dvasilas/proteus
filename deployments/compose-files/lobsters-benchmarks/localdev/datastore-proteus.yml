@@ -9,6 +9,7 @@ services:
     volumes:
       - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/setup-proteus.sh:/docker-entrypoint-initdb.d/setup.sh
       - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/proteus-lobsters/small.sql:/opt/proteus-lobsters/small.sql
+      - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/proteus-lobsters/med.sql:/opt/proteus-lobsters/med.sql
       - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/maxconn.cnf:/etc/mysql/conf.d/maxconn.cnf
       # - ${PWD}/build/datastore/lobsters-MySQL/docker-entrypoint-init.d/proteus-lobsters:/opt/proteus-lobsters
     ports:
