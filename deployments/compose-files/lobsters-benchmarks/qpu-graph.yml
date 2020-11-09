@@ -43,6 +43,7 @@ services:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
       - ${HOME}/volume/configs:/configs
+      - ${HOME}/volume/scripts:/opt/proteus-lobsters/freshness
     ports:
       - 50350:50350
     command: /configs/lobsters/join-stories.toml error

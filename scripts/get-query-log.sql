@@ -1,5 +1,5 @@
 SELECT row_ids, ts_local
-FROM stateDB.stateTableJoin_query_ts
+FROM stateDB.stories50350_query_log
 INTO outfile 'query-log.txt'
 FIELDS TERMINATED by ','
 LINES TERMINATED by '\n' ;

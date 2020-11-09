@@ -167,16 +167,6 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	var respRecords []*pb.QueryRespRecord
 
-	// first, log the query
-	snapshotTs := time.Now()
-	// we always call state.LogQuery here and have
-	// if s.logTimestamps { .. }
-	// inside state.LogQuery
-	err := q.state.LogQuery(q.stateTable, snapshotTs, respRecords)
-	if err != nil {
-		return nil, err
-	}
-
 	// prepare the state.Get predicate
 	var predicate []string
 	predicate = nil
@@ -190,6 +180,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		orderBy += query.GetOrderBy().GetAttributeName() + " " + query.GetOrderBy().GetDirection().String()
 	}
 
+	snapshotTs := time.Now()
 	stateCh, err := q.state.Get(
 		q.stateTable+q.port,
 		append(query.GetProjection(), q.joinAttributeKey, "ts_key", "ts"),
@@ -227,6 +218,12 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 			Attributes: attribs,
 			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
 		})
+	}
+
+	// log the query
+	err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.QueryResp{
@@ -318,11 +315,10 @@ func (q *JoinQPU) flushState() error {
 			return err
 		}
 	}
-	return q.state.SeparateTS(q.stateTable)
+	return q.state.SeparateTS(q.stateTable + q.port)
 }
 
 func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
-
 	row := make(map[string]interface{})
 	for attributeKey := range values {
 		val, err := q.outputSchema.GetValue(values, q.stateTable, attributeKey)

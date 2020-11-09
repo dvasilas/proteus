@@ -51,7 +51,7 @@ joinAttribute = "story_id"
 
 [Evaluation]
 tracing = false
-logTimestamps = false
+logTimestamps = true
 
 [[connections]]
 address = "127.0.0.1:50150"
