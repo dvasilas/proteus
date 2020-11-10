@@ -27,6 +27,7 @@ import (
 // backend store.
 type MySQLStateBackend struct {
 	db              *sql.DB
+	dbLog           *sql.DB
 	accessKeyID     string
 	secretAccessKey string
 	endpoint        string
@@ -66,6 +67,7 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		s.secretAccessKey,
 		s.endpoint,
 	)
+
 	db, err := sql.Open("mysql", connStr)
 	if err != nil {
 		return utils.Error(err)
@@ -89,26 +91,40 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 	}
 
 	if s.logTimestamps {
-		if _, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_write_log", table)); err != nil {
+		connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
+			s.accessKeyID,
+			s.secretAccessKey,
+			s.endpoint,
+			database,
+		)
+
+		dbLog, err := sql.Open("mysql", connStr)
+		if err != nil {
+			return utils.Error(err)
+		}
+
+		if _, err = dbLog.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_write_log", table)); err != nil {
 			return utils.Error(err)
 		}
 		createTSTable := fmt.Sprintf(
 			"CREATE TABLE %s_write_log (row_id INT, ts DATETIME(6), ts_local DATETIME(6))",
 			table,
 		)
-		if _, err = db.Exec(createTSTable); err != nil {
+		if _, err = dbLog.Exec(createTSTable); err != nil {
 			return utils.Error(err)
 		}
-		if _, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_log", table)); err != nil {
+		if _, err = dbLog.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_log", table)); err != nil {
 			return utils.Error(err)
 		}
 		createTSTable = fmt.Sprintf(
 			"CREATE TABLE %s_query_log (row_ids VARCHAR(30), ts_local DATETIME(6))",
 			table,
 		)
-		if _, err = db.Exec(createTSTable); err != nil {
+		if _, err = dbLog.Exec(createTSTable); err != nil {
 			return utils.Error(err)
 		}
+
+		s.dbLog = dbLog
 	}
 
 	db.Close()
@@ -119,6 +135,7 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		s.endpoint,
 		database,
 	)
+
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
 		return utils.Error(err)
@@ -186,7 +203,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 		go func() {
 			tsLocal := time.Now()
 			query = fmt.Sprintf("INSERT INTO %s_write_log (row_id, ts, ts_local) VALUES (?,?,?)", table)
-			stmtInsert, err = s.db.Prepare(query)
+			stmtInsert, err = s.dbLog.Prepare(query)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -261,7 +278,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 			tsLocal := time.Now()
 			query = fmt.Sprintf("INSERT INTO %s_write_log (row_id, ts, ts_local) VALUES (?,?,?)", table)
 			// utils.Trace("update", map[string]interface{}{"query": query})
-			stmtInsert, err = s.db.Prepare(query)
+			stmtInsert, err = s.dbLog.Prepare(query)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -421,13 +438,16 @@ func (s *MySQLStateBackend) Cleanup() {
 	if s.db != nil {
 		s.db.Close()
 	}
+	if s.dbLog != nil {
+		s.dbLog.Close()
+	}
 }
 
 // SeparateTS ...
 func (s *MySQLStateBackend) SeparateTS(table string) error {
 	if s.logTimestamps {
 		query := fmt.Sprintf("INSERT INTO %s_write_log (ts_local) VALUES (?)", table)
-		stmtInsert, err := s.db.Prepare(query)
+		stmtInsert, err := s.dbLog.Prepare(query)
 		if err != nil {
 			return err
 		}
@@ -449,7 +469,7 @@ func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*pb.Q
 			}
 			rowID = rowID[:len(rowID)-1]
 			query := fmt.Sprintf("INSERT INTO %s_query_log (row_ids, ts_local) VALUES (?,?)", table)
-			stmtInsert, err := s.db.Prepare(query)
+			stmtInsert, err := s.dbLog.Prepare(query)
 			if err != nil {
 				log.Fatal(err)
 			}
