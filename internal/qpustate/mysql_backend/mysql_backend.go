@@ -174,12 +174,13 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	if err != nil {
 		return err
 	}
-	defer stmtInsert.Close()
 
 	_, err = stmtInsert.Exec(insertValues...)
 	if err != nil {
 		return err
 	}
+
+	stmtInsert.Close()
 
 	if s.logTimestamps {
 		go func() {
@@ -246,12 +247,13 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	if err != nil {
 		return err
 	}
-	defer stmtUpdate.Close()
 
 	_, err = stmtUpdate.Exec(updateValues...)
 	if err != nil {
 		return err
 	}
+
+	stmtUpdate.Close()
 
 	if s.logTimestamps {
 		go func() {
