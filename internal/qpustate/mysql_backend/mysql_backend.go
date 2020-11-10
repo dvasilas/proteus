@@ -103,6 +103,10 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 			return utils.Error(err)
 		}
 
+		dbLog.SetMaxIdleConns(64)
+		dbLog.SetMaxOpenConns(64)
+		dbLog.SetConnMaxLifetime(10 * time.Minute)
+
 		if _, err = dbLog.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_write_log", table)); err != nil {
 			return utils.Error(err)
 		}
