@@ -51,7 +51,7 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 		c, err := net.DialTimeout("tcp", conf.DatastoreConfig.Endpoint, time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retying connecting to: ", conf.DatastoreConfig.Endpoint)
+			fmt.Println("retrying connecting to: ", conf.DatastoreConfig.Endpoint)
 		} else {
 			c.Close()
 			break
@@ -62,7 +62,7 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 		c, err := net.DialTimeout("tcp", conf.DatastoreConfig.LogStreamEndpoint, time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
+			fmt.Println("retrying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
 		} else {
 			c.Close()
 			break

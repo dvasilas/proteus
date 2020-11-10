@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -15,11 +16,15 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
-// DatastoreDriverQPU ...
-type DatastoreDriverQPU struct {
+const stateDatabase = "stateDB"
+
+// DsDriverQPU ...
+type DsDriverQPU struct {
+	state             libqpu.QPUState
 	datastore         dataStore
 	persistentQueries map[string]map[int]respChannels
 	inputSchema       libqpu.Schema
+	logTimestamps     bool
 }
 
 type respChannels struct {
@@ -36,43 +41,51 @@ type dataStore interface {
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DatastoreDriverQPU, error) {
+func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 	var ds dataStore
 	var err error
 	switch qpu.Config.DatastoreConfig.Type {
 	case libqpu.MYSQL:
 		ds, err = mysqldriver.NewDatastore(qpu.Config, qpu.InputSchema)
 		if err != nil {
-			return &DatastoreDriverQPU{}, err
+			return &DsDriverQPU{}, err
 		}
 	case libqpu.S3:
 		ds, err = s3driver.NewDatastore(qpu.Config, qpu.InputSchema)
 		if err != nil {
-			return &DatastoreDriverQPU{}, err
+			return &DsDriverQPU{}, err
 		}
 	default:
-		return &DatastoreDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
+		return &DsDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
+	}
+
+	if qpu.Config.Evaluation.LogTimestamps {
+		if err := qpu.State.Init(stateDatabase, "", ""); err != nil {
+			return &DsDriverQPU{}, err
+		}
 	}
 
 	go func() {
 		catchUpDoneCh <- 0
 	}()
 
-	return &DatastoreDriverQPU{
+	return &DsDriverQPU{
+		state:             qpu.State,
 		datastore:         ds,
 		persistentQueries: make(map[string]map[int]respChannels),
 		inputSchema:       qpu.InputSchema,
+		logTimestamps:     qpu.Config.Evaluation.LogTimestamps,
 	}, nil
 }
 
 // ProcessQuerySnapshot ...
-func (q *DatastoreDriverQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
+func (q *DsDriverQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
 	isNull, isNotNull := query.GetPredicateContains()
 	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }
 
 // ProcessQuerySubscribe ...
-func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
+func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -100,6 +113,14 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map
 						logOpCh = nil
 					} else {
 						// utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
+						if q.logTimestamps {
+							rowID, err := getRowID(logOp)
+							if err != nil {
+								panic(utils.Error(err))
+							}
+							go q.state.LogReceivedUpdateRec(rowID, logOp.GetTimestamp().GetVc(), time.Now())
+						}
+
 						if len(q.persistentQueries[query.GetTable()]) == 0 {
 							cancel()
 							delete(q.persistentQueries, query.GetTable())
@@ -147,12 +168,12 @@ func (q *DatastoreDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map
 }
 
 // ClientQuery ...
-func (q *DatastoreDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
+func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
 	return nil, nil
 }
 
 // RemovePersistentQuery ...
-func (q *DatastoreDriverQPU) RemovePersistentQuery(table string, queryID int) {
+func (q *DsDriverQPU) RemovePersistentQuery(table string, queryID int) {
 	if _, found := q.persistentQueries[table][queryID]; found {
 		close(q.persistentQueries[table][queryID].logOpCh)
 		close(q.persistentQueries[table][queryID].errCh)
@@ -161,7 +182,7 @@ func (q *DatastoreDriverQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetConfig ...
-func (q *DatastoreDriverQPU) GetConfig() *qpu_api.ConfigResponse {
+func (q *DsDriverQPU) GetConfig() *qpu_api.ConfigResponse {
 	schemaTables := make([]string, len(q.inputSchema))
 	i := 0
 	for table := range q.inputSchema {
@@ -170,5 +191,16 @@ func (q *DatastoreDriverQPU) GetConfig() *qpu_api.ConfigResponse {
 	}
 	return &qpu_api.ConfigResponse{
 		Schema: schemaTables,
+	}
+}
+
+// this is use case specific
+// should not be hardcoded here
+func getRowID(logOp libqpu.LogOperation) (interface{}, error) {
+	switch logOp.GetTable() {
+	case "votes":
+		return logOp.GetAttributes()["story_id"].GetInt(), nil
+	default:
+		return nil, errors.New("unknown bucket")
 	}
 }

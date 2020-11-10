@@ -39,7 +39,7 @@ type JoinQPU struct {
 	endOfStreamCnt   int
 	catchUpDoneCh    chan int
 	port             string
-	// dispatcher     *workerpool.Dispatcher
+	logTimestamps    bool
 }
 
 type stateEntry struct {
@@ -67,11 +67,12 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		joinAttributeKey: qpu.Config.JoinConfig.JoinedAttributeAlias,
 		catchUpDoneCh:    catchUpDoneCh,
 		port:             qpu.Config.Port,
+		logTimestamps:    qpu.Config.Evaluation.LogTimestamps,
 	}
 
 	err := jqpu.initializeState()
 	if err != nil {
-		return &JoinQPU{}, err
+		return nil, err
 	}
 
 	for tableName, table := range jqpu.inputSchema {
@@ -93,7 +94,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 					)
 					responseStreamStories, err := qpugraph.SendQuery(libqpu.NewQuery(nil, querySnapshot.Q), qpu.AdjacentQPUs[i])
 					if err != nil {
-						return &JoinQPU{}, err
+						return nil, err
 					}
 					go func() {
 						if err = responsestream.StreamConsumer(responseStreamStories, jqpu.processRespRecord, nil, nil); err != nil {
@@ -221,9 +222,11 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	}
 
 	// log the query
-	err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
-	if err != nil {
-		return nil, err
+	if q.logTimestamps {
+		err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &pb.QueryResp{

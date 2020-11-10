@@ -52,7 +52,7 @@ type = "string"
 
 [Evaluation]
 tracing = false
-logTimestamps = false
+logTimestamps = true
 
 [DatastoreConfig]
 type = "mysql"
@@ -62,3 +62,10 @@ DBName = "proteus_lobsters_db"
 [DatastoreConfig.Credentials]
 accessKeyID = "root"
 secretAccessKey = "verySecretPwd"
+
+[StateBackend]
+endpoint = "127.0.0.1:3308"
+
+[StateBackend.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecrectQPUPwd"

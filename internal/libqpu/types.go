@@ -67,6 +67,7 @@ type QPUState interface {
 	GetRow(string, []string, []string, opentracing.Span) *sql.Row
 	SeparateTS(string) error
 	LogQuery(string, time.Time, []*pb.QueryRespRecord) error
+	LogReceivedUpdateRec(interface{}, map[string]*timestamp.Timestamp, time.Time)
 	Cleanup()
 }
 

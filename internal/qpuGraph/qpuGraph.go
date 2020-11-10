@@ -32,7 +32,7 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 			c, err := net.DialTimeout("tcp", conn.Address, time.Second)
 			if err != nil {
 				time.Sleep(2 * time.Second)
-				utils.Trace("retying connecting to", map[string]interface{}{"conn": conn.Address})
+				utils.Trace("retrying connecting to", map[string]interface{}{"conn": conn.Address})
 			} else {
 				c.Close()
 				break

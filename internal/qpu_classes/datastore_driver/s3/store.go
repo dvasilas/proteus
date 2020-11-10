@@ -73,7 +73,7 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (S3DataStor
 		c, err := net.DialTimeout("tcp", endpoint, time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retying connecting to: ", conf.DatastoreConfig.Endpoint, err)
+			fmt.Println("retrying connecting to: ", conf.DatastoreConfig.Endpoint, err)
 		} else {
 			c.Close()
 			break
@@ -84,7 +84,7 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (S3DataStor
 		c, err := net.DialTimeout("tcp", conf.DatastoreConfig.LogStreamEndpoint, time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
+			fmt.Println("retrying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
 		} else {
 			c.Close()
 			break

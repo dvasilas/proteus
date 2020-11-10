@@ -81,14 +81,18 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		return utils.Error(err)
 	}
 
-	if _, err = db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
-		return utils.Error(err)
+	if table != "" {
+		if _, err = db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+			return utils.Error(err)
+		}
+
+		// utils.Trace("creating table", map[string]interface{}{"stmt": createTable})
+		if _, err = db.Exec(createTable); err != nil {
+			return utils.Error(err)
+		}
 	}
 
-	// utils.Trace("creating table", map[string]interface{}{"stmt": createTable})
-	if _, err = db.Exec(createTable); err != nil {
-		return utils.Error(err)
-	}
+	db.Close()
 
 	if s.logTimestamps {
 		connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
@@ -107,50 +111,42 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		dbLog.SetMaxOpenConns(64)
 		dbLog.SetConnMaxLifetime(10 * time.Minute)
 
-		if _, err = dbLog.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_write_log", table)); err != nil {
+		if _, err = dbLog.Exec("DROP TABLE IF EXISTS write_log"); err != nil {
 			return utils.Error(err)
 		}
-		createTSTable := fmt.Sprintf(
-			"CREATE TABLE %s_write_log (row_id INT, ts DATETIME(6), ts_local DATETIME(6))",
-			table,
-		)
-		if _, err = dbLog.Exec(createTSTable); err != nil {
+		if _, err = dbLog.Exec("CREATE TABLE write_log (row_id INT, ts DATETIME(6), ts_local DATETIME(6))"); err != nil {
 			return utils.Error(err)
 		}
-		if _, err = dbLog.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s_query_log", table)); err != nil {
+		if _, err = dbLog.Exec("DROP TABLE IF EXISTS query_log"); err != nil {
 			return utils.Error(err)
 		}
-		createTSTable = fmt.Sprintf(
-			"CREATE TABLE %s_query_log (row_ids VARCHAR(30), ts_local DATETIME(6))",
-			table,
-		)
-		if _, err = dbLog.Exec(createTSTable); err != nil {
+		if _, err = dbLog.Exec("CREATE TABLE query_log (row_ids VARCHAR(30), ts_local DATETIME(6))"); err != nil {
 			return utils.Error(err)
 		}
 
 		s.dbLog = dbLog
 	}
 
-	db.Close()
+	if table != "" {
+		connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
+			s.accessKeyID,
+			s.secretAccessKey,
+			s.endpoint,
+			database,
+		)
 
-	connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
-		s.accessKeyID,
-		s.secretAccessKey,
-		s.endpoint,
-		database,
-	)
+		db, err = sql.Open("mysql", connStr)
+		if err != nil {
+			return utils.Error(err)
+		}
 
-	db, err = sql.Open("mysql", connStr)
-	if err != nil {
-		return utils.Error(err)
+		// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
+		db.SetMaxIdleConns(2048)
+		db.SetMaxOpenConns(2048)
+		db.SetConnMaxLifetime(10 * time.Minute)
+
+		s.db = db
 	}
-
-	// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
-	db.SetMaxIdleConns(2048)
-	db.SetMaxOpenConns(2048)
-	db.SetConnMaxLifetime(10 * time.Minute)
-
-	s.db = db
 
 	return nil
 }
@@ -206,8 +202,7 @@ func (s *MySQLStateBackend) Insert(table string, row map[string]interface{}, vc 
 	if s.logTimestamps {
 		go func() {
 			tsLocal := time.Now()
-			query = fmt.Sprintf("INSERT INTO %s_write_log (row_id, ts, ts_local) VALUES (?,?,?)", table)
-			stmtInsert, err = s.dbLog.Prepare(query)
+			stmtInsert, err = s.dbLog.Prepare("INSERT INTO write_log (row_id, ts, ts_local) VALUES (?,?,?)")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -280,7 +275,7 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 		go func() {
 			var stmtInsert *sql.Stmt
 			tsLocal := time.Now()
-			query = fmt.Sprintf("INSERT INTO %s_write_log (row_id, ts, ts_local) VALUES (?,?,?)", table)
+			query = "INSERT INTO write_log (row_id, ts, ts_local) VALUES (?,?,?)"
 			// utils.Trace("update", map[string]interface{}{"query": query})
 			stmtInsert, err = s.dbLog.Prepare(query)
 			if err != nil {
@@ -292,6 +287,31 @@ func (s *MySQLStateBackend) Update(table string, predicate, newValues map[string
 	}
 
 	return err
+}
+
+// LogReceivedUpdateRec ...
+func (s *MySQLStateBackend) LogReceivedUpdateRec(rowIDVal interface{}, vc map[string]*timestamp.Timestamp, tsLocal time.Time) {
+
+	var ts time.Time
+	var err error
+
+	for _, v := range vc {
+		ts, err = ptypes.Timestamp(v)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	var stmtInsert *sql.Stmt
+	stmtInsert, err = s.dbLog.Prepare("INSERT INTO write_log (row_id, ts, ts_local) VALUES (?,?,?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsert.Close()
+	_, err = stmtInsert.Exec(rowIDVal, ts, tsLocal)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // GetRow ...
@@ -450,8 +470,7 @@ func (s *MySQLStateBackend) Cleanup() {
 // SeparateTS ...
 func (s *MySQLStateBackend) SeparateTS(table string) error {
 	if s.logTimestamps {
-		query := fmt.Sprintf("INSERT INTO %s_write_log (ts_local) VALUES (?)", table)
-		stmtInsert, err := s.dbLog.Prepare(query)
+		stmtInsert, err := s.dbLog.Prepare("INSERT INTO write_log (ts_local) VALUES (?)")
 		if err != nil {
 			return err
 		}
@@ -472,8 +491,7 @@ func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*pb.Q
 				rowID += rec.RecordId + "|"
 			}
 			rowID = rowID[:len(rowID)-1]
-			query := fmt.Sprintf("INSERT INTO %s_query_log (row_ids, ts_local) VALUES (?,?)", table)
-			stmtInsert, err := s.dbLog.Prepare(query)
+			stmtInsert, err := s.dbLog.Prepare("INSERT INTO query_log (row_ids, ts_local) VALUES (?,?)")
 			if err != nil {
 				log.Fatal(err)
 			}
