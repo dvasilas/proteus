@@ -64,7 +64,7 @@ accessKeyID = "root"
 secretAccessKey = "verySecretPwd"
 
 [StateBackend]
-endpoint = "127.0.0.1:3308"
+endpoint = "127.0.0.1:3306"
 
 [StateBackend.Credentials]
 accessKeyID = "root"

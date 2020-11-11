@@ -254,21 +254,26 @@ func readLog(filePath string) ([][]string, error) {
 
 func main() {
 
-	writeLog, err := readLog(os.Args[1])
-	if err != nil {
-		fmt.Println(err)
-	}
-	queryLog, err := readLog(os.Args[2])
-	if err != nil {
-		fmt.Println(err)
-	}
+	if len(os.Args) > 1 {
+		writeLog, err := readLog(os.Args[1])
+		if err != nil {
+			fmt.Println(err)
+		}
 
-	if err := freshnessLatency(writeLog); err != nil {
-		log.Fatal(err)
-	}
+		if err := freshnessLatency(writeLog); err != nil {
+			log.Fatal(err)
+		}
 
-	if err := freshnessVersions(writeLog, queryLog); err != nil {
-		log.Fatal(err)
+		if len(os.Args) > 2 {
+			queryLog, err := readLog(os.Args[2])
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			if err := freshnessVersions(writeLog, queryLog); err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 }
 

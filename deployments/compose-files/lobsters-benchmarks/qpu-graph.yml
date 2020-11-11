@@ -9,6 +9,7 @@ services:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
       - ${HOME}/volume/configs:/configs
+      - ${HOME}/volume/scripts:/opt/proteus-lobsters/freshness
     command: /configs/lobsters/dsdriver.toml error
     deploy:
       restart_policy:
@@ -26,6 +27,7 @@ services:
       - MYSQL_PASSWORD=verySecrectQPUPwd
     volumes:
       - ${HOME}/volume/configs:/configs
+      - ${HOME}/volume/scripts:/opt/proteus-lobsters/freshness
     command: /configs/lobsters/sum-stories.toml error
     deploy:
       restart_policy:
@@ -52,7 +54,7 @@ services:
         condition: none
       placement:
         constraints:
-          - node.labels.dc == 1
+          - node.labels.dc == 2
           - node.labels.placement_join == true
 
 networks:
