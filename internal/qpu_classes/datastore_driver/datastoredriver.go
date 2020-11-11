@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"log"
 	"math/big"
 	"time"
 
@@ -13,10 +14,20 @@ import (
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/opentracing/opentracing-go"
+	"google.golang.org/grpc/benchmark/stats"
 )
 
 const stateDatabase = "stateDB"
+
+var (
+	histogramOpts = stats.HistogramOptions{
+		// up to 2s
+		NumBuckets:   200000,
+		GrowthFactor: .01,
+	}
+)
 
 // DsDriverQPU ...
 type DsDriverQPU struct {
@@ -25,6 +36,7 @@ type DsDriverQPU struct {
 	persistentQueries map[string]map[int]respChannels
 	inputSchema       libqpu.Schema
 	logTimestamps     bool
+	histogram         *stats.Histogram
 }
 
 type respChannels struct {
@@ -59,10 +71,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		return &DsDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
 	}
 
+	var histogram *stats.Histogram
 	if qpu.Config.Evaluation.LogTimestamps {
-		if err := qpu.State.Init(stateDatabase, "", ""); err != nil {
-			return &DsDriverQPU{}, err
-		}
+		histogram = stats.NewHistogram(histogramOpts)
 	}
 
 	go func() {
@@ -75,6 +86,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		persistentQueries: make(map[string]map[int]respChannels),
 		inputSchema:       qpu.InputSchema,
 		logTimestamps:     qpu.Config.Evaluation.LogTimestamps,
+		histogram:         histogram,
 	}, nil
 }
 
@@ -113,12 +125,22 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 						logOpCh = nil
 					} else {
 						// utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
+
 						if q.logTimestamps {
-							rowID, err := getRowID(logOp)
+							var t0, t1 time.Time
+							t1 = time.Now()
+
+							for _, v := range logOp.GetTimestamp().GetVc() {
+								t0, err = ptypes.Timestamp(v)
+								if err != nil {
+									log.Fatal(err)
+								}
+							}
+
+							q.histogram.Add(t1.Sub(t0).Nanoseconds())
 							if err != nil {
 								panic(utils.Error(err))
 							}
-							go q.state.LogReceivedUpdateRec(rowID, logOp.GetTimestamp().GetVc(), time.Now())
 						}
 
 						if len(q.persistentQueries[query.GetTable()]) == 0 {
@@ -194,13 +216,29 @@ func (q *DsDriverQPU) GetConfig() *qpu_api.ConfigResponse {
 	}
 }
 
-// this is use case specific
-// should not be hardcoded here
-func getRowID(logOp libqpu.LogOperation) (interface{}, error) {
-	switch logOp.GetTable() {
-	case "votes":
-		return logOp.GetAttributes()["story_id"].GetInt(), nil
-	default:
-		return nil, errors.New("unknown bucket")
+// GetMetrics ...
+func (q *DsDriverQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return &pb.MetricsResponse{
+		FreshnessLatencyP50: durationToMillis(time.Duration(pepcentile(.5, q.histogram))),
+		FreshnessLatencyP90: durationToMillis(time.Duration(pepcentile(.9, q.histogram))),
+		FreshnessLatencyP95: durationToMillis(time.Duration(pepcentile(.95, q.histogram))),
+		FreshnessLatencyP99: durationToMillis(time.Duration(pepcentile(.99, q.histogram))),
+	}, nil
+}
+
+func pepcentile(percentile float64, h *stats.Histogram) int64 {
+	percentileCount := int64(float64(h.Count) * percentile)
+	currentCount := int64(0)
+	for _, bucket := range h.Buckets {
+		if currentCount+bucket.Count >= percentileCount {
+			lastBuckedFilled := float64(percentileCount-currentCount) / float64(bucket.Count)
+			return int64((1.0-lastBuckedFilled)*bucket.LowBound + lastBuckedFilled*bucket.LowBound*(1.0+histogramOpts.GrowthFactor))
+		}
+		currentCount += bucket.Count
 	}
+	panic("should have found a bound")
+}
+
+func durationToMillis(d time.Duration) float64 {
+	return float64(d) / float64(time.Millisecond)
 }

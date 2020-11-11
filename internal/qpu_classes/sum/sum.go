@@ -238,6 +238,11 @@ func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span)
 // RemovePersistentQuery ...
 func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {}
 
+// GetMetrics ...
+func (q *SumQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return nil, nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {

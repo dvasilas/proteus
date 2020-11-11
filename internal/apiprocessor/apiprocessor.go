@@ -180,6 +180,11 @@ func (s *APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest)
 	return s.qpuClass.GetConfig(), nil
 }
 
+// GetMetrics ...
+func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return s.qpuClass.GetMetrics(req)
+}
+
 // ---------------- Internal Functions --------------
 
 func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, error) {

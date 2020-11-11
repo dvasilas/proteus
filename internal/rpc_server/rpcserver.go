@@ -136,11 +136,16 @@ func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryRes
 }
 
 // GetConfig implements the QPU's low level GetConfig API.
-func (s *Server) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
-	return s.api.GetConfig(ctx, in)
+func (s *Server) GetConfig(ctx context.Context, req *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
+	return s.api.GetConfig(ctx, req)
 }
 
 // GetDataTransfer implements the QPU's low level GetDataTransfer API.
 // func (s *Server) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
 // 	return s.api.GetDataTransfer(ctx, in)
 // }
+
+// GetMetrics ...
+func (s *Server) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return s.api.GetMetrics(ctx, req)
+}

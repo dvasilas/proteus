@@ -243,6 +243,11 @@ func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]str
 func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
+// GetMetrics ...
+func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return nil, nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {

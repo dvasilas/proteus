@@ -104,6 +104,11 @@ func (q *RouterQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]s
 func (q *RouterQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
+// GetMetrics ...
+func (q *RouterQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	return nil, nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *RouterQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {

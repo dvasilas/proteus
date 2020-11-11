@@ -8,7 +8,6 @@ import (
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
-	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -23,18 +22,6 @@ type Host struct {
 	Name string
 	Port int
 }
-
-// ResponseRecord ...
-type ResponseRecord struct {
-	SequenceID int64
-	ObjectID   string
-	Bucket     string
-	State      map[string]string
-	Timestamp  Vectorclock
-}
-
-// Vectorclock ...
-type Vectorclock map[string]*tspb.Timestamp
 
 // NewClient creates a new Proteus client connected to the given QPU server.
 func NewClient(host Host, poolSize, poolOverflow int, tracing bool) (*Client, error) {
@@ -78,6 +65,25 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 	defer cancel()
 
 	resp, err := client.Cli.QueryUnary(ctx, r)
+
+	c.pool.Return(client)
+
+	return resp, err
+}
+
+// Query ...
+func (c *Client) GetMetrics() (*pb.MetricsResponse, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &pb.MetricsRequest{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resp, err := client.Cli.GetMetrics(ctx, r)
 
 	c.pool.Return(client)
 

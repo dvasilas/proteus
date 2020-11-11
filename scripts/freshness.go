@@ -3,12 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 )
 
 var opType = "freshness"
@@ -254,27 +255,44 @@ func readLog(filePath string) ([][]string, error) {
 
 func main() {
 
-	if len(os.Args) > 1 {
-		writeLog, err := readLog(os.Args[1])
-		if err != nil {
-			fmt.Println(err)
-		}
+	// if len(os.Args) > 1 {
+	// 	writeLog, err := readLog(os.Args[1])
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
 
-		if err := freshnessLatency(writeLog); err != nil {
-			log.Fatal(err)
-		}
+	// 	if err := freshnessLatency(writeLog); err != nil {
+	// 		log.Fatal(err)
+	// 	}
 
-		if len(os.Args) > 2 {
-			queryLog, err := readLog(os.Args[2])
-			if err != nil {
-				fmt.Println(err)
-			}
+	// 	if len(os.Args) > 2 {
+	// 		queryLog, err := readLog(os.Args[2])
+	// 		if err != nil {
+	// 			fmt.Println(err)
+	// 		}
 
-			if err := freshnessVersions(writeLog, queryLog); err != nil {
-				log.Fatal(err)
-			}
-		}
+	// 		if err := freshnessVersions(writeLog, queryLog); err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 	}
+	// }
+
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50150}, 1, 1, false)
+	if err != nil {
+		panic(err)
 	}
+
+	resp, err := c.GetMetrics()
+	fmt.Println(resp, err)
+	if err != nil {
+		panic(err)
+
+	}
+	fmt.Printf("[%s-latency] p50(ms): %.5f\n", opType, resp.FreshnessLatencyP50)
+	fmt.Printf("[%s-latency] p90(ms): %.5f\n", opType, resp.FreshnessLatencyP90)
+	fmt.Printf("[%s-latency] p95(ms): %.5f\n", opType, resp.FreshnessLatencyP95)
+	fmt.Printf("[%s-latency] p99(ms): %.5f\n", opType, resp.FreshnessLatencyP99)
+
 }
 
 func durationToMillis(d time.Duration) float64 {

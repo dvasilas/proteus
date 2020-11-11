@@ -31,6 +31,7 @@ type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
 	QueryUnary(QueryRequest, opentracing.Span) (*pb.QueryResp, error)
 	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
+	GetMetrics(context.Context, *pb.MetricsRequest) (*pb.MetricsResponse, error)
 	// GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
 }
 
@@ -41,6 +42,7 @@ type QPUClass interface {
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
 	GetConfig() *qpu_api.ConfigResponse
+	GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error)
 }
 
 // AdjacentQPU ...
