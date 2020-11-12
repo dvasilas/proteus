@@ -75,7 +75,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		datastore:                  ds,
 		persistentQueries:          make(map[string]map[int]respChannels),
 		inputSchema:                qpu.InputSchema,
-		measureNotificationLatency: qpu.Config.Evaluation.LogTimestamps,
+		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
 		notificationLatencyM:       notificationLatencyM,
 	}, nil
 }

@@ -10,6 +10,8 @@ services:
     volumes:
       - ${HOME}/volume/configs:/configs
       - ${HOME}/volume/scripts:/opt/proteus-lobsters/freshness
+    ports:
+      - 50150:50150
     command: /configs/lobsters/dsdriver.toml error
     deploy:
       restart_policy:
@@ -28,6 +30,8 @@ services:
     volumes:
       - ${HOME}/volume/configs:/configs
       - ${HOME}/volume/scripts:/opt/proteus-lobsters/freshness
+    ports:
+      - 50250:50250
     command: /configs/lobsters/sum-stories.toml error
     deploy:
       restart_policy:
