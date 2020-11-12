@@ -6,37 +6,27 @@ import (
 	"errors"
 	"log"
 	"math/big"
-	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/opentracing/opentracing-go"
-	"google.golang.org/grpc/benchmark/stats"
 )
 
 const stateDatabase = "stateDB"
 
-var (
-	histogramOpts = stats.HistogramOptions{
-		// up to 2s
-		NumBuckets:   200000,
-		GrowthFactor: .01,
-	}
-)
-
 // DsDriverQPU ...
 type DsDriverQPU struct {
-	state             libqpu.QPUState
-	datastore         dataStore
-	persistentQueries map[string]map[int]respChannels
-	inputSchema       libqpu.Schema
-	logTimestamps     bool
-	histogram         *stats.Histogram
+	state                      libqpu.QPUState
+	datastore                  dataStore
+	persistentQueries          map[string]map[int]respChannels
+	inputSchema                libqpu.Schema
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.NotificationLatencyM
 }
 
 type respChannels struct {
@@ -71,9 +61,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		return &DsDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
 	}
 
-	var histogram *stats.Histogram
-	if qpu.Config.Evaluation.LogTimestamps {
-		histogram = stats.NewHistogram(histogramOpts)
+	var notificationLatencyM metrics.NotificationLatencyM
+	if qpu.Config.Evaluation.MeasureNotificationLatency {
+		notificationLatencyM = metrics.NewNotificationLatencyM()
 	}
 
 	go func() {
@@ -81,12 +71,12 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 	}()
 
 	return &DsDriverQPU{
-		state:             qpu.State,
-		datastore:         ds,
-		persistentQueries: make(map[string]map[int]respChannels),
-		inputSchema:       qpu.InputSchema,
-		logTimestamps:     qpu.Config.Evaluation.LogTimestamps,
-		histogram:         histogram,
+		state:                      qpu.State,
+		datastore:                  ds,
+		persistentQueries:          make(map[string]map[int]respChannels),
+		inputSchema:                qpu.InputSchema,
+		measureNotificationLatency: qpu.Config.Evaluation.LogTimestamps,
+		notificationLatencyM:       notificationLatencyM,
 	}, nil
 }
 
@@ -126,20 +116,9 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 					} else {
 						// utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
 
-						if q.logTimestamps {
-							var t0, t1 time.Time
-							t1 = time.Now()
-
-							for _, v := range logOp.GetTimestamp().GetVc() {
-								t0, err = ptypes.Timestamp(v)
-								if err != nil {
-									log.Fatal(err)
-								}
-							}
-
-							q.histogram.Add(t1.Sub(t0).Nanoseconds())
-							if err != nil {
-								panic(utils.Error(err))
+						if q.measureNotificationLatency {
+							if err = q.notificationLatencyM.Add(logOp); err != nil {
+								log.Fatal(err)
 							}
 						}
 
@@ -218,27 +197,11 @@ func (q *DsDriverQPU) GetConfig() *qpu_api.ConfigResponse {
 
 // GetMetrics ...
 func (q *DsDriverQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
 	return &pb.MetricsResponse{
-		FreshnessLatencyP50: durationToMillis(time.Duration(pepcentile(.5, q.histogram))),
-		FreshnessLatencyP90: durationToMillis(time.Duration(pepcentile(.9, q.histogram))),
-		FreshnessLatencyP95: durationToMillis(time.Duration(pepcentile(.95, q.histogram))),
-		FreshnessLatencyP99: durationToMillis(time.Duration(pepcentile(.99, q.histogram))),
+		NotificationLatencyP50: p50,
+		NotificationLatencyP90: p90,
+		NotificationLatencyP95: p95,
+		NotificationLatencyP99: p99,
 	}, nil
-}
-
-func pepcentile(percentile float64, h *stats.Histogram) int64 {
-	percentileCount := int64(float64(h.Count) * percentile)
-	currentCount := int64(0)
-	for _, bucket := range h.Buckets {
-		if currentCount+bucket.Count >= percentileCount {
-			lastBuckedFilled := float64(percentileCount-currentCount) / float64(bucket.Count)
-			return int64((1.0-lastBuckedFilled)*bucket.LowBound + lastBuckedFilled*bucket.LowBound*(1.0+histogramOpts.GrowthFactor))
-		}
-		currentCount += bucket.Count
-	}
-	panic("should have found a bound")
-}
-
-func durationToMillis(d time.Duration) float64 {
-	return float64(d) / float64(time.Millisecond)
 }

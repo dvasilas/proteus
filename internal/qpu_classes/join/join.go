@@ -10,6 +10,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
@@ -29,17 +30,20 @@ const stateDatabase = "stateDB"
 
 // JoinQPU ...
 type JoinQPU struct {
-	state            libqpu.QPUState
-	inputSchema      libqpu.Schema
-	outputSchema     libqpu.Schema
-	stateTable       string
-	joinAttributeKey string
-	inMemState       *inMemState
-	joinAttributes   map[string]string
-	endOfStreamCnt   int
-	catchUpDoneCh    chan int
-	port             string
-	logTimestamps    bool
+	state                      libqpu.QPUState
+	inputSchema                libqpu.Schema
+	outputSchema               libqpu.Schema
+	stateTable                 string
+	joinAttributeKey           string
+	inMemState                 *inMemState
+	joinAttributes             map[string]string
+	endOfStreamCnt             int
+	catchUpDoneCh              chan int
+	port                       string
+	logTimestamps              bool
+	catchUpDone                bool
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.NotificationLatencyM
 }
 
 type stateEntry struct {
@@ -58,16 +62,22 @@ type inMemState struct {
 // InitClass ...
 func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 	jqpu := &JoinQPU{
-		state:            qpu.State,
-		inputSchema:      qpu.InputSchema,
-		outputSchema:     make(map[string]libqpu.SchemaTable),
-		joinAttributes:   qpu.Config.JoinConfig.JoinAttribute,
-		inMemState:       &inMemState{entries: make(map[int64]*stateEntry)},
-		stateTable:       qpu.Config.JoinConfig.OutputTableAlias,
-		joinAttributeKey: qpu.Config.JoinConfig.JoinedAttributeAlias,
-		catchUpDoneCh:    catchUpDoneCh,
-		port:             qpu.Config.Port,
-		logTimestamps:    qpu.Config.Evaluation.LogTimestamps,
+		state:                      qpu.State,
+		inputSchema:                qpu.InputSchema,
+		outputSchema:               make(map[string]libqpu.SchemaTable),
+		joinAttributes:             qpu.Config.JoinConfig.JoinAttribute,
+		inMemState:                 &inMemState{entries: make(map[int64]*stateEntry)},
+		stateTable:                 qpu.Config.JoinConfig.OutputTableAlias,
+		joinAttributeKey:           qpu.Config.JoinConfig.JoinedAttributeAlias,
+		catchUpDoneCh:              catchUpDoneCh,
+		port:                       qpu.Config.Port,
+		logTimestamps:              qpu.Config.Evaluation.LogTimestamps,
+		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
+		catchUpDone:                false,
+	}
+
+	if jqpu.measureNotificationLatency {
+		jqpu.notificationLatencyM = metrics.NewNotificationLatencyM()
 	}
 
 	err := jqpu.initializeState()
@@ -243,14 +253,33 @@ func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]str
 func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
+// GetConfig ...
+func (q JoinQPU) GetConfig() *qpu_api.ConfigResponse {
+	return &qpu_api.ConfigResponse{
+		Schema: []string{q.stateTable},
+	}
+}
+
 // GetMetrics ...
 func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	return nil, nil
+	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
+	return &pb.MetricsResponse{
+		NotificationLatencyP50: p50,
+		NotificationLatencyP90: p90,
+		NotificationLatencyP95: p95,
+		NotificationLatencyP99: p99,
+	}, nil
 }
 
 // ---------------- Internal Functions --------------
 
 func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	if q.catchUpDone && q.measureNotificationLatency {
+		if err := q.notificationLatencyM.Add(respRecord.GetLogOp()); err != nil {
+			return err
+		}
+	}
+
 	respRecordType, err := respRecord.GetType()
 	if err != nil {
 		return err
@@ -259,10 +288,13 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 	if respRecordType == libqpu.EndOfStream {
 		q.endOfStreamCnt++
 		if q.endOfStreamCnt == len(q.joinAttributes) {
+			q.catchUpDone = true
+
 			err := q.flushState()
 			if err != nil {
 				return err
 			}
+
 			go func() {
 				q.catchUpDoneCh <- 0
 			}()
@@ -359,11 +391,4 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 		return nil, err
 	}
 	return values, nil
-}
-
-// GetConfig ...
-func (q JoinQPU) GetConfig() *qpu_api.ConfigResponse {
-	return &qpu_api.ConfigResponse{
-		Schema: []string{q.stateTable},
-	}
 }

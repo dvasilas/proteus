@@ -131,8 +131,9 @@ type QPUConfig struct {
 		JoinAttribute        map[string]string
 	}
 	Evaluation struct {
-		Tracing       bool
-		LogTimestamps bool
+		Tracing                    bool
+		LogTimestamps              bool
+		MeasureNotificationLatency bool
 	}
 	MaxWorkers  int
 	MaxJobQueue int

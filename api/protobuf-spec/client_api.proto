@@ -27,8 +27,8 @@ message QueryRespRecord {
 message MetricsRequest {}
 
 message MetricsResponse {
-  double freshnessLatencyP50 = 1;
-  double freshnessLatencyP90 = 2;
-  double freshnessLatencyP95 = 3;
-  double freshnessLatencyP99 = 4;
+  double notificationLatencyP50 = 1;
+  double notificationLatencyP90 = 2;
+  double notificationLatencyP95 = 3;
+  double notificationLatencyP99 = 4;
 }

@@ -24,6 +24,7 @@ GroupBy = "story_id"
 [Evaluation]
 tracing = false
 logTimestamps = false
+measureNotificationLatency = true
 
 [[connections]]
 address = "127.0.0.1:50150"

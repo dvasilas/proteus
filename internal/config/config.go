@@ -87,8 +87,9 @@ type inputQPUConfig struct {
 		Delay    int64
 	}
 	Evaluation struct {
-		Tracing       bool
-		LogTimestamps bool
+		Tracing                    bool
+		LogTimestamps              bool
+		MeasureNotificationLatency bool
 	}
 	MaxWorkers  int
 	MaxJobQueue int
@@ -324,6 +325,7 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 func getEvaluation(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.Evaluation.Tracing = inputConf.Evaluation.Tracing
 	config.Evaluation.LogTimestamps = inputConf.Evaluation.LogTimestamps
+	config.Evaluation.MeasureNotificationLatency = inputConf.Evaluation.MeasureNotificationLatency
 
 	return nil
 }

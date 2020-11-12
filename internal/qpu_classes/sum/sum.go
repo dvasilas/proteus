@@ -10,6 +10,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
@@ -30,15 +31,18 @@ const stateDatabase = "stateDB"
 
 // SumQPU ...
 type SumQPU struct {
-	state                libqpu.QPUState
-	inputSchema          libqpu.Schema
-	subscribeQueries     []chan libqpu.LogOperation
-	aggregationAttribute string
-	groupBy              string
-	schemaTable          string
-	inMemState           *inMemState
-	port                 string
-	catchUpDoneCh        chan int
+	state                      libqpu.QPUState
+	inputSchema                libqpu.Schema
+	subscribeQueries           []chan libqpu.LogOperation
+	aggregationAttribute       string
+	groupBy                    string
+	schemaTable                string
+	inMemState                 *inMemState
+	port                       string
+	catchUpDoneCh              chan int
+	catchUpDone                bool
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.NotificationLatencyM
 }
 
 type inMemState struct {
@@ -55,16 +59,18 @@ type stateEntry struct {
 // ---------------- API Functions -------------------
 
 // InitClass ...
-func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
+func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 	sqpu := &SumQPU{
-		state:                q.State,
-		inputSchema:          q.InputSchema,
-		subscribeQueries:     make([]chan libqpu.LogOperation, 0),
-		aggregationAttribute: q.Config.AggregationConfig.AggregationAttribute,
-		groupBy:              q.Config.AggregationConfig.GroupBy,
-		inMemState:           &inMemState{entries: make(map[int64]*stateEntry)},
-		port:                 q.Config.Port,
-		catchUpDoneCh:        catchUpDoneCh,
+		state:                      qpu.State,
+		inputSchema:                qpu.InputSchema,
+		subscribeQueries:           make([]chan libqpu.LogOperation, 0),
+		aggregationAttribute:       qpu.Config.AggregationConfig.AggregationAttribute,
+		groupBy:                    qpu.Config.AggregationConfig.GroupBy,
+		inMemState:                 &inMemState{entries: make(map[int64]*stateEntry)},
+		port:                       qpu.Config.Port,
+		catchUpDoneCh:              catchUpDoneCh,
+		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
+		catchUpDone:                false,
 	}
 
 	err := sqpu.initializeState()
@@ -72,9 +78,13 @@ func InitClass(q *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 		return &SumQPU{}, err
 	}
 
+	if sqpu.measureNotificationLatency {
+		sqpu.notificationLatencyM = metrics.NewNotificationLatencyM()
+	}
+
 	query := sqpu.prepareDownstreamQuery()
 
-	for _, adjQPU := range q.AdjacentQPUs {
+	for _, adjQPU := range qpu.AdjacentQPUs {
 		responseStream, err := qpugraph.SendQuery(libqpu.NewQuery(nil, query.Q), adjQPU)
 		if err != nil {
 			return &SumQPU{}, err
@@ -235,31 +245,53 @@ func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span)
 	return nil, errors.New("not implemented")
 }
 
+// GetConfig ...
+func (q *SumQPU) GetConfig() *qpu_api.ConfigResponse {
+	return &qpu_api.ConfigResponse{
+		Schema: []string{q.schemaTable},
+	}
+}
+
 // RemovePersistentQuery ...
 func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {}
 
 // GetMetrics ...
 func (q *SumQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	return nil, nil
+	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
+	return &pb.MetricsResponse{
+		NotificationLatencyP50: p50,
+		NotificationLatencyP90: p90,
+		NotificationLatencyP95: p95,
+		NotificationLatencyP99: p99,
+	}, nil
 }
 
 // ---------------- Internal Functions --------------
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+	if q.catchUpDone && q.measureNotificationLatency {
+		if err := q.notificationLatencyM.Add(respRecord.GetLogOp()); err != nil {
+			return err
+		}
+	}
+
 	respRecordType, err := respRecord.GetType()
 	if err != nil {
 		return err
 	}
 
 	if respRecordType == libqpu.EndOfStream {
+		q.catchUpDone = true
+
 		err := q.flushState()
 		if err != nil {
 			return err
 		}
+
 		go func() {
 			q.catchUpDoneCh <- 0
 		}()
-		return nil
+
 	} else if respRecordType == libqpu.State {
 		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
 			return err
@@ -382,11 +414,4 @@ func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qp
 	}
 
 	return newSumValue, nil
-}
-
-// GetConfig ...
-func (q *SumQPU) GetConfig() *qpu_api.ConfigResponse {
-	return &qpu_api.ConfigResponse{
-		Schema: []string{q.schemaTable},
-	}
 }

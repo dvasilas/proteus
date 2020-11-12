@@ -51,7 +51,8 @@ joinAttribute = "story_id"
 
 [Evaluation]
 tracing = false
-logTimestamps = true
+logTimestamps = false
+measureNotificationLatency = true
 
 [[connections]]
 address = "dsdriver:50150"
