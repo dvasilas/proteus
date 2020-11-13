@@ -381,6 +381,15 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 
 	if errScan == sql.ErrNoRows {
 		row[q.joinAttributeKey] = joinID
+		for k, v := range q.outputSchema[q.stateTable].Attributes {
+			if _, ok := row[k]; !ok {
+				switch v {
+				case libqpu.INT:
+					row[k] = 0
+				}
+			}
+		}
+
 		err = q.state.Insert(q.stateTable+q.port, row, vc, joinID)
 	} else {
 		err = q.state.Update(q.stateTable+q.port,

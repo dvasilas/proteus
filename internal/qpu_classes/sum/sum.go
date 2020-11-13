@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -17,7 +16,6 @@ import (
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
-	"github.com/golang/protobuf/ptypes"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 )
@@ -33,6 +31,7 @@ const stateDatabase = "stateDB"
 type SumQPU struct {
 	state                      libqpu.QPUState
 	inputSchema                libqpu.Schema
+	outputSchema               libqpu.Schema
 	subscribeQueries           []chan libqpu.LogOperation
 	aggregationAttribute       string
 	groupBy                    string
@@ -46,14 +45,15 @@ type SumQPU struct {
 }
 
 type inMemState struct {
+	sync.RWMutex
 	entries map[int64]*stateEntry
 }
 
 type stateEntry struct {
+	sync.RWMutex
 	val        int64
 	attributes map[string]*qpu.Value
 	ts         *qpu.Vectorclock
-	mutex      sync.RWMutex
 }
 
 // ---------------- API Functions -------------------
@@ -61,8 +61,9 @@ type stateEntry struct {
 // InitClass ...
 func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 	sqpu := &SumQPU{
-		state:                      qpu.State,
+		// state:                      qpu.State,
 		inputSchema:                qpu.InputSchema,
+		outputSchema:               make(map[string]libqpu.SchemaTable),
 		subscribeQueries:           make([]chan libqpu.LogOperation, 0),
 		aggregationAttribute:       qpu.Config.AggregationConfig.AggregationAttribute,
 		groupBy:                    qpu.Config.AggregationConfig.GroupBy,
@@ -109,33 +110,7 @@ func (q *SumQPU) initializeState() error {
 		outputSchemaTable = v
 	}
 
-	createSchemaStmt := ""
-	for attr, attrType := range outputSchemaTable.Attributes {
-		if attr == q.aggregationAttribute {
-			createSchemaStmt += q.aggregationAttribute + "_sum"
-		} else {
-			createSchemaStmt += attr
-		}
-		switch attrType {
-		case libqpu.INT:
-			createSchemaStmt += " bigint, "
-		default:
-			return utils.Error(errors.New("unknown attribute type"))
-		}
-	}
-
-	if err := q.state.Init(
-		stateDatabase,
-		q.schemaTable+q.port,
-		fmt.Sprintf(
-			"CREATE TABLE %s (%s ts_key varchar(30), ts datetime(6), PRIMARY KEY ( %s ) )",
-			q.schemaTable+q.port,
-			createSchemaStmt,
-			q.groupBy,
-		),
-	); err != nil {
-		return err
-	}
+	q.outputSchema[q.schemaTable] = outputSchemaTable
 
 	return nil
 }
@@ -169,59 +144,27 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	stateCh, err := q.state.Get(
-		q.schemaTable+q.port,
-		[]string{"*"},
-		nil, "",
-		query.GetLimit(),
-		nil,
-	)
-	if err != nil {
-		errCh <- utils.Error(err)
-		return logOpCh, errCh
-	}
-
 	go func() {
-		for record := range stateCh {
-			// prepare timestamp
-			vectorClockKey := record["ts_key"].(string)
-			ts := record["ts"].(time.Time)
-			if err != nil {
-				errCh <- utils.Error(err)
-				break
-			}
-			timestamp, err := ptypes.TimestampProto(ts)
-			if err != nil {
-				errCh <- err
-				break
-			}
-			delete(record, "ts")
-			delete(record, "ts_key")
+		q.inMemState.Lock()
+		for k, e := range q.inMemState.entries {
+			recordID := strconv.FormatInt(k, 10)
 
-			// prepare attributes
 			attributes := make(map[string]*qpu.Value)
-			// prepare record ID
-			recordID := record[q.groupBy].(string)
-			n, err := strconv.ParseInt(record[q.groupBy].(string), 10, 64)
-			if err != nil {
-				errCh <- err
-				break
-			}
-			attributes[q.groupBy] = libqpu.ValueInt(n)
-			n, err = strconv.ParseInt(record[q.aggregationAttribute+"_sum"].(string), 10, 64)
-			if err != nil {
-				errCh <- err
-				break
-			}
-			attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(n)
+			attributes[q.groupBy] = libqpu.ValueInt(k)
+			attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(e.val)
 
-			logOpCh <- libqpu.LogOperationState(
+			for attrN, attrV := range e.attributes {
+				attributes[attrN] = attrV
+			}
+			logOp := libqpu.LogOperationState(
 				recordID,
 				q.schemaTable,
-				libqpu.Vectorclock(map[string]*tspb.Timestamp{vectorClockKey: timestamp}),
+				e.ts,
 				attributes,
 			)
+			logOpCh <- logOp
 		}
+		q.inMemState.Unlock()
 
 		close(logOpCh)
 		close(errCh)
@@ -283,42 +226,15 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	if respRecordType == libqpu.EndOfStream {
 		q.catchUpDone = true
 
-		err := q.flushState()
-		if err != nil {
-			return err
-		}
-
 		go func() {
 			q.catchUpDoneCh <- 0
 		}()
 
 	} else if respRecordType == libqpu.State {
-		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
-			return err
-		}
+		q.processStateRecordInMem(respRecord, data, recordCh)
 	} else {
-		attributes := respRecord.GetAttributes()
 
-		groupByValue := attributes[q.groupBy].GetInt()
-		sumValue := attributes[q.aggregationAttribute].GetInt()
-		delete(attributes, q.groupBy)
-		delete(attributes, q.aggregationAttribute)
-
-		newSumValue, err := q.updateState(groupByValue, sumValue, map[string]*qpu.Value{}, respRecord.GetLogOp().GetTimestamp().GetVc())
-		if err != nil {
-			return err
-		}
-
-		attributes[q.groupBy] = libqpu.ValueInt(groupByValue)
-		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(newSumValue)
-
-		logOp := libqpu.LogOperationDelta(
-			respRecord.GetRecordID(),
-			q.schemaTable,
-			respRecord.GetLogOp().GetTimestamp(),
-			nil,
-			attributes,
-		)
+		logOp := q.processUpdateRecordInMem(respRecord, data, recordCh)
 
 		for _, ch := range q.subscribeQueries {
 			ch <- logOp
@@ -328,7 +244,7 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	return nil
 }
 
-func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *SumQPU) processStateRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) {
 	attributes := respRecord.GetAttributes()
 
 	sumValue := attributes[q.aggregationAttribute].GetInt()
@@ -338,12 +254,10 @@ func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 
 	_, found := q.inMemState.entries[groupByValue]
 	if found {
-		// sequential processing for now
-		// value.mutex.Lock()
+		// initial snapshot is processed sequentially for now, no need to lock
 		q.inMemState.entries[groupByValue].val += sumValue
 		q.inMemState.entries[groupByValue].attributes = attributes
 		q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
-		// value.mutex.Unlock()
 	} else {
 		q.inMemState.entries[groupByValue] = &stateEntry{
 			val:        sumValue,
@@ -351,15 +265,55 @@ func (q *SumQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data i
 			ts:         respRecord.GetLogOp().GetTimestamp(),
 		}
 	}
+}
 
-	return nil
+func (q *SumQPU) processUpdateRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) libqpu.LogOperation {
+	attributes := respRecord.GetAttributes()
+
+	groupByValue := attributes[q.groupBy].GetInt()
+	sumValue := attributes[q.aggregationAttribute].GetInt()
+	delete(attributes, q.aggregationAttribute)
+
+	_, found := q.inMemState.entries[groupByValue]
+	if found {
+		q.inMemState.entries[groupByValue].Lock()
+
+		q.inMemState.entries[groupByValue].val += sumValue
+		q.inMemState.entries[groupByValue].attributes = attributes
+		q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
+
+		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(q.inMemState.entries[groupByValue].val)
+
+		q.inMemState.entries[groupByValue].Unlock()
+
+	} else {
+		q.inMemState.Lock()
+
+		q.inMemState.entries[groupByValue] = &stateEntry{
+			val:        sumValue,
+			attributes: attributes,
+			ts:         respRecord.GetLogOp().GetTimestamp(),
+		}
+
+		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(sumValue)
+
+		q.inMemState.Unlock()
+	}
+
+	return libqpu.LogOperationDelta(
+		respRecord.GetRecordID(),
+		q.schemaTable,
+		respRecord.GetLogOp().GetTimestamp(),
+		nil,
+		attributes,
+	)
 }
 
 func (q *SumQPU) flushState() error {
 	for stateMapKey, stateEntry := range q.inMemState.entries {
-		stateEntry.mutex.RLock()
+		stateEntry.RLock()
 		_, err := q.updateState(stateMapKey, stateEntry.val, stateEntry.attributes, stateEntry.ts.GetVc())
-		stateEntry.mutex.RUnlock()
+		stateEntry.RUnlock()
 		if err != nil {
 			return err
 		}
