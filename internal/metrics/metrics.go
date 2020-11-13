@@ -40,7 +40,10 @@ func (m NotificationLatencyM) Add(logOp libqpu.LogOperation) (err error) {
 		}
 	}
 
-	return m.hist.Add(t1.Sub(t0).Nanoseconds())
+	if t1.After(t0) {
+		return m.hist.Add(t1.Sub(t0).Nanoseconds())
+	}
+	return nil
 }
 
 // GetMetrics ...
