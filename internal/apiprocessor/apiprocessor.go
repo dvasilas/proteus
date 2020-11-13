@@ -3,10 +3,12 @@ package apiprocessor
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
@@ -25,8 +27,10 @@ import (
 // APIProcessor implements the libqpu.APIProcessor interface.
 // It provides access to the methods implemented by libqpu.QPUClass.
 type APIProcessor struct {
-	qpuClass libqpu.QPUClass
-	sqlCache *sqlToASTCache
+	qpuClass                   libqpu.QPUClass
+	sqlCache                   *sqlToASTCache
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.NotificationLatencyM
 }
 
 // ---------------- API Functions -------------------
@@ -39,9 +43,16 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 		return nil, utils.Error(err)
 	}
 
+	var notificationLatencyM metrics.NotificationLatencyM
+	if qpu.Config.Evaluation.MeasureNotificationLatency {
+		notificationLatencyM = metrics.NewNotificationLatencyM()
+	}
+
 	return &APIProcessor{
-		qpuClass: qpuClass,
-		sqlCache: newSQLToASTCache(),
+		qpuClass:                   qpuClass,
+		sqlCache:                   newSQLToASTCache(),
+		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
+		notificationLatencyM:       notificationLatencyM,
 	}, nil
 }
 
@@ -98,6 +109,13 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 					return utils.Error(err)
 				}
 				if ok {
+
+					if s.measureNotificationLatency {
+						if err = s.notificationLatencyM.Add(logOp); err != nil {
+							log.Fatal(err)
+						}
+					}
+
 					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
 						utils.Warn(err)
 						s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
@@ -182,7 +200,18 @@ func (s *APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest)
 
 // GetMetrics ...
 func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	return s.qpuClass.GetMetrics(req)
+	resp, err := s.qpuClass.GetMetrics(req)
+	if err != nil {
+		return nil, err
+	}
+
+	p50, p90, p95, p99 := s.notificationLatencyM.GetMetrics()
+	resp.ProcessingLatencyP50 = p50
+	resp.ProcessingLatencyP90 = p90
+	resp.ProcessingLatencyP95 = p95
+	resp.ProcessingLatencyP99 = p99
+
+	return resp, nil
 }
 
 // ---------------- Internal Functions --------------

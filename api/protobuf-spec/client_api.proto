@@ -31,4 +31,8 @@ message MetricsResponse {
   double notificationLatencyP90 = 2;
   double notificationLatencyP95 = 3;
   double notificationLatencyP99 = 4;
+  double processingLatencyP50 = 5;
+  double processingLatencyP90 = 6;
+  double processingLatencyP95 = 7;
+  double processingLatencyP99 = 8;
 }
