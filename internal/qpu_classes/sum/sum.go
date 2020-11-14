@@ -270,36 +270,35 @@ func (q *SumQPU) processStateRecordInMem(respRecord libqpu.ResponseRecord, data 
 func (q *SumQPU) processUpdateRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) libqpu.LogOperation {
 	attributes := respRecord.GetAttributes()
 
-	// groupByValue := attributes[q.groupBy].GetInt()
+	groupByValue := attributes[q.groupBy].GetInt()
 	sumValue := attributes[q.aggregationAttribute].GetInt()
 	delete(attributes, q.aggregationAttribute)
-	attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(sumValue)
 
-	// _, found := q.inMemState.entries[groupByValue]
-	// if found {
-	// 	q.inMemState.entries[groupByValue].Lock()
+	_, found := q.inMemState.entries[groupByValue]
+	if found {
+		q.inMemState.entries[groupByValue].Lock()
 
-	// 	q.inMemState.entries[groupByValue].val += sumValue
-	// 	q.inMemState.entries[groupByValue].attributes = attributes
-	// 	q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
+		q.inMemState.entries[groupByValue].val += sumValue
+		q.inMemState.entries[groupByValue].attributes = attributes
+		q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
 
-	// 	attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(q.inMemState.entries[groupByValue].val)
+		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(q.inMemState.entries[groupByValue].val)
 
-	// 	q.inMemState.entries[groupByValue].Unlock()
+		q.inMemState.entries[groupByValue].Unlock()
 
-	// } else {
-	// 	q.inMemState.Lock()
+	} else {
+		q.inMemState.Lock()
 
-	// 	q.inMemState.entries[groupByValue] = &stateEntry{
-	// 		val:        sumValue,
-	// 		attributes: attributes,
-	// 		ts:         respRecord.GetLogOp().GetTimestamp(),
-	// 	}
+		q.inMemState.entries[groupByValue] = &stateEntry{
+			val:        sumValue,
+			attributes: attributes,
+			ts:         respRecord.GetLogOp().GetTimestamp(),
+		}
 
-	// 	attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(sumValue)
+		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(sumValue)
 
-	// 	q.inMemState.Unlock()
-	// }
+		q.inMemState.Unlock()
+	}
 
 	return libqpu.LogOperationDelta(
 		respRecord.GetRecordID(),
