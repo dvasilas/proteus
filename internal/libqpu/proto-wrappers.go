@@ -3,6 +3,7 @@ package libqpu
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -14,7 +15,8 @@ import (
 
 // LogOperation ...
 type LogOperation struct {
-	Op *qpu.LogOperation
+	Op   *qpu.LogOperation
+	InTs time.Time
 }
 
 // LogOperationDelta ...
@@ -148,7 +150,8 @@ const (
 
 // ResponseRecord ...
 type ResponseRecord struct {
-	Rec *qpu_api.ResponseStreamRecord
+	Rec  *qpu_api.ResponseStreamRecord
+	InTs time.Time
 }
 
 // GetLogOp ...

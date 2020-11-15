@@ -43,7 +43,7 @@ type JoinQPU struct {
 	logTimestamps              bool
 	catchUpDone                bool
 	measureNotificationLatency bool
-	notificationLatencyM       metrics.NotificationLatencyM
+	notificationLatencyM       metrics.LatencyM
 }
 
 type stateEntry struct {
@@ -77,7 +77,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 	}
 
 	if jqpu.measureNotificationLatency {
-		jqpu.notificationLatencyM = metrics.NewNotificationLatencyM()
+		jqpu.notificationLatencyM = metrics.NewLatencyM()
 	}
 
 	err := jqpu.initializeState()
@@ -275,7 +275,7 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 
 func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	if q.catchUpDone && q.measureNotificationLatency {
-		if err := q.notificationLatencyM.Add(respRecord.GetLogOp()); err != nil {
+		if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 			return err
 		}
 	}

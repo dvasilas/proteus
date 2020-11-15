@@ -16,20 +16,25 @@ var (
 	}
 )
 
-// NotificationLatencyM ...
-type NotificationLatencyM struct {
+// LatencyM ...
+type LatencyM struct {
 	hist *stats.Histogram
 }
 
-// NewNotificationLatencyM ...
-func NewNotificationLatencyM() NotificationLatencyM {
-	return NotificationLatencyM{
+// NewLatencyM ...
+func NewLatencyM() LatencyM {
+	return LatencyM{
 		hist: stats.NewHistogram(histogramOpts),
 	}
 }
 
-// Add ...
-func (m NotificationLatencyM) Add(logOp libqpu.LogOperation) (err error) {
+// AddFromTs ...
+func (m LatencyM) AddFromTs(t0 time.Time) (err error) {
+	return m.hist.Add(time.Since(t0).Nanoseconds())
+}
+
+// AddFromOp ...
+func (m LatencyM) AddFromOp(logOp libqpu.LogOperation) (err error) {
 	var t0, t1 time.Time
 	t1 = time.Now()
 
@@ -47,7 +52,7 @@ func (m NotificationLatencyM) Add(logOp libqpu.LogOperation) (err error) {
 }
 
 // GetMetrics ...
-func (m NotificationLatencyM) GetMetrics() (float64, float64, float64, float64) {
+func (m LatencyM) GetMetrics() (float64, float64, float64, float64) {
 	return durationToMillis(time.Duration(pepcentile(.5, m.hist))),
 		durationToMillis(time.Duration(pepcentile(.9, m.hist))),
 		durationToMillis(time.Duration(pepcentile(.95, m.hist))),

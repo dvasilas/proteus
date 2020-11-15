@@ -4,12 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"log"
 	"math/big"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
@@ -21,12 +19,10 @@ const stateDatabase = "stateDB"
 
 // DsDriverQPU ...
 type DsDriverQPU struct {
-	state                      libqpu.QPUState
-	datastore                  dataStore
-	persistentQueries          map[string]map[int]respChannels
-	inputSchema                libqpu.Schema
-	measureNotificationLatency bool
-	notificationLatencyM       metrics.NotificationLatencyM
+	state             libqpu.QPUState
+	datastore         dataStore
+	persistentQueries map[string]map[int]respChannels
+	inputSchema       libqpu.Schema
 }
 
 type respChannels struct {
@@ -38,6 +34,7 @@ type respChannels struct {
 type dataStore interface {
 	GetSnapshot(string, []string, []string, []string) (<-chan libqpu.LogOperation, <-chan error)
 	SubscribeOps(string) (<-chan libqpu.LogOperation, context.CancelFunc, <-chan error)
+	GetNotificationLanency() (float64, float64, float64, float64)
 }
 
 // ---------------- API Functions -------------------
@@ -61,22 +58,15 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		return &DsDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
 	}
 
-	var notificationLatencyM metrics.NotificationLatencyM
-	if qpu.Config.Evaluation.MeasureNotificationLatency {
-		notificationLatencyM = metrics.NewNotificationLatencyM()
-	}
-
 	go func() {
 		catchUpDoneCh <- 0
 	}()
 
 	return &DsDriverQPU{
-		state:                      qpu.State,
-		datastore:                  ds,
-		persistentQueries:          make(map[string]map[int]respChannels),
-		inputSchema:                qpu.InputSchema,
-		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
-		notificationLatencyM:       notificationLatencyM,
+		state:             qpu.State,
+		datastore:         ds,
+		persistentQueries: make(map[string]map[int]respChannels),
+		inputSchema:       qpu.InputSchema,
 	}, nil
 }
 
@@ -115,13 +105,6 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 						logOpCh = nil
 					} else {
 						// utils.Trace("datastore received", map[string]interface{}{"logOp": logOp, "table": query.GetTable()})
-
-						if q.measureNotificationLatency {
-							if err = q.notificationLatencyM.Add(logOp); err != nil {
-								log.Fatal(err)
-							}
-						}
-
 						if len(q.persistentQueries[query.GetTable()]) == 0 {
 							cancel()
 							delete(q.persistentQueries, query.GetTable())
@@ -197,7 +180,7 @@ func (q *DsDriverQPU) GetConfig() *qpu_api.ConfigResponse {
 
 // GetMetrics ...
 func (q *DsDriverQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
+	p50, p90, p95, p99 := q.datastore.GetNotificationLanency()
 	return &pb.MetricsResponse{
 		NotificationLatencyP50: p50,
 		NotificationLatencyP90: p90,

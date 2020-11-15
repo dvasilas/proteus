@@ -2,6 +2,7 @@ package responsestream
 
 import (
 	"io"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -25,8 +26,7 @@ func StreamConsumer(stream libqpu.ResponseStream, processLogOp func(libqpu.Respo
 			return utils.Error(err)
 		}
 
-		// respRecordType, err := respRecord.GetType()
-		// if respRecordType == libqpu.EndOfStream {}
+		respRecord.InTs = time.Now()
 
 		err = processLogOp(respRecord, data, recordCh)
 		if err != nil {

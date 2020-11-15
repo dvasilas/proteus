@@ -41,7 +41,7 @@ type SumQPU struct {
 	catchUpDoneCh              chan int
 	catchUpDone                bool
 	measureNotificationLatency bool
-	notificationLatencyM       metrics.NotificationLatencyM
+	notificationLatencyM       metrics.LatencyM
 }
 
 type inMemState struct {
@@ -80,7 +80,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 	}
 
 	if sqpu.measureNotificationLatency {
-		sqpu.notificationLatencyM = metrics.NewNotificationLatencyM()
+		sqpu.notificationLatencyM = metrics.NewLatencyM()
 	}
 
 	query := sqpu.prepareDownstreamQuery()
@@ -213,7 +213,7 @@ func (q *SumQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	if q.catchUpDone && q.measureNotificationLatency {
-		if err := q.notificationLatencyM.Add(respRecord.GetLogOp()); err != nil {
+		if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 			return err
 		}
 	}
@@ -235,6 +235,8 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 	} else {
 
 		logOp := q.processUpdateRecordInMem(respRecord, data, recordCh)
+
+		logOp.InTs = respRecord.InTs
 
 		for _, ch := range q.subscribeQueries {
 			ch <- logOp

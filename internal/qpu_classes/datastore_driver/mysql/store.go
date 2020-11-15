@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/mysql"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/golang/protobuf/ptypes"
@@ -23,11 +25,13 @@ import (
 
 // MySQLDataStore ...
 type MySQLDataStore struct {
-	subscriptionEndpoint string
-	cli                  mysql.PublishUpdatesClient
-	inputSchema          libqpu.Schema
-	conn                 *grpc.ClientConn
-	db                   *sql.DB
+	subscriptionEndpoint       string
+	cli                        mysql.PublishUpdatesClient
+	inputSchema                libqpu.Schema
+	conn                       *grpc.ClientConn
+	db                         *sql.DB
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.LatencyM
 }
 
 // MySQLUpdate ...
@@ -91,6 +95,11 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 		inputSchema:          inputSchema,
 		conn:                 conn,
 		db:                   db,
+		measureNotificationLatency: conf.Evaluation.MeasureNotificationLatency,
+	}
+
+	if s.measureNotificationLatency {
+		s.notificationLatencyM = metrics.NewLatencyM()
 	}
 
 	err = errors.New("not tried yet")
@@ -237,6 +246,11 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 	return logOpCh, errCh
 }
 
+// GetNotificationLanency ...
+func (ds MySQLDataStore) GetNotificationLanency() (float64, float64, float64, float64) {
+	return ds.notificationLatencyM.GetMetrics()
+}
+
 // ---------------- Internal Functions --------------
 
 func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdatesClient, msg chan libqpu.LogOperation, errCh chan error) {
@@ -250,11 +264,23 @@ func (ds MySQLDataStore) opConsumer(stream mysql.PublishUpdates_SubscribeToUpdat
 			errCh <- err
 			break
 		}
+
+		t := time.Now()
+
 		formattedOp, err := ds.formatLogOpDelta(op)
 		if err != nil {
 			errCh <- err
 			break
 		}
+
+		formattedOp.InTs = t
+
+		if ds.measureNotificationLatency {
+			if err = ds.notificationLatencyM.AddFromOp(formattedOp); err != nil {
+				log.Fatal(err)
+			}
+		}
+
 		msg <- formattedOp
 
 	}

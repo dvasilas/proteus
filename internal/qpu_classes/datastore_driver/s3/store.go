@@ -361,6 +361,11 @@ func (ds S3DataStore) GetSnapshot(table string, projection, isNull, isNotNull []
 	return logOpCh, errCh
 }
 
+// GetNotificationLanency ...
+func (ds S3DataStore) GetNotificationLanency() (float64, float64, float64, float64) {
+	return -1, -1, -1, -1
+}
+
 // ---------------- Internal Functions --------------
 
 func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotificationsClient, msg chan libqpu.LogOperation, errCh chan error) {

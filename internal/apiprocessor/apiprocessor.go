@@ -30,7 +30,7 @@ type APIProcessor struct {
 	qpuClass                   libqpu.QPUClass
 	sqlCache                   *sqlToASTCache
 	measureNotificationLatency bool
-	notificationLatencyM       metrics.NotificationLatencyM
+	processingLatencyM         metrics.LatencyM
 }
 
 // ---------------- API Functions -------------------
@@ -43,16 +43,16 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 		return nil, utils.Error(err)
 	}
 
-	var notificationLatencyM metrics.NotificationLatencyM
+	var processingLatencyM metrics.LatencyM
 	if qpu.Config.Evaluation.MeasureNotificationLatency {
-		notificationLatencyM = metrics.NewNotificationLatencyM()
+		processingLatencyM = metrics.NewLatencyM()
 	}
 
 	return &APIProcessor{
 		qpuClass:                   qpuClass,
 		sqlCache:                   newSQLToASTCache(),
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
-		notificationLatencyM:       notificationLatencyM,
+		processingLatencyM:         processingLatencyM,
 	}, nil
 }
 
@@ -111,7 +111,7 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 				if ok {
 
 					if s.measureNotificationLatency {
-						if err = s.notificationLatencyM.Add(logOp); err != nil {
+						if err = s.processingLatencyM.AddFromTs(logOp.InTs); err != nil {
 							log.Fatal(err)
 						}
 					}
@@ -205,7 +205,7 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (
 		return nil, err
 	}
 
-	p50, p90, p95, p99 := s.notificationLatencyM.GetMetrics()
+	p50, p90, p95, p99 := s.processingLatencyM.GetMetrics()
 	resp.ProcessingLatencyP50 = p50
 	resp.ProcessingLatencyP90 = p90
 	resp.ProcessingLatencyP95 = p95
