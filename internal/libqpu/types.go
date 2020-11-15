@@ -70,6 +70,7 @@ type QPUState interface {
 	SeparateTS(string) error
 	LogQuery(string, time.Time, []*pb.QueryRespRecord) error
 	LogReceivedUpdateRec(interface{}, map[string]*timestamp.Timestamp, time.Time)
+	ReadLogs() ([]QueryLogEntry, []WriteLogEntry, error)
 	Cleanup()
 }
 
@@ -162,3 +163,16 @@ const (
 	// Sum ...
 	Sum AggregationType = iota
 )
+
+// WriteLogEntry ...
+type WriteLogEntry struct {
+	RowID int64
+	T0    time.Time
+	T1    time.Time
+}
+
+// QueryLogEntry ...
+type QueryLogEntry struct {
+	RowIDs []int64
+	T      time.Time
+}

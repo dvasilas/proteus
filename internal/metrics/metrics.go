@@ -75,3 +75,17 @@ func pepcentile(percentile float64, h *stats.Histogram) int64 {
 func durationToMillis(d time.Duration) float64 {
 	return float64(d) / float64(time.Millisecond)
 }
+
+// FreshnessLatency ...
+func FreshnessLatency(writeLog []libqpu.WriteLogEntry) (float64, float64, float64, float64) {
+	hist := stats.NewHistogram(histogramOpts)
+
+	for _, e := range writeLog {
+		hist.Add(e.T1.Sub(e.T0).Nanoseconds())
+	}
+
+	return durationToMillis(time.Duration(pepcentile(.5, hist))),
+		durationToMillis(time.Duration(pepcentile(.9, hist))),
+		durationToMillis(time.Duration(pepcentile(.95, hist))),
+		durationToMillis(time.Duration(pepcentile(.99, hist)))
+}

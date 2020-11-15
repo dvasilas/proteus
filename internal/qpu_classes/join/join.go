@@ -262,12 +262,23 @@ func (q JoinQPU) GetConfig() *qpu_api.ConfigResponse {
 
 // GetMetrics ...
 func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
+	_, wLog, err := q.state.ReadLogs()
+	if err != nil {
+		return nil, err
+	}
+
+	FL50, FL90, FL95, FL99 := metrics.FreshnessLatency(wLog)
+	NL50, NL90, NL95, NL99 := q.notificationLatencyM.GetMetrics()
+
 	return &pb.MetricsResponse{
-		NotificationLatencyP50: p50,
-		NotificationLatencyP90: p90,
-		NotificationLatencyP95: p95,
-		NotificationLatencyP99: p99,
+		NotificationLatencyP50: NL50,
+		NotificationLatencyP90: NL90,
+		NotificationLatencyP95: NL95,
+		NotificationLatencyP99: NL99,
+		FreshnessLatencyP50:    FL50,
+		FreshnessLatencyP90:    FL90,
+		FreshnessLatencyP95:    FL95,
+		FreshnessLatencyP99:    FL99,
 	}, nil
 }
 

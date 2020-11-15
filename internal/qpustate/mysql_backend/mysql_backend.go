@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -503,4 +504,122 @@ func (s *MySQLStateBackend) LogQuery(table string, ts time.Time, records []*pb.Q
 		}()
 	}
 	return nil
+}
+
+// ReadLogs ...
+func (s *MySQLStateBackend) ReadLogs() ([]libqpu.QueryLogEntry, []libqpu.WriteLogEntry, error) {
+	rows, err := s.db.Query("SELECT row_id, ts, ts_local FROM ( SELECT row_id, ts, ts_local FROM write_log WHERE ts_local > ( SELECT ts_local FROM write_log where ts is null ) ) as t")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	wLog := make([]libqpu.WriteLogEntry, 0)
+
+	columns, _ := rows.Columns()
+
+	count := len(columns)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
+
+	for rows.Next() {
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+
+		rows.Scan(valuePtrs...)
+
+		row := make(map[string]interface{})
+		for i, col := range values {
+			if col != nil {
+				row[columns[i]] = col
+			}
+		}
+
+		for i, col := range columns {
+			val := values[i]
+
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
+			}
+			row[col] = v
+		}
+
+		if row["row_id"] != nil {
+			id, err := strconv.ParseInt(row["row_id"].(string), 10, 64)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			wLog = append(wLog, libqpu.WriteLogEntry{
+				RowID: id,
+				T0:    row["ts"].(time.Time),
+				T1:    row["ts_local"].(time.Time),
+			})
+		}
+	}
+
+	rows.Close()
+
+	rows, err = s.db.Query("SELECT * FROM query_log")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	qLog := make([]libqpu.QueryLogEntry, 0)
+
+	columns, _ = rows.Columns()
+
+	count = len(columns)
+	values = make([]interface{}, count)
+	valuePtrs = make([]interface{}, count)
+
+	for rows.Next() {
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+
+		rows.Scan(valuePtrs...)
+
+		row := make(map[string]interface{})
+		for i, col := range values {
+			if col != nil {
+				row[columns[i]] = col
+			}
+		}
+
+		for i, col := range columns {
+			val := values[i]
+
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
+			}
+			row[col] = v
+		}
+
+		ids := strings.Split(row["row_ids"].(string), "|")
+		rIDs := make([]int64, len(ids))
+		for i, id := range ids {
+			rIDs[i], err = strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		qLog = append(qLog, libqpu.QueryLogEntry{
+			RowIDs: rIDs,
+			T:      row["ts_local"].(time.Time),
+		})
+	}
+
+	rows.Close()
+
+	return qLog, wLog, nil
 }
