@@ -115,12 +115,13 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 							log.Fatal(err)
 						}
 					}
-
-					if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
-						utils.Warn(err)
-						s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
-						return nil
-					}
+					go func() {
+						if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
+							utils.Warn(err)
+							s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
+							// return nil
+						}
+					}()
 					seqID++
 				}
 			}
