@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -32,7 +34,7 @@ type SumQPU struct {
 	state                      libqpu.QPUState
 	inputSchema                libqpu.Schema
 	outputSchema               libqpu.Schema
-	subscribeQueries           []chan libqpu.LogOperation
+	subscribeQueries           map[int]chan libqpu.LogOperation
 	aggregationAttribute       string
 	groupBy                    string
 	schemaTable                string
@@ -60,11 +62,13 @@ type stateEntry struct {
 
 // InitClass ...
 func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	sqpu := &SumQPU{
 		// state:                      qpu.State,
 		inputSchema:                qpu.InputSchema,
 		outputSchema:               make(map[string]libqpu.SchemaTable),
-		subscribeQueries:           make([]chan libqpu.LogOperation, 0),
+		subscribeQueries:           make(map[int]chan libqpu.LogOperation),
 		aggregationAttribute:       qpu.Config.AggregationConfig.AggregationAttribute,
 		groupBy:                    qpu.Config.AggregationConfig.GroupBy,
 		inMemState:                 &inMemState{entries: make(map[int64]*stateEntry)},
@@ -178,9 +182,10 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]stri
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	q.subscribeQueries = append(q.subscribeQueries, logOpCh)
+	queryID := rand.Int()
+	q.subscribeQueries[queryID] = logOpCh
 
-	return -1, logOpCh, errCh
+	return queryID, logOpCh, errCh
 }
 
 // ClientQuery ...
@@ -196,7 +201,9 @@ func (q *SumQPU) GetConfig() *qpu_api.ConfigResponse {
 }
 
 // RemovePersistentQuery ...
-func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {}
+func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {
+	delete(q.subscribeQueries, queryID)
+}
 
 // GetMetrics ...
 func (q *SumQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
