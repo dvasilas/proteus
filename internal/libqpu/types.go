@@ -101,6 +101,7 @@ const (
 // QPUConfig specifies the configuration structure of a QPU
 type QPUConfig struct {
 	Operator     OperatorType
+	SubOperator  string
 	State        StateType
 	Port         string
 	Connections  []QPUConnection

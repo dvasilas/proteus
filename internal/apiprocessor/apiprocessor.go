@@ -12,6 +12,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
+	jointest1qpu "github.com/dvasilas/proteus/internal/qpu_classes/jointest1"
 	router "github.com/dvasilas/proteus/internal/qpu_classes/router"
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
@@ -223,7 +224,12 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 	case libqpu.Aggregation:
 		return sumqpu.InitClass(qpu, catchUpDoneCh)
 	case libqpu.Join:
-		return joinqpu.InitClass(qpu, catchUpDoneCh)
+		switch qpu.Config.SubOperator {
+		case "test1":
+			return jointest1qpu.InitClass(qpu, catchUpDoneCh)
+		default:
+			return joinqpu.InitClass(qpu, catchUpDoneCh)
+		}
 	case libqpu.Router:
 		return router.InitClass(qpu, catchUpDoneCh)
 	default:
