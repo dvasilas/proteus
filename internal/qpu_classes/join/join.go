@@ -310,28 +310,28 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 		if q.endOfStreamCnt == len(q.joinAttributes) {
 			q.catchUpDone = true
 
-			err := q.flushState()
-			if err != nil {
-				return err
-			}
+			// err := q.flushState()
+			// if err != nil {
+			// 	return err
+			// }
 
 			go func() {
 				q.catchUpDoneCh <- 0
 			}()
 		}
 	} else if respRecordType == libqpu.State {
-		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
-			return err
-		}
+		// if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
+		// 	return err
+		// }
 	} else if respRecordType == libqpu.Delta {
-		attributes := respRecord.GetAttributes()
-		joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
-		joinAttributeValue := attributes[joinAttribute].GetInt()
-		delete(attributes, joinAttribute)
-		_, err := q.updateState(joinAttributeValue, attributes, respRecord.GetLogOp().GetTimestamp().GetVc())
-		if err != nil {
-			return err
-		}
+		// attributes := respRecord.GetAttributes()
+		// joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
+		// joinAttributeValue := attributes[joinAttribute].GetInt()
+		// delete(attributes, joinAttribute)
+		// _, err := q.updateState(joinAttributeValue, attributes, respRecord.GetLogOp().GetTimestamp().GetVc())
+		// if err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
