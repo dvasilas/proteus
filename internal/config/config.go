@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
-	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -92,8 +90,16 @@ type inputQPUConfig struct {
 		LogTimestamps              bool
 		MeasureNotificationLatency bool
 	}
-	MaxWorkers  int
-	MaxJobQueue int
+	ProcessingConfig struct {
+		API struct {
+			MaxWorkers  int
+			MaxJobQueue int
+		}
+		Input struct {
+			MaxWorkers  int
+			MaxJobQueue int
+		}
+	}
 }
 
 // ---------------- API Functions -------------------
@@ -159,21 +165,8 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 	}
 
 	// Misc
-	config.MaxWorkers = inputConfig.MaxWorkers
-	if val, isSet := os.LookupEnv("MAX_WORKERS"); isSet {
-		maxWorkers, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil
-		}
-		config.MaxWorkers = int(maxWorkers)
-	}
-	config.MaxJobQueue = inputConfig.MaxJobQueue
-	if val, isSet := os.LookupEnv("MAX_JOB_QUEUE"); isSet {
-		maxWorkers, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil
-		}
-		config.MaxWorkers = int(maxWorkers)
+	if err := getProcessingConfig(inputConfig, config); err != nil {
+		return err
 	}
 
 	qpu.Config = config
@@ -328,6 +321,15 @@ func getEvaluation(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.Evaluation.Tracing = inputConf.Evaluation.Tracing
 	config.Evaluation.LogTimestamps = inputConf.Evaluation.LogTimestamps
 	config.Evaluation.MeasureNotificationLatency = inputConf.Evaluation.MeasureNotificationLatency
+
+	return nil
+}
+
+func getProcessingConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	config.ProcessingConfig.API.MaxWorkers = int(inputConf.ProcessingConfig.API.MaxWorkers)
+	config.ProcessingConfig.API.MaxJobQueue = int(inputConf.ProcessingConfig.API.MaxJobQueue)
+	config.ProcessingConfig.Input.MaxWorkers = int(inputConf.ProcessingConfig.Input.MaxWorkers)
+	config.ProcessingConfig.Input.MaxJobQueue = int(inputConf.ProcessingConfig.Input.MaxJobQueue)
 
 	return nil
 }

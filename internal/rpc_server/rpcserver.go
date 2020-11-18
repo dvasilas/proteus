@@ -45,7 +45,7 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 		state:      state,
 	}
 
-	server.dispatcher = workerpool.NewDispatcher(conf.MaxWorkers, conf.MaxJobQueue)
+	server.dispatcher = workerpool.NewDispatcher(conf.ProcessingConfig.API.MaxWorkers, conf.ProcessingConfig.API.MaxJobQueue)
 	server.dispatcher.Run()
 
 	qpu_api.RegisterQPUAPIServer(grpcServer.Server, &server)
@@ -94,7 +94,6 @@ type Job struct {
 	req    libqpu.QueryRequest
 	result *jobResult
 	done   chan bool
-	// do     func(*Server, context.Context, *qpu_api.QueryReq, interface{})
 }
 
 // Do ...

@@ -17,6 +17,7 @@ import (
 // RouterQPU ...
 type RouterQPU struct {
 	adjacentQPUs []*libqpu.AdjacentQPU
+	conf         *libqpu.QPUConfig
 }
 
 // ---------------- API Functions -------------------
@@ -26,6 +27,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*RouterQPU, error) {
 
 	rqpu := &RouterQPU{
 		adjacentQPUs: qpu.AdjacentQPUs,
+		conf:         qpu.Config,
 	}
 
 	go func() {
@@ -66,7 +68,7 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 
 	respCh := make(chan libqpu.ResponseRecord)
 	go func() {
-		if err = responsestream.StreamConsumer(subQueryResponseStream, q.processRespRecord, nil, respCh); err != nil {
+		if err = responsestream.StreamConsumer(subQueryResponseStream, q.conf.ProcessingConfig.Input.MaxWorkers, q.conf.ProcessingConfig.Input.MaxJobQueue, q.processRespRecord, nil, respCh); err != nil {
 			panic(err)
 		}
 	}()

@@ -95,7 +95,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 			return &SumQPU{}, err
 		}
 		go func() {
-			if err = responsestream.StreamConsumer(responseStream, sqpu.processRespRecord, nil, nil); err != nil {
+			if err = responsestream.StreamConsumer(responseStream, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, sqpu.processRespRecord, nil, nil); err != nil {
 				panic(err)
 			}
 		}()
@@ -237,67 +237,36 @@ func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interf
 			q.catchUpDoneCh <- 0
 		}()
 
-	} else if respRecordType == libqpu.State {
-		q.processStateRecordInMem(respRecord, data, recordCh)
 	} else {
+		logOp := q.processRecordInMem(respRecord, data, recordCh)
+		if respRecordType == libqpu.Delta {
+			logOp.InTs = respRecord.InTs
 
-		logOp := q.processUpdateRecordInMem(respRecord, data, recordCh)
-
-		logOp.InTs = respRecord.InTs
-
-		for _, ch := range q.subscribeQueries {
-			ch <- logOp
+			for _, ch := range q.subscribeQueries {
+				ch <- logOp
+			}
 		}
 	}
 
 	return nil
 }
 
-func (q *SumQPU) processStateRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) {
-	attributes := respRecord.GetAttributes()
-
-	sumValue := attributes[q.aggregationAttribute].GetInt()
-	groupByValue := attributes[q.groupBy].GetInt()
-	delete(attributes, q.aggregationAttribute)
-	delete(attributes, q.groupBy)
-
-	_, found := q.inMemState.entries[groupByValue]
-	if found {
-		// initial snapshot is processed sequentially for now, no need to lock
-		q.inMemState.entries[groupByValue].val += sumValue
-		q.inMemState.entries[groupByValue].attributes = attributes
-		q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
-	} else {
-		q.inMemState.entries[groupByValue] = &stateEntry{
-			val:        sumValue,
-			attributes: attributes,
-			ts:         respRecord.GetLogOp().GetTimestamp(),
-		}
-	}
-}
-
-func (q *SumQPU) processUpdateRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) libqpu.LogOperation {
+func (q *SumQPU) processRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) libqpu.LogOperation {
 	attributes := respRecord.GetAttributes()
 
 	groupByValue := attributes[q.groupBy].GetInt()
 	sumValue := attributes[q.aggregationAttribute].GetInt()
 	delete(attributes, q.aggregationAttribute)
 
+	q.inMemState.Lock()
 	_, found := q.inMemState.entries[groupByValue]
 	if found {
-		q.inMemState.entries[groupByValue].Lock()
-
 		q.inMemState.entries[groupByValue].val += sumValue
 		q.inMemState.entries[groupByValue].attributes = attributes
 		q.inMemState.entries[groupByValue].ts = respRecord.GetLogOp().GetTimestamp()
 
 		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(q.inMemState.entries[groupByValue].val)
-
-		q.inMemState.entries[groupByValue].Unlock()
-
 	} else {
-		q.inMemState.Lock()
-
 		q.inMemState.entries[groupByValue] = &stateEntry{
 			val:        sumValue,
 			attributes: attributes,
@@ -306,8 +275,9 @@ func (q *SumQPU) processUpdateRecordInMem(respRecord libqpu.ResponseRecord, data
 
 		attributes[q.aggregationAttribute+"_sum"] = libqpu.ValueInt(sumValue)
 
-		q.inMemState.Unlock()
 	}
+
+	q.inMemState.Unlock()
 
 	return libqpu.LogOperationDelta(
 		respRecord.GetRecordID(),

@@ -74,7 +74,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*TestQPU, error) {
 	}
 
 	go func() {
-		if err = responsestream.StreamConsumer(responseStreamStories, q.processRespRecord, nil, nil); err != nil {
+		if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, q.processRespRecord, nil, nil); err != nil {
 			panic(err)
 		}
 	}()
@@ -91,7 +91,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*TestQPU, error) {
 		return nil, err
 	}
 	go func() {
-		if err = responsestream.StreamConsumer(responseStreamStories, q.processRespRecord, nil, nil); err != nil {
+		if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, q.processRespRecord, nil, nil); err != nil {
 			panic(err)
 		}
 	}()

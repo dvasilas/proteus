@@ -137,8 +137,16 @@ type QPUConfig struct {
 		LogTimestamps              bool
 		MeasureNotificationLatency bool
 	}
-	MaxWorkers  int
-	MaxJobQueue int
+	ProcessingConfig struct {
+		API struct {
+			MaxWorkers  int
+			MaxJobQueue int
+		}
+		Input struct {
+			MaxWorkers  int
+			MaxJobQueue int
+		}
+	}
 }
 
 // QPUConnection ...
