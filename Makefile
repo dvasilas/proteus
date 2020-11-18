@@ -11,7 +11,6 @@ REPO_PROTEUS := dvasilas/proteus
 TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
 IMG_QPU := ${REPO_PROTEUS}:${TAG}
 IMG_REG := 127.0.0.1:5000/${APP}:${TAG}
-IMG_DS_REG := 127.0.0.1:5000/proteus-lobsters:${TAG}
 
 $(PROTOC_CMD):
 ifeq ($(UNAME), Darwin)
@@ -73,8 +72,6 @@ image-push:
 image-push-registry:
 	docker tag qpu/dev ${IMG_REG}
 	docker push ${IMG_REG}
-	docker tag datastore/proteus ${IMG_DS_REG}
-	docker push ${IMG_DS_REG}
 
 .PHONY: clean
 ## clean: cleans the binary
