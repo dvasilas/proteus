@@ -15,7 +15,6 @@ import (
 
 type inputQPUConfig struct {
 	Operator    string
-	SubOperator string
 	State       string
 	Port        string
 	Connections []struct {
@@ -199,7 +198,6 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	default:
 		return utils.Error(errors.New("unknown operator type"))
 	}
-	config.SubOperator = inputConf.SubOperator
 	return nil
 }
 
