@@ -44,6 +44,7 @@ type JoinQPU struct {
 	catchUpDone                bool
 	measureNotificationLatency bool
 	notificationLatencyM       metrics.LatencyM
+	writeLog                   writeLog
 }
 
 type stateEntry struct {
@@ -55,6 +56,11 @@ type stateEntry struct {
 type inMemState struct {
 	entries map[int64]*stateEntry
 	mutex   sync.RWMutex
+}
+
+type writeLog struct {
+	sync.Mutex
+	entries []libqpu.WriteLogEntry
 }
 
 // ---------------- API Functions -------------------
@@ -74,6 +80,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		logTimestamps:              qpu.Config.Evaluation.LogTimestamps,
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
 		catchUpDone:                false,
+		writeLog: writeLog{
+			entries: make([]libqpu.WriteLogEntry, 0),
+		},
 	}
 
 	if jqpu.measureNotificationLatency {
@@ -191,7 +200,6 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		orderBy += query.GetOrderBy().GetAttributeName() + " " + query.GetOrderBy().GetDirection().String()
 	}
 
-	snapshotTs := time.Now()
 	stateCh, err := q.state.Get(
 		q.stateTable+q.port,
 		append(query.GetProjection(), q.joinAttributeKey, "ts_key", "ts"),
@@ -232,12 +240,12 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 	}
 
 	// log the query
-	if q.logTimestamps {
-		err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if q.logTimestamps {
+	// 	err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	return &pb.QueryResp{
 		RespRecord: respRecords,
@@ -254,7 +262,7 @@ func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetConfig ...
-func (q JoinQPU) GetConfig() *qpu_api.ConfigResponse {
+func (q *JoinQPU) GetConfig() *qpu_api.ConfigResponse {
 	return &qpu_api.ConfigResponse{
 		Schema: []string{q.stateTable},
 	}
@@ -266,12 +274,12 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 	FL50, FL90, FL95, FL99 = -1, -1, -1, -1
 
 	if q.logTimestamps {
-		_, wLog, err := q.state.ReadLogs()
-		if err != nil {
-			return nil, err
-		}
+		// _, wLog, err := q.state.ReadLogs()
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
 
-		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(wLog)
+		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
 	}
 	NL50, NL90, NL95, NL99 := q.notificationLatencyM.GetMetrics()
 
@@ -337,7 +345,7 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 	return nil
 }
 
-func (q JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *JoinQPU) processRespRecordInMem(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
 	attributes := respRecord.GetAttributes()
 
 	joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
@@ -375,10 +383,10 @@ func (q *JoinQPU) flushState() error {
 			return err
 		}
 	}
-	return q.state.SeparateTS(q.stateTable + q.port)
+	return nil
 }
 
-func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
+func (q *JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
 	row := make(map[string]interface{})
 	for attributeKey := range values {
 		val, err := q.outputSchema.GetValue(values, q.stateTable, attributeKey)
@@ -410,14 +418,35 @@ func (q JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[
 			}
 		}
 
-		err = q.state.Insert(q.stateTable+q.port, row, vc, joinID)
+		err = q.state.Insert(q.stateTable+q.port, row, vc)
 	} else {
 		err = q.state.Update(q.stateTable+q.port,
 			map[string]interface{}{q.joinAttributeKey: joinID},
-			row, vc, joinID)
+			row, vc)
+
+		if q.logTimestamps {
+			var t0, t1 time.Time
+			t1 = time.Now()
+
+			q.writeLog.Lock()
+
+			for _, v := range vc {
+				t0, err = ptypes.Timestamp(v)
+				if err != nil {
+					return nil, err
+				}
+			}
+			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+				RowID: joinID,
+				T0:    t0,
+				T1:    t1,
+			})
+			q.writeLog.Unlock()
+		}
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	return values, nil
 }

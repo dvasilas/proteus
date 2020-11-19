@@ -335,11 +335,11 @@ func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qp
 	if errScan == sql.ErrNoRows {
 		// insert the new value
 		row[q.aggregationAttribute+"_sum"] = sumVal
-		err = q.state.Insert(q.schemaTable+q.port, row, vc, sumVal)
+		err = q.state.Insert(q.schemaTable+q.port, row, vc)
 		newSumValue = sumVal
 	} else {
 		newSumValue = storedSumValue + sumVal
-		err = q.state.Update(q.schemaTable+q.port, row, map[string]interface{}{q.aggregationAttribute + "_sum": newSumValue}, vc, sumVal)
+		err = q.state.Update(q.schemaTable+q.port, row, map[string]interface{}{q.aggregationAttribute + "_sum": newSumValue}, vc)
 	}
 
 	if err != nil {

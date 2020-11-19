@@ -63,14 +63,10 @@ type APIClient interface {
 // QPUState ...
 type QPUState interface {
 	Init(string, string, string) error
-	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
-	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp, interface{}) error
+	Insert(string, map[string]interface{}, map[string]*timestamp.Timestamp) error
+	Update(string, map[string]interface{}, map[string]interface{}, map[string]*timestamp.Timestamp) error
 	Get(string, []string, []string, string, int64, opentracing.Span) (<-chan map[string]interface{}, error)
 	GetRow(string, []string, []string, opentracing.Span) *sql.Row
-	SeparateTS(string) error
-	LogQuery(string, time.Time, []*pb.QueryRespRecord) error
-	LogReceivedUpdateRec(interface{}, map[string]*timestamp.Timestamp, time.Time)
-	ReadLogs() ([]QueryLogEntry, []WriteLogEntry, error)
 	Cleanup()
 }
 
