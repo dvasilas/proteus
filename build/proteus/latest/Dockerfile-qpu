@@ -14,7 +14,6 @@ ENV GO111MODULE=on
 WORKDIR /app/proteus/
 RUN set -x \
     && go mod download \
-    && make qpu \
-    && cp /app/proteus/scripts/freshness.sh /
+    && make qpu
 
 ENTRYPOINT ["/app/proteus/build/proteus/localdev/start-mysql.sh"]
