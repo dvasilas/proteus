@@ -45,6 +45,7 @@ type JoinQPU struct {
 	measureNotificationLatency bool
 	notificationLatencyM       metrics.LatencyM
 	writeLog                   writeLog
+	queryLog                   queryLog
 }
 
 type stateEntry struct {
@@ -61,6 +62,11 @@ type inMemState struct {
 type writeLog struct {
 	sync.Mutex
 	entries []libqpu.WriteLogEntry
+}
+
+type queryLog struct {
+	sync.Mutex
+	entries []libqpu.QueryLogEntry
 }
 
 // ---------------- API Functions -------------------
@@ -82,6 +88,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		catchUpDone:                false,
 		writeLog: writeLog{
 			entries: make([]libqpu.WriteLogEntry, 0),
+		},
+		queryLog: queryLog{
+			entries: make([]libqpu.QueryLogEntry, 0),
 		},
 	}
 
@@ -200,6 +209,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		orderBy += query.GetOrderBy().GetAttributeName() + " " + query.GetOrderBy().GetDirection().String()
 	}
 
+	snapshotTs := time.Now()
 	stateCh, err := q.state.Get(
 		q.stateTable+q.port,
 		append(query.GetProjection(), q.joinAttributeKey, "ts_key", "ts"),
@@ -211,7 +221,8 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		return nil, err
 	}
 
-	respRecords = make([]*pb.QueryRespRecord, 0)
+	respRecords = make([]*pb.QueryRespRecord, query.GetLimit())
+	i := 0
 	for record := range stateCh {
 		// process timestamp
 		vectorClockKey := record["ts_key"].(string)
@@ -232,20 +243,26 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 			attribs[k] = v.(string)
 		}
 
-		respRecords = append(respRecords, &pb.QueryRespRecord{
+		respRecords[i] = &pb.QueryRespRecord{
 			RecordId:   string(attribs[q.joinAttributeKey]),
 			Attributes: attribs,
 			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
-		})
+		}
+		i++
 	}
 
 	// log the query
-	// if q.logTimestamps {
-	// 	err = q.state.LogQuery(q.stateTable+q.port, snapshotTs, respRecords)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+	if q.logTimestamps {
+		qLogEntry := libqpu.QueryLogEntry{
+			RowIDs: make([]string, 0),
+			Ts:     snapshotTs,
+		}
+		for _, rec := range respRecords {
+			qLogEntry.RowIDs = append(qLogEntry.RowIDs, rec.RecordId)
+		}
+
+		q.queryLog.entries = append(q.queryLog.entries, qLogEntry)
+	}
 
 	return &pb.QueryResp{
 		RespRecord: respRecords,
@@ -270,16 +287,19 @@ func (q *JoinQPU) GetConfig() *qpu_api.ConfigResponse {
 
 // GetMetrics ...
 func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+	var err error
 	var FL50, FL90, FL95, FL99 float64
+	var FV0, FV1, FV2, FV4 float64
 	FL50, FL90, FL95, FL99 = -1, -1, -1, -1
+	FV0, FV1, FV2, FV4 = -1, -1, -1, -1
 
 	if q.logTimestamps {
-		// _, wLog, err := q.state.ReadLogs()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
+
+		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries)
+		if err != nil {
+			return nil, err
+		}
 	}
 	NL50, NL90, NL95, NL99 := q.notificationLatencyM.GetMetrics()
 
@@ -296,6 +316,10 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 		FreshnessLatencyP90:    FL90,
 		FreshnessLatencyP95:    FL95,
 		FreshnessLatencyP99:    FL99,
+		FreshnessVersions0:     FV0,
+		FreshnessVersions1:     FV1,
+		FreshnessVersions2:     FV2,
+		FreshnessVersions4:     FV4,
 	}, nil
 }
 

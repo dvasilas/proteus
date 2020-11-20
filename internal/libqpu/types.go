@@ -177,6 +177,6 @@ type WriteLogEntry struct {
 
 // QueryLogEntry ...
 type QueryLogEntry struct {
-	RowIDs []int64
-	T      time.Time
+	RowIDs []string
+	Ts     time.Time
 }

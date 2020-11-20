@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -20,6 +22,27 @@ var (
 type LatencyM struct {
 	hist *stats.Histogram
 }
+
+type opType int
+
+const (
+	writeDB      opType = iota
+	writeApplied opType = iota
+	query        opType = iota
+)
+
+type opLogEntry struct {
+	recordWritten int64
+	recordsRead   []int64
+	ts            time.Time
+	opType        opType
+}
+
+type opLog []opLogEntry
+
+func (t opLog) Len() int           { return len(t) }
+func (t opLog) Less(i, j int) bool { return t[i].ts.Before(t[j].ts) }
+func (t opLog) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 // NewLatencyM ...
 func NewLatencyM() LatencyM {
@@ -88,4 +111,94 @@ func FreshnessLatency(writeLog []libqpu.WriteLogEntry) (float64, float64, float6
 		durationToMillis(time.Duration(pepcentile(.9, hist))),
 		durationToMillis(time.Duration(pepcentile(.95, hist))),
 		durationToMillis(time.Duration(pepcentile(.99, hist)))
+}
+
+// FreshnessVersions ...
+func FreshnessVersions(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry) (float64, float64, float64, float64, error) {
+	opLog, err := constructOpLog(queryLog, writeLog)
+	if err != nil {
+		return -1, -1, -1, -1, err
+	}
+	versionReadLog := postMortem(opLog)
+
+	hist := stats.NewHistogram(stats.HistogramOptions{
+		NumBuckets:   10,
+		GrowthFactor: 1,
+	})
+
+	for _, e := range versionReadLog {
+		hist.Add(int64(e))
+	}
+
+	return float64(hist.Buckets[0].Count) / float64(len(versionReadLog)),
+		float64(hist.Buckets[1].Count) / float64(len(versionReadLog)),
+		float64(hist.Buckets[2].Count) / float64(len(versionReadLog)),
+		float64(hist.Buckets[3].Count) / float64(len(versionReadLog)),
+		nil
+}
+
+func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry) (opLog, error) {
+	log := make([]opLogEntry, 2*len(writeLog)+len(queryLog))
+	i := 0
+	for _, entry := range writeLog {
+		log[i] = opLogEntry{recordWritten: entry.RowID, ts: entry.T0, opType: writeDB}
+		i++
+		log[i] = opLogEntry{recordWritten: entry.RowID, ts: entry.T1, opType: writeApplied}
+		i++
+	}
+
+	for _, entry := range queryLog {
+		rec := opLogEntry{
+			recordsRead: make([]int64, len(entry.RowIDs)),
+			ts:          entry.Ts,
+			opType:      query,
+		}
+
+		for j, id := range entry.RowIDs {
+			rID, err := strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				return log, err
+			}
+			rec.recordsRead[j] = rID
+		}
+		log[i] = rec
+		i++
+	}
+
+	sort.Sort(opLog(log))
+
+	return log, nil
+}
+
+func postMortem(opLog opLog) []int {
+	snapshotDatastore := make(map[int64]int)
+	snapshotQPU := make(map[int64]int)
+	stalenessLog := make([]int, 0)
+
+	for _, entry := range opLog {
+		switch entry.opType {
+		case writeDB:
+			_, ok := snapshotDatastore[entry.recordWritten]
+			if ok {
+				snapshotDatastore[entry.recordWritten]++
+			} else {
+				snapshotDatastore[entry.recordWritten] = 1
+			}
+		case writeApplied:
+			_, ok := snapshotQPU[entry.recordWritten]
+			if ok {
+				snapshotQPU[entry.recordWritten]++
+			} else {
+				snapshotQPU[entry.recordWritten] = 1
+			}
+		case query:
+			for _, rID := range entry.recordsRead {
+				if _, ok := snapshotQPU[rID]; ok {
+					stalenessLog = append(stalenessLog, int(snapshotDatastore[rID]-snapshotQPU[rID]))
+				}
+			}
+		}
+	}
+
+	return stalenessLog
 }
