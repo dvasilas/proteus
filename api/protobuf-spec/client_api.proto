@@ -43,4 +43,8 @@ message MetricsResponse {
   double freshnessVersions1 = 14;
   double freshnessVersions2 = 15;
   double freshnessVersions4 = 16;
+  double stateUpdateLatencyP50 = 17;
+  double stateUpdateLatencyP90 = 18;
+  double stateUpdateLatencyP95 = 19;
+  double stateUpdateLatencyP99 = 20;
 }

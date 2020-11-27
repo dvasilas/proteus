@@ -44,6 +44,7 @@ type JoinQPU struct {
 	catchUpDone                bool
 	measureNotificationLatency bool
 	notificationLatencyM       metrics.LatencyM
+	stateUpdateM               metrics.LatencyM
 	writeLog                   writeLog
 	queryLog                   queryLog
 }
@@ -96,6 +97,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 
 	if jqpu.measureNotificationLatency {
 		jqpu.notificationLatencyM = metrics.NewLatencyM()
+		jqpu.stateUpdateM = metrics.NewLatencyM()
 	}
 
 	err := jqpu.initializeState()
@@ -302,6 +304,7 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 		}
 	}
 	NL50, NL90, NL95, NL99 := q.notificationLatencyM.GetMetrics()
+	UL50, UL90, UL95, UL99 := q.stateUpdateM.GetMetrics()
 
 	return &pb.MetricsResponse{
 		NotificationLatencyP50: NL50,
@@ -320,6 +323,10 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 		FreshnessVersions1:     FV1,
 		FreshnessVersions2:     FV2,
 		FreshnessVersions4:     FV4,
+		StateUpdateLatencyP50:  UL50,
+		StateUpdateLatencyP90:  UL90,
+		StateUpdateLatencyP95:  UL95,
+		StateUpdateLatencyP99:  UL99,
 	}, nil
 }
 
@@ -356,6 +363,7 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 			return err
 		}
 	} else if respRecordType == libqpu.Delta {
+		t0 := time.Now()
 		attributes := respRecord.GetAttributes()
 		joinAttribute := q.joinAttributes[respRecord.GetLogOp().GetTable()]
 		joinAttributeValue := attributes[joinAttribute].GetInt()
@@ -363,6 +371,11 @@ func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inter
 		_, err := q.updateState(joinAttributeValue, attributes, respRecord.GetLogOp().GetTimestamp().GetVc())
 		if err != nil {
 			return err
+		}
+		if q.measureNotificationLatency {
+			if err := q.stateUpdateM.AddFromTs(t0); err != nil {
+				return err
+			}
 		}
 	}
 
