@@ -24,12 +24,13 @@ const (
 )
 
 // NewQueryRequest ...
-func NewQueryRequest(query *qpu_api.Query, md map[string]string, sync bool) QueryRequest {
+func NewQueryRequest(query *qpu_api.Query, md map[string]string, sync, measureDataTransfer bool) QueryRequest {
 	return QueryRequest{
 		Req: &qpu_api.QueryRequest{
-			Query:    query,
-			Metadata: md,
-			Sync:     sync,
+			Query:               query,
+			Metadata:            md,
+			Sync:                sync,
+			MeasureDataTransfer: measureDataTransfer,
 		},
 	}
 }
@@ -64,4 +65,9 @@ func (r QueryRequest) GetMetadata() map[string]string {
 // GetSync ...
 func (r QueryRequest) GetSync() bool {
 	return r.Req.GetSync()
+}
+
+// GetMeasureDataTransfer ...
+func (r QueryRequest) GetMeasureDataTransfer() bool {
+	return r.Req.GetMeasureDataTransfer()
 }

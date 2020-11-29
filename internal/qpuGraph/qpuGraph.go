@@ -50,8 +50,9 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 		}
 
 		adjQPUs[i] = &libqpu.AdjacentQPU{
-			APIClient:    qpuapiclient,
-			OutputSchema: adjQPUConf.Schema,
+			APIClient:           qpuapiclient,
+			OutputSchema:        adjQPUConf.Schema,
+			MeasureDataTransfer: conn.MeasureDataTransfer,
 		}
 	}
 	qpu.AdjacentQPUs = adjQPUs
@@ -65,6 +66,6 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 // (libqpu.ResponseStream struct) for receiving response records.
 func SendQuery(query *qpu_api.Query, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
 	return to.APIClient.Query(
-		libqpu.NewQueryRequest(query, nil, false),
+		libqpu.NewQueryRequest(query, nil, false, to.MeasureDataTransfer),
 	)
 }

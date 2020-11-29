@@ -57,6 +57,7 @@ message QueryRequest {
   // Only makes sence to use synchronous mode when the underlying datastore'
   // subscribe API has the ability to block updates waiting for acks.
   bool sync = 3;
+  bool measureDataTransfer = 4;
 }
 
 message Query {

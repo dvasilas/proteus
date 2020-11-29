@@ -1,6 +1,7 @@
 package apiprocessor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	"github.com/golang/protobuf/proto"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -31,6 +33,13 @@ type APIProcessor struct {
 	sqlCache                   *sqlToASTCache
 	measureNotificationLatency bool
 	processingLatencyM         metrics.LatencyM
+	measureDataTransfer        bool
+	dataTransfer               dataSent
+}
+
+type dataSent struct {
+	sync.Mutex
+	count int64
 }
 
 // ---------------- API Functions -------------------
@@ -52,6 +61,7 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 		qpuClass:                   qpuClass,
 		sqlCache:                   newSQLToASTCache(),
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
+		measureDataTransfer:        qpu.Config.Evaluation.MeasureDataTransfer,
 		processingLatencyM:         processingLatencyM,
 	}, nil
 }
@@ -116,6 +126,18 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 						}
 					}
 					go func() {
+
+						if s.measureDataTransfer && queryReq.GetMeasureDataTransfer() {
+							logOpSize, err := getLogOperationSize(logOp)
+							if err != nil {
+								utils.Error(err)
+							}
+
+							s.dataTransfer.Lock()
+							s.dataTransfer.count += logOpSize
+							s.dataTransfer.Unlock()
+						}
+
 						if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
 							utils.Warn(err)
 							s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
@@ -190,7 +212,19 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 		s.sqlCache.put(req.GetSQLStr(), astQuery)
 	}
 
-	return s.qpuClass.ClientQuery(astQuery, parentSpan)
+	resp, err := s.qpuClass.ClientQuery(astQuery, parentSpan)
+
+	if s.measureDataTransfer {
+		respSize, err := getQueryRespSize(resp)
+		if err != nil {
+			return nil, err
+		}
+		s.dataTransfer.Lock()
+		s.dataTransfer.count += respSize
+		s.dataTransfer.Unlock()
+	}
+
+	return resp, err
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
@@ -210,6 +244,12 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (
 	resp.ProcessingLatencyP90 = p90
 	resp.ProcessingLatencyP95 = p95
 	resp.ProcessingLatencyP99 = p99
+
+	if s.measureDataTransfer {
+		s.dataTransfer.Lock()
+		resp.KBytesSent = float64(s.dataTransfer.count) / float64(1024)
+		s.dataTransfer.Unlock()
+	}
 
 	return resp, nil
 }
@@ -258,4 +298,22 @@ func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool) {
 	c.RUnlock()
 
 	return ast, found
+}
+
+func getQueryRespSize(resp *pb.QueryResp) (int64, error) {
+	buff, err := proto.Marshal(resp)
+	if err != nil {
+		return -1, err
+	}
+	bytesBuff := bytes.NewBuffer(buff)
+	return int64(bytesBuff.Len()), nil
+}
+
+func getLogOperationSize(logOp libqpu.LogOperation) (int64, error) {
+	buff, err := proto.Marshal(logOp.Op)
+	if err != nil {
+		return -1, err
+	}
+	bytesBuff := bytes.NewBuffer(buff)
+	return int64(bytesBuff.Len()), nil
 }

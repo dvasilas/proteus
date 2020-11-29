@@ -47,4 +47,5 @@ message MetricsResponse {
   double stateUpdateLatencyP90 = 18;
   double stateUpdateLatencyP95 = 19;
   double stateUpdateLatencyP99 = 20;
+  double kBytesSent = 21;
 }

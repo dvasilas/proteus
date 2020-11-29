@@ -47,8 +47,9 @@ type QPUClass interface {
 
 // AdjacentQPU ...
 type AdjacentQPU struct {
-	APIClient    APIClient
-	OutputSchema []string
+	APIClient           APIClient
+	OutputSchema        []string
+	MeasureDataTransfer bool
 }
 
 // APIClient ...
@@ -131,6 +132,7 @@ type QPUConfig struct {
 		Tracing                    bool
 		LogTimestamps              bool
 		MeasureNotificationLatency bool
+		MeasureDataTransfer        bool
 	}
 	ProcessingConfig struct {
 		API struct {
@@ -146,8 +148,8 @@ type QPUConfig struct {
 
 // QPUConnection ...
 type QPUConnection struct {
-	Address string
-	Local   bool
+	Address             string
+	MeasureDataTransfer bool
 }
 
 // DatastoreType ...

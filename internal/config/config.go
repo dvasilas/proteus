@@ -18,8 +18,8 @@ type inputQPUConfig struct {
 	State       string
 	Port        string
 	Connections []struct {
-		Address string
-		Local   string
+		Address             string
+		MeasureDataTransfer bool
 	}
 	InputSchema []struct {
 		Table      string
@@ -88,6 +88,7 @@ type inputQPUConfig struct {
 		Tracing                    bool
 		LogTimestamps              bool
 		MeasureNotificationLatency bool
+		MeasureDataTransfer        bool
 	}
 	ProcessingConfig struct {
 		API struct {
@@ -216,19 +217,9 @@ func getStateType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 func getConnections(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	connections := make([]libqpu.QPUConnection, 0)
 	for _, conn := range inputConf.Connections {
-		var isLocal bool
-		switch conn.Local {
-		case "local":
-			isLocal = true
-		case "remote":
-			isLocal = false
-		default:
-			return utils.Error(errors.New("connection should be either 'local' or 'remote'"))
-		}
-
 		connections = append(connections, libqpu.QPUConnection{
-			Address: conn.Address,
-			Local:   isLocal,
+			Address:             conn.Address,
+			MeasureDataTransfer: conn.MeasureDataTransfer,
 		})
 	}
 	config.Connections = connections
@@ -319,6 +310,7 @@ func getEvaluation(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.Evaluation.Tracing = inputConf.Evaluation.Tracing
 	config.Evaluation.LogTimestamps = inputConf.Evaluation.LogTimestamps
 	config.Evaluation.MeasureNotificationLatency = inputConf.Evaluation.MeasureNotificationLatency
+	config.Evaluation.MeasureDataTransfer = inputConf.Evaluation.MeasureDataTransfer
 
 	return nil
 }

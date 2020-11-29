@@ -122,6 +122,7 @@ func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryRes
 		req: libqpu.NewQueryRequest(
 			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
 			nil,
+			false,
 			false),
 		result: &jobResult{},
 		done:   make(chan bool),
