@@ -239,7 +239,12 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (
 		return nil, err
 	}
 
-	p50, p90, p95, p99 := s.processingLatencyM.GetMetrics()
+	var p50, p90, p95, p99 float64
+	p50, p90, p95, p99 = -1, -1, -1, -1
+
+	if s.measureNotificationLatency {
+		p50, p90, p95, p99 = s.processingLatencyM.GetMetrics()
+	}
 	resp.ProcessingLatencyP50 = p50
 	resp.ProcessingLatencyP90 = p90
 	resp.ProcessingLatencyP95 = p95

@@ -207,7 +207,12 @@ func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {
 
 // GetMetrics ...
 func (q *SumQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	p50, p90, p95, p99 := q.notificationLatencyM.GetMetrics()
+	var p50, p90, p95, p99 float64
+	p50, p90, p95, p99 = -1, -1, -1, -1
+
+	if q.measureNotificationLatency {
+		p50, p90, p95, p99 = q.notificationLatencyM.GetMetrics()
+	}
 	return &pb.MetricsResponse{
 		NotificationLatencyP50: p50,
 		NotificationLatencyP90: p90,

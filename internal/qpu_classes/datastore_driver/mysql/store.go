@@ -248,7 +248,10 @@ func (ds MySQLDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 
 // GetNotificationLanency ...
 func (ds MySQLDataStore) GetNotificationLanency() (float64, float64, float64, float64) {
-	return ds.notificationLatencyM.GetMetrics()
+	if ds.measureNotificationLatency {
+		return ds.notificationLatencyM.GetMetrics()
+	}
+	return -1, -1, -1, -1
 }
 
 // ---------------- Internal Functions --------------

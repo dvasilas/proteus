@@ -292,8 +292,13 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 	var err error
 	var FL50, FL90, FL95, FL99 float64
 	var FV0, FV1, FV2, FV4 float64
+	var NL50, NL90, NL95, NL99 float64
+	var UL50, UL90, UL95, UL99 float64
+
 	FL50, FL90, FL95, FL99 = -1, -1, -1, -1
 	FV0, FV1, FV2, FV4 = -1, -1, -1, -1
+	NL50, NL90, NL95, NL99 = -1, -1, -1, -1
+	UL50, UL90, UL95, UL99 = -1, -1, -1, -1
 
 	if q.logTimestamps {
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
@@ -303,8 +308,11 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 			return nil, err
 		}
 	}
-	NL50, NL90, NL95, NL99 := q.notificationLatencyM.GetMetrics()
-	UL50, UL90, UL95, UL99 := q.stateUpdateM.GetMetrics()
+
+	if q.measureNotificationLatency {
+		NL50, NL90, NL95, NL99 = q.notificationLatencyM.GetMetrics()
+		UL50, UL90, UL95, UL99 = q.stateUpdateM.GetMetrics()
+	}
 
 	return &pb.MetricsResponse{
 		NotificationLatencyP50: NL50,
