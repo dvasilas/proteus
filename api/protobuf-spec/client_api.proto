@@ -48,4 +48,8 @@ message MetricsResponse {
   double stateUpdateLatencyP95 = 19;
   double stateUpdateLatencyP99 = 20;
   double kBytesSent = 21;
+  double responseTimeP50 = 22;
+  double responseTimeP90 = 23;
+  double responseTimeP95 = 24;
+  double responseTimeP99 = 25;
 }

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
 	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
@@ -21,13 +23,13 @@ import (
 
 // Server represents the QPU's API server.
 type Server struct {
-	port       string
-	tracing    bool
-	grpcServer grpcutils.GrpcServer
-	api        libqpu.APIProcessor
-	// temporarily here
-	state      libqpu.QPUState
-	dispatcher *workerpool.Dispatcher
+	port          string
+	tracing       bool
+	grpcServer    grpcutils.GrpcServer
+	api           libqpu.APIProcessor
+	state         libqpu.QPUState
+	dispatcher    *workerpool.Dispatcher
+	responseTimeM metrics.LatencyM
 }
 
 // NewServer initializes a grpc server.
@@ -38,11 +40,12 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 	}
 
 	server := Server{
-		port:       port,
-		tracing:    tracing,
-		grpcServer: grpcServer,
-		api:        api,
-		state:      state,
+		port:          port,
+		tracing:       tracing,
+		grpcServer:    grpcServer,
+		api:           api,
+		state:         state,
+		responseTimeM: metrics.NewLatencyM(),
 	}
 
 	server.dispatcher = workerpool.NewDispatcher(conf.ProcessingConfig.API.MaxWorkers, conf.ProcessingConfig.API.MaxJobQueue)
@@ -116,6 +119,8 @@ type jobResult struct {
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryResp, error) {
+	t0 := time.Now()
+
 	work := &Job{
 		server: s,
 		ctx:    ctx,
@@ -132,6 +137,10 @@ func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryRes
 
 	<-work.done
 
+	if err := s.responseTimeM.AddFromTs(t0); err != nil {
+		return nil, err
+	}
+
 	return work.result.response, work.result.err
 }
 
@@ -147,5 +156,15 @@ func (s *Server) GetConfig(ctx context.Context, req *qpu_api.ConfigRequest) (*qp
 
 // GetMetrics ...
 func (s *Server) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
-	return s.api.GetMetrics(ctx, req)
+	metrics, err := s.api.GetMetrics(ctx, req)
+
+	var RT50, RT90, RT95, RT99 float64
+	RT50, RT90, RT95, RT99 = s.responseTimeM.GetMetrics()
+
+	metrics.ResponseTimeP50 = RT50
+	metrics.ResponseTimeP90 = RT90
+	metrics.ResponseTimeP95 = RT95
+	metrics.ResponseTimeP99 = RT99
+
+	return metrics, err
 }
