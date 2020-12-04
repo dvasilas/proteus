@@ -1,0 +1,15 @@
+FROM golang as proteus
+ENV GO111MODULE=on
+WORKDIR /
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+WORKDIR /app/proteus/
+COPY . .
+
+RUN make qpu
+
+FROM mysql
+COPY --from=proteus /app/proteus/bin/qpu /proteus
+

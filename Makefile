@@ -11,6 +11,7 @@ REPO_PROTEUS := dvasilas/proteus
 TAG := $(shell git log -1 --pretty=%H | cut -c1-8)
 IMG_QPU := ${REPO_PROTEUS}:${TAG}
 IMG_REG := 127.0.0.1:5000/${APP}:${TAG}
+IMG_REG_SL := 127.0.0.1:5000/${APP}-stateless:${TAG}
 
 $(PROTOC_CMD):
 ifeq ($(UNAME), Darwin)
@@ -60,6 +61,7 @@ proto: $(PROTOC_CMD)
 ## image-build:
 image-build:
 	docker build -f build/proteus/localdev/Dockerfile-qpu -t qpu/dev .
+	docker build -f build/proteus/localdev/Dockerfile-qpu-stateless -t qpu/stateless .
 
 .PHONY: image-push
 ## image-push: Pushes image to docker hub
@@ -72,6 +74,8 @@ image-push:
 image-push-registry:
 	docker tag qpu/dev ${IMG_REG}
 	docker push ${IMG_REG}
+	docker tag qpu/dev ${IMG_REG_SL}
+	docker push ${IMG_REG_SL}
 
 .PHONY: clean
 ## clean: cleans the binary
