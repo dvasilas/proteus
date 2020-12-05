@@ -71,7 +71,7 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 	return resp, err
 }
 
-// Query ...
+// GetMetrics ...
 func (c *Client) GetMetrics() (*pb.MetricsResponse, error) {
 	client, err := c.pool.Get()
 	if err != nil {
@@ -84,6 +84,47 @@ func (c *Client) GetMetrics() (*pb.MetricsResponse, error) {
 	defer cancel()
 
 	resp, err := client.Cli.GetMetrics(ctx, r)
+
+	c.pool.Return(client)
+
+	return resp, err
+}
+
+// LobstersFrontpage ...
+func (c *Client) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &pb.LobFrontpageReq{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resp, err := client.Cli.LobstersFrontpage(ctx, r)
+
+	c.pool.Return(client)
+
+	return resp, err
+}
+
+// LobstersStoryVote ...
+func (c *Client) LobstersStoryVote(storyID int64, vote int) (*pb.LobStoryVoteResp, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &pb.LobStoryVoteReq{
+		StoryID: storyID,
+		Vote:    int64(vote),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resp, err := client.Cli.LobstersStoryVote(ctx, r)
 
 	c.pool.Return(client)
 

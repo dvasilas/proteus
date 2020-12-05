@@ -69,6 +69,8 @@ type QPUState interface {
 	Get(string, []string, []string, string, int64, opentracing.Span) (<-chan map[string]interface{}, error)
 	GetRow(string, []string, []string, opentracing.Span) *sql.Row
 	Cleanup()
+	LobstersFrontpage() (*pb.LobFrontpageResp, error)
+	LobstersStoryVote(*pb.LobStoryVoteReq) error
 }
 
 // OperatorType ...
@@ -83,6 +85,8 @@ const (
 	Join OperatorType = iota
 	// Router ...
 	Router OperatorType = iota
+	// Lobsters ...
+	Lobsters OperatorType = iota
 )
 
 // StateType ...

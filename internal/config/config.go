@@ -196,6 +196,8 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.Operator = libqpu.Join
 	case "router":
 		config.Operator = libqpu.Router
+	case "lobsters":
+		config.Operator = libqpu.Lobsters
 	default:
 		return utils.Error(errors.New("unknown operator type"))
 	}

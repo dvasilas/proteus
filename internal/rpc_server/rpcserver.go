@@ -168,3 +168,88 @@ func (s *Server) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.Me
 
 	return metrics, err
 }
+
+// LobstersFrontpage ...
+func (s *Server) LobstersFrontpage(ctx context.Context, req *pb.LobFrontpageReq) (*pb.LobFrontpageResp, error) {
+	work := &JobFrontPage{
+		server: s,
+		ctx:    ctx,
+		result: &JobFrontPageResult{},
+		done:   make(chan bool),
+	}
+
+	s.dispatcher.JobQueue <- work
+
+	<-work.done
+
+	return work.result.response, work.result.err
+}
+
+// LobstersStoryVote ...
+func (s *Server) LobstersStoryVote(ctx context.Context, req *pb.LobStoryVoteReq) (*pb.LobStoryVoteResp, error) {
+	work := &JobStoryVote{
+		server: s,
+		ctx:    ctx,
+		req:    req,
+		result: &JobStoryVoteResult{},
+		done:   make(chan bool),
+	}
+
+	s.dispatcher.JobQueue <- work
+
+	<-work.done
+
+	return &pb.LobStoryVoteResp{}, work.result.err
+}
+
+// JobFrontPage ...
+type JobFrontPage struct {
+	server *Server
+	ctx    context.Context
+	result *JobFrontPageResult
+	done   chan bool
+}
+
+// Do ...
+func (j *JobFrontPage) Do() {
+	j.do(j.ctx, j.server)
+	j.done <- true
+}
+
+func (j *JobFrontPage) do(ctx context.Context, s *Server) {
+	resp, err := s.state.LobstersFrontpage()
+
+	j.result.response = resp
+	j.result.err = err
+}
+
+// JobFrontPageResult ...
+type JobFrontPageResult struct {
+	response *pb.LobFrontpageResp
+	err      error
+}
+
+// JobStoryVote ...
+type JobStoryVote struct {
+	server *Server
+	ctx    context.Context
+	req    *pb.LobStoryVoteReq
+	result *JobStoryVoteResult
+	done   chan bool
+}
+
+// Do ...
+func (j *JobStoryVote) Do() {
+	j.do(j.ctx, j.server)
+	j.done <- true
+}
+
+func (j *JobStoryVote) do(ctx context.Context, s *Server) {
+	err := s.state.LobstersStoryVote(j.req)
+	j.result.err = err
+}
+
+// JobStoryVoteResult ...
+type JobStoryVoteResult struct {
+	err error
+}

@@ -26,6 +26,9 @@ service QPUAPI {
   // rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
   // rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
   rpc GetMetrics(pb.MetricsRequest) returns (pb.MetricsResponse) {}
+
+  rpc LobstersFrontpage(pb.LobFrontpageReq) returns (pb.LobFrontpageResp) {}
+  rpc LobstersStoryVote(pb.LobStoryVoteReq) returns (pb.LobStoryVoteResp) {}
 }
 
 message NoOpReq {

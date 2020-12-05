@@ -8,6 +8,9 @@ import "google/protobuf/timestamp.proto";
 service QPUAPI {
   rpc QueryUnary(QueryReq) returns (QueryResp) {}
   rpc GetMetrics(MetricsRequest) returns (MetricsResponse) {}
+
+  rpc LobstersFrontpage(LobFrontpageReq) returns (LobFrontpageResp) {}
+  rpc LobstersStoryVote(LobStoryVoteReq) returns (LobStoryVoteResp) {}
 }
 
 message QueryReq {
@@ -53,3 +56,23 @@ message MetricsResponse {
   double responseTimeP95 = 24;
   double responseTimeP99 = 25;
 }
+
+message Story {
+  string title = 1;
+  string description = 2;
+  string shortID = 3;
+  int64 voteCount = 4;
+}
+
+message LobFrontpageReq {}
+
+message LobFrontpageResp {
+  repeated Story stories = 1;
+}
+
+message LobStoryVoteReq {
+  int64 storyID = 1;
+  int64 vote = 2;
+}
+
+message LobStoryVoteResp {}

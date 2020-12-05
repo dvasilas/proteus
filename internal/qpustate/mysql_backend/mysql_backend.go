@@ -1,6 +1,7 @@
 package mysqlbackend
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -90,9 +92,9 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		}
 	}
 
-	db.Close()
-
 	if table != "" {
+		db.Close()
+
 		connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
 			s.accessKeyID,
 			s.secretAccessKey,
@@ -110,8 +112,9 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		db.SetMaxOpenConns(2048)
 		db.SetConnMaxLifetime(10 * time.Minute)
 
-		s.db = db
 	}
+
+	s.db = db
 
 	return nil
 }
@@ -426,3 +429,113 @@ func (s *MySQLStateBackend) Cleanup() {
 // 	}
 // 	return nil
 // }
+
+// LobstersFrontpage ...
+func (s *MySQLStateBackend) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
+	queryStr := fmt.Sprintf("SELECT title, description, short_id, user_id, vote_sum FROM stories ORDER BY vote_sum DESC LIMIT %d", 5)
+
+	rows, err := s.db.Query(queryStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columns, _ := rows.Columns()
+	count := len(columns)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
+
+	result := make([]map[string]interface{}, 0)
+
+	for rows.Next() {
+
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+
+		rows.Scan(valuePtrs...)
+
+		row := make(map[string]interface{})
+		for i, col := range values {
+			if col != nil {
+				row[columns[i]] = col
+			}
+		}
+
+		for i, col := range columns {
+			val := values[i]
+
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
+			}
+			row[col] = v
+		}
+
+		result = append(result, row)
+	}
+
+	resp := pb.LobFrontpageResp{
+		Stories: make([]*pb.Story, len(result)),
+	}
+
+	for i, entry := range result {
+
+		vc, err := strconv.ParseInt(entry["vote_sum"].(string), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		story := &pb.Story{
+			Title:       entry["title"].(string),
+			Description: entry["description"].(string),
+			ShortID:     entry["short_id"].(string),
+			VoteCount:   vc,
+		}
+		resp.Stories[i] = story
+	}
+
+	return &resp, nil
+}
+
+// LobstersStoryVote ...
+func (s *MySQLStateBackend) LobstersStoryVote(req *pb.LobStoryVoteReq) error {
+
+	storyID := req.GetStoryID()
+	vote := req.GetVote()
+	userID := 1
+
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	insertVote := fmt.Sprintf("INSERT INTO votes (story_id, vote, user_id) VALUES (%d, %d, %d)", storyID, vote, userID)
+	_, err = tx.ExecContext(ctx, insertVote)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	selectStory := fmt.Sprintf("SELECT vote_sum FROM stories WHERE id = %d", storyID)
+	row := tx.QueryRow(selectStory)
+	var voteCount int64
+	err = row.Scan(&voteCount)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	updateStory := fmt.Sprintf("UPDATE stories SET vote_sum=%d WHERE id = %d", voteCount+int64(vote), storyID)
+	_, err = tx.ExecContext(ctx, updateStory)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpu_api"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
+	lobsters "github.com/dvasilas/proteus/internal/qpu_classes/lobsters"
 	router "github.com/dvasilas/proteus/internal/qpu_classes/router"
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
@@ -271,6 +272,8 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 		return joinqpu.InitClass(qpu, catchUpDoneCh)
 	case libqpu.Router:
 		return router.InitClass(qpu, catchUpDoneCh)
+	case libqpu.Lobsters:
+		return lobsters.InitClass(qpu, catchUpDoneCh)
 	default:
 		return nil, utils.Error(errors.New("Unknown QPU class"))
 	}
