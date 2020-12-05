@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"strconv"
 	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
@@ -25,7 +27,7 @@ import (
 type Server struct {
 	port          string
 	tracing       bool
-	grpcServer    grpcutils.GrpcServer
+	grpcServers   []grpcutils.GrpcServer
 	api           libqpu.APIProcessor
 	state         libqpu.QPUState
 	dispatcher    *workerpool.Dispatcher
@@ -34,15 +36,20 @@ type Server struct {
 
 // NewServer initializes a grpc server.
 func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.QPUState, conf *libqpu.QPUConfig) (*Server, error) {
-	grpcServer, err := grpcutils.NewServer(tracing)
-	if err != nil {
-		return nil, err
+	grpcServers := make([]grpcutils.GrpcServer, conf.ProcessingConfig.GrpcServers)
+
+	for i := 0; i < conf.ProcessingConfig.GrpcServers; i++ {
+		grpcServer, err := grpcutils.NewServer(tracing)
+		if err != nil {
+			return nil, err
+		}
+		grpcServers[i] = grpcServer
 	}
 
 	server := Server{
 		port:          port,
 		tracing:       tracing,
-		grpcServer:    grpcServer,
+		grpcServers:   grpcServers,
 		api:           api,
 		state:         state,
 		responseTimeM: metrics.NewLatencyM(),
@@ -51,8 +58,10 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 	server.dispatcher = workerpool.NewDispatcher(conf.ProcessingConfig.API.MaxWorkers, conf.ProcessingConfig.API.MaxJobQueue)
 	server.dispatcher.Run()
 
-	qpu_api.RegisterQPUAPIServer(grpcServer.Server, &server)
-	reflection.Register(grpcServer.Server)
+	for _, s := range grpcServers {
+		qpu_api.RegisterQPUAPIServer(s.Server, &server)
+		reflection.Register(s.Server)
+	}
 
 	return &server, nil
 }
@@ -60,13 +69,30 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 // Serve starts the server and listents for connections.
 // It returns only when an error occurs.
 func (s *Server) Serve() error {
-	lis, err := net.Listen("tcp", ":"+s.port)
+	fmt.Println("Serve()")
+	port, err := strconv.ParseInt(s.port, 10, 64)
 	if err != nil {
 		return err
 	}
+	for i, grpcS := range s.grpcServers {
+		lis, err := net.Listen("tcp", ":"+strconv.FormatInt(port+int64(i), 10))
+		if err != nil {
+			return err
+		}
 
-	fmt.Println("QPU service starting")
-	return s.grpcServer.Server.Serve(lis)
+		if i < len(s.grpcServers)-1 {
+			go func(s grpcutils.GrpcServer) {
+				err = s.Server.Serve(lis)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}(grpcS)
+		} else {
+			fmt.Println("QPU service starting")
+			return grpcS.Server.Serve(lis)
+		}
+	}
+	return errors.New("should not have reached this point")
 }
 
 // Query implements the QPU's low level Query API.

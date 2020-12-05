@@ -99,6 +99,7 @@ type inputQPUConfig struct {
 			MaxWorkers  int
 			MaxJobQueue int
 		}
+		GrpcServers int
 	}
 }
 
@@ -322,6 +323,7 @@ func getProcessingConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) err
 	config.ProcessingConfig.API.MaxJobQueue = int(inputConf.ProcessingConfig.API.MaxJobQueue)
 	config.ProcessingConfig.Input.MaxWorkers = int(inputConf.ProcessingConfig.Input.MaxWorkers)
 	config.ProcessingConfig.Input.MaxJobQueue = int(inputConf.ProcessingConfig.Input.MaxJobQueue)
+	config.ProcessingConfig.GrpcServers = inputConf.ProcessingConfig.GrpcServers
 
 	return nil
 }

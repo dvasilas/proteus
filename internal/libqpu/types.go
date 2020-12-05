@@ -147,6 +147,7 @@ type QPUConfig struct {
 			MaxWorkers  int
 			MaxJobQueue int
 		}
+		GrpcServers int
 	}
 }
 
