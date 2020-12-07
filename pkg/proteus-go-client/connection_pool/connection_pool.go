@@ -4,7 +4,8 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
-
+"runtime/debug"
+"fmt"
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 )
 
@@ -51,6 +52,8 @@ var connPoolAvailWaitTime = time.Millisecond
 func makeConn(host string, tracing bool) (*grpcutils.GrpcClientConn, error) {
 	grpcConn, err := grpcutils.NewClientConn(host, tracing)
 	if err != nil {
+fmt.Println(err)
+	debug.PrintStack()
 		return nil, err
 	}
 	return grpcConn, err
@@ -154,6 +157,8 @@ func (cp *ConnectionPool) GetWithTimeout(d time.Duration) (rv *grpcutils.GrpcCli
 			// Enable tracing only the first client we create.
 			cp.tracing = false
 			if err != nil {
+				fmt.Println(err)
+	debug.PrintStack()
 				// On error, release our create hold
 				<-cp.createsem
 			} else {

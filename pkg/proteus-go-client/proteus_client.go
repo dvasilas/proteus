@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"strconv"
+	"runtime/debug"
+	"fmt"
 
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
@@ -65,6 +67,11 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 	defer cancel()
 
 	resp, err := client.Cli.QueryUnary(ctx, r)
+
+	if err != nil {
+		fmt.Println(err)
+		debug.PrintStack()
+	}
 
 	c.pool.Return(client)
 
