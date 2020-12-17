@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
@@ -62,6 +63,17 @@ func NewStateBackend(conf *libqpu.QPUConfig) (*MySQLStateBackend, error) {
 // - and creates the table to be used for storing the state (it drops the table
 //   if it already exists)
 func (s *MySQLStateBackend) Init(database, table, createTable string) error {
+	for {
+		c, err := net.DialTimeout("tcp", s.endpoint, time.Second)
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			fmt.Println("retrying connecting to ", s.endpoint)
+		} else {
+			c.Close()
+			break
+		}
+	}
+
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
 		s.accessKeyID,
 		s.secretAccessKey,
