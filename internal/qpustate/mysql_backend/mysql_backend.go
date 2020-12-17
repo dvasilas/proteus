@@ -74,10 +74,11 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		}
 	}
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s",
 		s.accessKeyID,
 		s.secretAccessKey,
 		s.endpoint,
+		database,
 	)
 
 	db, err := sql.Open("mysql", connStr)
@@ -85,13 +86,13 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		return utils.Error(err)
 	}
 
-	if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
-		return utils.Error(err)
-	}
+	// if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
+	// 	return utils.Error(err)
+	// }
 
-	if _, err = db.Exec("USE " + database); err != nil {
-		return utils.Error(err)
-	}
+	// if _, err = db.Exec("USE " + database); err != nil {
+	// 	return utils.Error(err)
+	// }
 
 	if table != "" {
 		if _, err = db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
