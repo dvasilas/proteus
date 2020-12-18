@@ -29,6 +29,7 @@ service QPUAPI {
 
   rpc LobstersFrontpage(pb.LobFrontpageReq) returns (pb.LobFrontpageResp) {}
   rpc LobstersStoryVote(pb.LobStoryVoteReq) returns (pb.LobStoryVoteResp) {}
+  rpc LobstersStoryVoteInsert(pb.LobStoryVoteReq) returns (pb.LobStoryVoteResp) {}
 }
 
 message NoOpReq {

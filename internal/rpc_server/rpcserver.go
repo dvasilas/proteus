@@ -228,6 +228,23 @@ func (s *Server) LobstersStoryVote(ctx context.Context, req *pb.LobStoryVoteReq)
 	return &pb.LobStoryVoteResp{}, work.result.err
 }
 
+// LobstersStoryVoteInsert ...
+func (s *Server) LobstersStoryVoteInsert(ctx context.Context, req *pb.LobStoryVoteReq) (*pb.LobStoryVoteResp, error) {
+	work := &JobStoryVoteInsert{
+		server: s,
+		ctx:    ctx,
+		req:    req,
+		result: &JobStoryVoteInsertResult{},
+		done:   make(chan bool),
+	}
+
+	s.dispatcher.JobQueue <- work
+
+	<-work.done
+
+	return &pb.LobStoryVoteResp{}, work.result.err
+}
+
 // JobFrontPage ...
 type JobFrontPage struct {
 	server *Server
@@ -277,5 +294,30 @@ func (j *JobStoryVote) do(ctx context.Context, s *Server) {
 
 // JobStoryVoteResult ...
 type JobStoryVoteResult struct {
+	err error
+}
+
+// JobStoryVoteInsert ...
+type JobStoryVoteInsert struct {
+	server *Server
+	ctx    context.Context
+	req    *pb.LobStoryVoteReq
+	result *JobStoryVoteInsertResult
+	done   chan bool
+}
+
+// Do ...
+func (j *JobStoryVoteInsert) Do() {
+	j.do(j.ctx, j.server)
+	j.done <- true
+}
+
+func (j *JobStoryVoteInsert) do(ctx context.Context, s *Server) {
+	err := s.state.LobstersStoryVoteInsert(j.req)
+	j.result.err = err
+}
+
+// JobStoryVoteInsertResult ...
+type JobStoryVoteInsertResult struct {
 	err error
 }

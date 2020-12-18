@@ -74,27 +74,42 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		}
 	}
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s",
-		s.accessKeyID,
-		s.secretAccessKey,
-		s.endpoint,
-		database,
-	)
+	var db *sql.DB
+	var err error
 
-	db, err := sql.Open("mysql", connStr)
-	if err != nil {
-		return utils.Error(err)
-	}
+	if table == "" {
+		connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
+			s.accessKeyID,
+			s.secretAccessKey,
+			s.endpoint,
+			database,
+		)
 
-	// if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
-	// 	return utils.Error(err)
-	// }
+		db, err = sql.Open("mysql", connStr)
+		if err != nil {
+			return utils.Error(err)
+		}
+	} else {
 
-	// if _, err = db.Exec("USE " + database); err != nil {
-	// 	return utils.Error(err)
-	// }
+		connStr := fmt.Sprintf("%s:%s@tcp(%s)/",
+			s.accessKeyID,
+			s.secretAccessKey,
+			s.endpoint,
+		)
 
-	if table != "" {
+		db, err = sql.Open("mysql", connStr)
+		if err != nil {
+			return utils.Error(err)
+		}
+
+		if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + database); err != nil {
+			return utils.Error(err)
+		}
+
+		if _, err = db.Exec("USE " + database); err != nil {
+			return utils.Error(err)
+		}
+
 		if _, err = db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
 			return utils.Error(err)
 		}
@@ -103,9 +118,7 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 		if _, err = db.Exec(createTable); err != nil {
 			return utils.Error(err)
 		}
-	}
 
-	if table != "" {
 		db.Close()
 
 		connStr = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&interpolateParams=true",
@@ -120,12 +133,12 @@ func (s *MySQLStateBackend) Init(database, table, createTable string) error {
 			return utils.Error(err)
 		}
 
-		// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
-		db.SetMaxIdleConns(2048)
-		db.SetMaxOpenConns(2048)
-		db.SetConnMaxLifetime(10 * time.Minute)
-
 	}
+
+	// echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
+	db.SetMaxIdleConns(2048)
+	db.SetMaxOpenConns(2048)
+	db.SetConnMaxLifetime(10 * time.Minute)
 
 	s.db = db
 
@@ -551,4 +564,16 @@ func (s *MySQLStateBackend) LobstersStoryVote(req *pb.LobStoryVoteReq) error {
 	}
 
 	return tx.Commit()
+}
+
+// LobstersStoryVoteInsert ...
+func (s *MySQLStateBackend) LobstersStoryVoteInsert(req *pb.LobStoryVoteReq) error {
+	storyID := req.GetStoryID()
+	vote := req.GetVote()
+	userID := 1
+
+	query := fmt.Sprintf("INSERT INTO votes (story_id, vote, user_id) VALUES (%d, %d, %d)", storyID, vote, userID)
+	var err error
+	_, err = s.db.Exec(query)
+	return err
 }

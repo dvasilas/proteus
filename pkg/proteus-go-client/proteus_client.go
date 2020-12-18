@@ -2,10 +2,10 @@ package proteusclient
 
 import (
 	"context"
-	"io"
-	"strconv"
-	"runtime/debug"
 	"fmt"
+	"io"
+	"runtime/debug"
+	"strconv"
 
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
@@ -132,6 +132,28 @@ func (c *Client) LobstersStoryVote(storyID int64, vote int) (*pb.LobStoryVoteRes
 	defer cancel()
 
 	resp, err := client.Cli.LobstersStoryVote(ctx, r)
+
+	c.pool.Return(client)
+
+	return resp, err
+}
+
+// LobstersStoryVoteInsert ...
+func (c *Client) LobstersStoryVoteInsert(storyID int64, vote int) (*pb.LobStoryVoteResp, error) {
+	client, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &pb.LobStoryVoteReq{
+		StoryID: storyID,
+		Vote:    int64(vote),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resp, err := client.Cli.LobstersStoryVoteInsert(ctx, r)
 
 	c.pool.Return(client)
 

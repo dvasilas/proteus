@@ -11,6 +11,7 @@ service QPUAPI {
 
   rpc LobstersFrontpage(LobFrontpageReq) returns (LobFrontpageResp) {}
   rpc LobstersStoryVote(LobStoryVoteReq) returns (LobStoryVoteResp) {}
+  rpc LobstersStoryVoteInsert(LobStoryVoteReq) returns (LobStoryVoteResp) {}
 }
 
 message QueryReq {
