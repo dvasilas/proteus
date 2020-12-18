@@ -71,6 +71,7 @@ type QPUState interface {
 	Cleanup()
 	LobstersFrontpage() (*pb.LobFrontpageResp, error)
 	LobstersStoryVote(*pb.LobStoryVoteReq) error
+	LobstersStoryVoteInsert(*pb.LobStoryVoteReq) error
 }
 
 // OperatorType ...
