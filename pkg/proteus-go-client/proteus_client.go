@@ -2,9 +2,9 @@ package proteusclient
 
 import (
 	"context"
-	"fmt"
+	//"fmt"
 	"io"
-	"runtime/debug"
+	//"runtime/debug"
 	"strconv"
 
 	"github.com/dvasilas/proteus/internal/tracer"
@@ -68,10 +68,10 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 
 	resp, err := client.Cli.QueryUnary(ctx, r)
 
-	if err != nil {
-		fmt.Println(err)
-		debug.PrintStack()
-	}
+//	if err != nil {
+//		fmt.Println(err)
+//		debug.PrintStack()
+//	}
 
 	c.pool.Return(client)
 
