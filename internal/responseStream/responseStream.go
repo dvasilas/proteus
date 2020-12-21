@@ -48,13 +48,15 @@ func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, proc
 
 		respRecord.InTs = time.Now()
 
-		work := &Job{
-			respRecord:   respRecord,
-			data:         data,
-			recordCh:     recordCh,
-			processLogOp: processLogOp,
-		}
+		go func(respRecord libqpu.ResponseRecord) {
+			work := &Job{
+				respRecord:   respRecord,
+				data:         data,
+				recordCh:     recordCh,
+				processLogOp: processLogOp,
+			}
 
-		dispatcher.JobQueue <- work
+			dispatcher.JobQueue <- work
+		}(respRecord)
 	}
 }
