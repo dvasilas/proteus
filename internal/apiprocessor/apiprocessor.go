@@ -36,10 +36,10 @@ type APIProcessor struct {
 	processingLatencyM         metrics.LatencyM
 	measureDataTransfer        bool
 	dataTransfer               dataSent
+	dataTransferCh             chan int64
 }
 
 type dataSent struct {
-	sync.Mutex
 	count int64
 }
 
@@ -58,13 +58,22 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 		processingLatencyM = metrics.NewLatencyM()
 	}
 
-	return &APIProcessor{
+	s := &APIProcessor{
 		qpuClass:                   qpuClass,
 		sqlCache:                   newSQLToASTCache(),
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
 		measureDataTransfer:        qpu.Config.Evaluation.MeasureDataTransfer,
 		processingLatencyM:         processingLatencyM,
-	}, nil
+		dataTransferCh:             make(chan int64, 10000),
+	}
+
+	go func() {
+		for respSize := range s.dataTransferCh {
+			s.dataTransfer.count += respSize
+		}
+	}()
+
+	return s, nil
 }
 
 // Query is responsible for the top-level processing of invocation of the Query API.
@@ -127,16 +136,13 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 						}
 					}
 					go func() {
-
 						if s.measureDataTransfer && queryReq.GetMeasureDataTransfer() {
 							logOpSize, err := getLogOperationSize(logOp)
 							if err != nil {
 								utils.Error(err)
 							}
 
-							s.dataTransfer.Lock()
-							s.dataTransfer.count += logOpSize
-							s.dataTransfer.Unlock()
+							s.dataTransferCh <- logOpSize
 						}
 
 						if err := stream.Send(seqID, libqpu.Delta, logOp); err != nil {
@@ -220,9 +226,7 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 		if err != nil {
 			return nil, err
 		}
-		s.dataTransfer.Lock()
-		s.dataTransfer.count += respSize
-		s.dataTransfer.Unlock()
+		s.dataTransferCh <- respSize
 	}
 
 	return resp, err
@@ -252,9 +256,7 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (
 	resp.ProcessingLatencyP99 = p99
 
 	if s.measureDataTransfer {
-		s.dataTransfer.Lock()
 		resp.KBytesSent = float64(s.dataTransfer.count) / float64(1024)
-		s.dataTransfer.Unlock()
 	}
 
 	return resp, nil
