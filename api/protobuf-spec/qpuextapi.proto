@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package qpuextapi;
+option java_multiple_files = true;
+option java_package = "io.grpc.proteusclient";
+option java_outer_classname = "QPUProto";
+option go_package = "github.com/dvasilas/proteus/internal/proto/qpuextapi";
+
+// import "utils.proto";
+import "google/protobuf/timestamp.proto";
+
+service QPUAPI {
+  rpc QueryUnary(QueryReq) returns (QueryResp) {}
+  rpc GetMetrics(MetricsRequest) returns (MetricsResponse) {}
+
+  rpc LobstersFrontpage(LobFrontpageReq) returns (LobFrontpageResp) {}
+  rpc LobstersStoryVote(LobStoryVoteReq) returns (LobStoryVoteResp) {}
+  rpc LobstersStoryVoteInsert(LobStoryVoteReq) returns (LobStoryVoteResp) {}
+}
+
+message QueryReq {
+  string queryStr = 1;
+}
+
+message QueryResp {
+  repeated QueryRespRecord respRecord = 1;
+}
+
+message QueryRespRecord {
+  string record_id = 1;
+  map<string, string> attributes = 2;
+  map<string, google.protobuf.Timestamp> timestamp = 3;
+}
+
+message MetricsRequest {}
+
+message MetricsResponse {
+  double notificationLatencyP50 = 1;
+  double notificationLatencyP90 = 2;
+  double notificationLatencyP95 = 3;
+  double notificationLatencyP99 = 4;
+  double processingLatencyP50 = 5;
+  double processingLatencyP90 = 6;
+  double processingLatencyP95 = 7;
+  double processingLatencyP99 = 8;
+  double freshnessLatencyP50 = 9;
+  double freshnessLatencyP90 = 10;
+  double freshnessLatencyP95 = 11;
+  double freshnessLatencyP99 = 12;
+  double freshnessVersions0 = 13;
+  double freshnessVersions1 = 14;
+  double freshnessVersions2 = 15;
+  double freshnessVersions4 = 16;
+  double stateUpdateLatencyP50 = 17;
+  double stateUpdateLatencyP90 = 18;
+  double stateUpdateLatencyP95 = 19;
+  double stateUpdateLatencyP99 = 20;
+  double kBytesSent = 21;
+  double responseTimeP50 = 22;
+  double responseTimeP90 = 23;
+  double responseTimeP95 = 24;
+  double responseTimeP99 = 25;
+}
+
+message Story {
+  string title = 1;
+  string description = 2;
+  string shortID = 3;
+  int64 voteCount = 4;
+}
+
+message LobFrontpageReq {}
+
+message LobFrontpageResp {
+  repeated Story stories = 1;
+}
+
+message LobStoryVoteReq {
+  int64 storyID = 1;
+  int64 vote = 2;
+}
+
+message LobStoryVoteResp {}

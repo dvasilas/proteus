@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	"github.com/opentracing/opentracing-go"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 
 	//
 	_ "github.com/go-sql-driver/mysql"
@@ -121,7 +121,7 @@ func (q *LobQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 }
 
 // ClientQuery ...
-func (q *LobQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
+func (q *LobQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 
 	return nil, nil
 }
@@ -136,12 +136,12 @@ func (q *LobQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetConfig ...
-func (q *LobQPU) GetConfig() *qpu_api.ConfigResponse {
+func (q *LobQPU) GetConfig() *qpuapi.ConfigResponse {
 	return nil
 }
 
 // GetMetrics ...
-func (q *LobQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (q *LobQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	return nil, nil
 }
 

@@ -8,12 +8,12 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/xwb1989/sqlparser"
 )
 
 type sqlParseCtx struct {
-	proteusAST   *qpu_api.ASTQuery
+	proteusAST   *qpuapi.ASTQuery
 	walkStateStr []string
 	walkState    []sqlTreeNodeType
 	whereStack   []whereExpr
@@ -72,7 +72,7 @@ const (
 
 func createSQLParseCtx() *sqlParseCtx {
 	return &sqlParseCtx{
-		proteusAST:   &qpu_api.ASTQuery{},
+		proteusAST:   &qpuapi.ASTQuery{},
 		walkStateStr: make([]string, 0),
 		walkState:    make([]sqlTreeNodeType, 0),
 	}
@@ -233,12 +233,12 @@ func (ctx *sqlParseCtx) parseOrderBy(node sqlparser.SQLNode) error {
 
 		switch node.(type) {
 		case *sqlparser.Order:
-			ctx.proteusAST.OrderBy = &qpu_api.OrderBy{}
+			ctx.proteusAST.OrderBy = &qpuapi.OrderBy{}
 			switch node.(*sqlparser.Order).Direction {
 			case "desc":
-				ctx.proteusAST.OrderBy.Direction = qpu_api.OrderBy_DESC
+				ctx.proteusAST.OrderBy.Direction = qpuapi.OrderBy_DESC
 			case "asc":
-				ctx.proteusAST.OrderBy.Direction = qpu_api.OrderBy_ASC
+				ctx.proteusAST.OrderBy.Direction = qpuapi.OrderBy_ASC
 			default:
 				return false, errors.New("unknown value in orderBy:direction")
 			}

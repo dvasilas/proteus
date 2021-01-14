@@ -1,8 +1,12 @@
 syntax = "proto3";
 
-package pb;
-option go_package = "github.com/dvasilas/proteus/pkg/proteus-go-client/pb";
+package qpuapi;
+option java_multiple_files = true;
+option java_package = "io.grpc.proteusclient";
+option java_outer_classname = "QPUProto";
+option go_package = "github.com/dvasilas/proteus/internal/proto/qpuapi";
 
+// import "utils.proto";
 import "google/protobuf/timestamp.proto";
 
 service QPUAPI {

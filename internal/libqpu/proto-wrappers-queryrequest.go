@@ -1,14 +1,14 @@
 package libqpu
 
 import (
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 )
 
 // ---------------- QueryReq -------------------
 
 // QueryRequest ...
 type QueryRequest struct {
-	Req *qpu_api.QueryRequest
+	Req *qpuapi.QueryRequest
 }
 
 // QueryType ...
@@ -24,9 +24,9 @@ const (
 )
 
 // NewQueryRequest ...
-func NewQueryRequest(query *qpu_api.Query, md map[string]string, sync, measureDataTransfer bool) QueryRequest {
+func NewQueryRequest(query *qpuapi.Query, md map[string]string, sync, measureDataTransfer bool) QueryRequest {
 	return QueryRequest{
-		Req: &qpu_api.QueryRequest{
+		Req: &qpuapi.QueryRequest{
 			Query:               query,
 			Metadata:            md,
 			Sync:                sync,
@@ -38,9 +38,9 @@ func NewQueryRequest(query *qpu_api.Query, md map[string]string, sync, measureDa
 // QueryType ...
 func (r QueryRequest) QueryType() QueryType {
 	switch r.Req.GetQuery().GetQuery().(type) {
-	case *qpu_api.Query_QueryAst:
+	case *qpuapi.Query_QueryAst:
 		return ASTQueryT
-	case *qpu_api.Query_QuerySql:
+	case *qpuapi.Query_QuerySql:
 		return SQLQueryT
 	default:
 		return UnknownQueryT

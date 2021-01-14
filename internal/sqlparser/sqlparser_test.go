@@ -6,7 +6,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,11 +17,11 @@ func TestMain(m *testing.M) {
 
 var filterTests = []struct {
 	querySQL       string
-	expectedQueryI *qpu_api.ASTQuery
+	expectedQueryI *qpuapi.ASTQuery
 }{
 	{
 		"select * from t where x = 42",
-		&qpu_api.ASTQuery{
+		&qpuapi.ASTQuery{
 			Projection: []string{"*"},
 			Table:      "t",
 			Predicate: []*qpu.AttributePredicate{
@@ -40,12 +40,12 @@ var filterTests = []struct {
 	},
 	{
 		"SELECT title, description, short_id, user_id, vote_sum FROM qpu ORDER BY vote_sum DESC LIMIT 5",
-		&qpu_api.ASTQuery{
+		&qpuapi.ASTQuery{
 			Projection: []string{"title", "description", "short_id", "user_id", "vote_sum"},
 			Table:      "qpu",
-			OrderBy: &qpu_api.OrderBy{
+			OrderBy: &qpuapi.OrderBy{
 				AttributeName: "vote_sum",
-				Direction:     qpu_api.OrderBy_DESC,
+				Direction:     qpuapi.OrderBy_DESC,
 			},
 			Limit: int64(5),
 			TsPredicate: libqpu.SnapshotTimePredicate(

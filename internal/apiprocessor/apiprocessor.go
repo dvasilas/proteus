@@ -10,7 +10,8 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/metrics"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	datastoredriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
 	lobsters "github.com/dvasilas/proteus/internal/qpu_classes/lobsters"
@@ -18,7 +19,6 @@ import (
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/dvasilas/proteus/internal/sqlparser"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/golang/protobuf/proto"
 	"github.com/opentracing/opentracing-go"
 )
@@ -208,7 +208,7 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 }
 
 // QueryUnary ...
-func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*pb.QueryResp, error) {
+func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	astQuery, found := s.sqlCache.get(req.GetSQLStr())
 	if !found {
 		var err error
@@ -233,12 +233,12 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
-func (s *APIProcessor) GetConfig(ctx context.Context, in *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
+func (s *APIProcessor) GetConfig(ctx context.Context, in *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error) {
 	return s.qpuClass.GetConfig(), nil
 }
 
 // GetMetrics ...
-func (s *APIProcessor) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (s *APIProcessor) GetMetrics(ctx context.Context, req *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	resp, err := s.qpuClass.GetMetrics(req)
 	if err != nil {
 		return nil, err
@@ -310,7 +310,7 @@ func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool) {
 	return ast, found
 }
 
-func getQueryRespSize(resp *pb.QueryResp) (int64, error) {
+func getQueryRespSize(resp *qpuextapi.QueryResp) (int64, error) {
 	buff, err := proto.Marshal(resp)
 	if err != nil {
 		return -1, err

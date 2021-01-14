@@ -7,7 +7,7 @@ import (
 	"github.com/dvasilas/proteus/internal/apiclient"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 )
 
 // This package is responsible for the QPU's outgoing communications with the
@@ -64,7 +64,7 @@ func ConnectToGraph(qpu *libqpu.QPU) error {
 // and an adjacent QPU (libqpu.AdjacentQPU struct), send a request with the
 // given query to the given QPU, and returns a response stream handler
 // (libqpu.ResponseStream struct) for receiving response records.
-func SendQuery(query *qpu_api.Query, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
+func SendQuery(query *qpuapi.Query, to *libqpu.AdjacentQPU) (libqpu.ResponseStream, error) {
 	return to.APIClient.Query(
 		libqpu.NewQueryRequest(query, nil, false, to.MeasureDataTransfer),
 	)
