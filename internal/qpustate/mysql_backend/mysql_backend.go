@@ -10,7 +10,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	ptypes "github.com/golang/protobuf/ptypes"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
@@ -457,7 +457,7 @@ func (s *MySQLStateBackend) Cleanup() {
 // }
 
 // LobstersFrontpage ...
-func (s *MySQLStateBackend) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
+func (s *MySQLStateBackend) LobstersFrontpage() (*qpuextapi.LobFrontpageResp, error) {
 	queryStr := fmt.Sprintf("SELECT title, description, short_id, user_id, vote_sum FROM stories ORDER BY vote_sum DESC LIMIT %d", 5)
 
 	rows, err := s.db.Query(queryStr)
@@ -504,8 +504,8 @@ func (s *MySQLStateBackend) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
 		result = append(result, row)
 	}
 
-	resp := pb.LobFrontpageResp{
-		Stories: make([]*pb.Story, len(result)),
+	resp := qpuextapi.LobFrontpageResp{
+		Stories: make([]*qpuextapi.Story, len(result)),
 	}
 
 	for i, entry := range result {
@@ -515,7 +515,7 @@ func (s *MySQLStateBackend) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
 			return nil, err
 		}
 
-		story := &pb.Story{
+		story := &qpuextapi.Story{
 			Title:       entry["title"].(string),
 			Description: entry["description"].(string),
 			ShortID:     entry["short_id"].(string),
@@ -528,7 +528,7 @@ func (s *MySQLStateBackend) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
 }
 
 // LobstersStoryVote ...
-func (s *MySQLStateBackend) LobstersStoryVote(req *pb.LobStoryVoteReq) error {
+func (s *MySQLStateBackend) LobstersStoryVote(req *qpuextapi.LobStoryVoteReq) error {
 
 	storyID := req.GetStoryID()
 	vote := req.GetVote()
@@ -567,7 +567,7 @@ func (s *MySQLStateBackend) LobstersStoryVote(req *pb.LobStoryVoteReq) error {
 }
 
 // LobstersStoryVoteInsert ...
-func (s *MySQLStateBackend) LobstersStoryVoteInsert(req *pb.LobStoryVoteReq) error {
+func (s *MySQLStateBackend) LobstersStoryVoteInsert(req *qpuextapi.LobStoryVoteReq) error {
 	storyID := req.GetStoryID()
 	vote := req.GetVote()
 	userID := 1

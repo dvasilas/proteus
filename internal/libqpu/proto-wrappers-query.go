@@ -2,43 +2,43 @@ package libqpu
 
 import (
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 )
 
 // ---------------- ASTQuery -------------------
 
 // ASTQuery ...
 type ASTQuery struct {
-	Q *qpu_api.ASTQuery
+	Q *qpuapi.ASTQuery
 }
 
 // NewQuery ...
-func NewQuery(qSQL *qpu_api.SQLQuery, qAST *qpu_api.ASTQuery) *qpu_api.Query {
+func NewQuery(qSQL *qpuapi.SQLQuery, qAST *qpuapi.ASTQuery) *qpuapi.Query {
 	if qAST == nil {
-		return &qpu_api.Query{
-			Query: &qpu_api.Query_QuerySql{
+		return &qpuapi.Query{
+			Query: &qpuapi.Query_QuerySql{
 				QuerySql: qSQL,
 			},
 		}
 	}
 
-	return &qpu_api.Query{
-		Query: &qpu_api.Query_QueryAst{
+	return &qpuapi.Query{
+		Query: &qpuapi.Query_QueryAst{
 			QueryAst: qAST,
 		},
 	}
 }
 
 // NewSQLQuery ...
-func NewSQLQuery(query string) *qpu_api.SQLQuery {
-	return &qpu_api.SQLQuery{
+func NewSQLQuery(query string) *qpuapi.SQLQuery {
+	return &qpuapi.SQLQuery{
 		QueryStr: query,
 	}
 }
 
 // NewASTQuery ...
-func NewASTQuery(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpu_api.ASTQuery {
-	return &qpu_api.ASTQuery{
+func NewASTQuery(table string, ts *qpu.SnapshotTimePredicate, predicate []*qpu.AttributePredicate, projection []string, limit int64) *qpuapi.ASTQuery {
+	return &qpuapi.ASTQuery{
 		Table:       table,
 		Projection:  projection,
 		Predicate:   predicate,
@@ -87,6 +87,6 @@ func (q ASTQuery) GetLimit() int64 {
 }
 
 // GetOrderBy ...
-func (q ASTQuery) GetOrderBy() *qpu_api.OrderBy {
+func (q ASTQuery) GetOrderBy() *qpuapi.OrderBy {
 	return q.Q.GetOrderBy()
 }

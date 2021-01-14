@@ -14,9 +14,9 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/metrics"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -59,7 +59,7 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 	server.dispatcher.Run()
 
 	for _, s := range grpcServers {
-		qpu_api.RegisterQPUAPIServer(s.Server, &server)
+		qpuapi.RegisterQPUAPIServer(s.Server, &server)
 		reflection.Register(s.Server)
 	}
 
@@ -96,7 +96,7 @@ func (s *Server) Serve() error {
 }
 
 // Query implements the QPU's low level Query API.
-func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
+func (s *Server) Query(stream qpuapi.QPUAPI_QueryServer) error {
 	requestRecord, err := stream.Recv()
 	if err == io.EOF {
 		return utils.Error(errors.New("Query:stream.Recv EOF"))
@@ -106,7 +106,7 @@ func (s *Server) Query(stream qpu_api.QPUAPI_QueryServer) error {
 	}
 
 	switch requestRecord.GetRequest().(type) {
-	case *qpu_api.RequestStreamRecord_QueryRequest:
+	case *qpuapi.RequestStreamRecord_QueryRequest:
 		return s.api.Query(
 			libqpu.QueryRequest{Req: requestRecord.GetQueryRequest()},
 			libqpu.RequestStream{Stream: stream},
@@ -139,12 +139,12 @@ func (j *Job) do(ctx context.Context, s *Server, req libqpu.QueryRequest) {
 }
 
 type jobResult struct {
-	response *pb.QueryResp
+	response *qpuextapi.QueryResp
 	err      error
 }
 
 // QueryUnary ...
-func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryResp, error) {
+func (s *Server) QueryUnary(ctx context.Context, req *qpuextapi.QueryReq) (*qpuextapi.QueryResp, error) {
 	t0 := time.Now()
 
 	work := &Job{
@@ -171,17 +171,17 @@ func (s *Server) QueryUnary(ctx context.Context, req *pb.QueryReq) (*pb.QueryRes
 }
 
 // GetConfig implements the QPU's low level GetConfig API.
-func (s *Server) GetConfig(ctx context.Context, req *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error) {
+func (s *Server) GetConfig(ctx context.Context, req *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error) {
 	return s.api.GetConfig(ctx, req)
 }
 
 // GetDataTransfer implements the QPU's low level GetDataTransfer API.
-// func (s *Server) GetDataTransfer(ctx context.Context, in *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error) {
+// func (s *Server) GetDataTransfer(ctx context.Context, in *qpuapi.GetDataRequest) (*qpuapi.DataTransferResponse, error) {
 // 	return s.api.GetDataTransfer(ctx, in)
 // }
 
 // GetMetrics ...
-func (s *Server) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (s *Server) GetMetrics(ctx context.Context, req *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	metrics, err := s.api.GetMetrics(ctx, req)
 
 	var RT50, RT90, RT95, RT99 float64
@@ -196,7 +196,7 @@ func (s *Server) GetMetrics(ctx context.Context, req *pb.MetricsRequest) (*pb.Me
 }
 
 // LobstersFrontpage ...
-func (s *Server) LobstersFrontpage(ctx context.Context, req *pb.LobFrontpageReq) (*pb.LobFrontpageResp, error) {
+func (s *Server) LobstersFrontpage(ctx context.Context, req *qpuextapi.LobFrontpageReq) (*qpuextapi.LobFrontpageResp, error) {
 	work := &JobFrontPage{
 		server: s,
 		ctx:    ctx,
@@ -212,7 +212,7 @@ func (s *Server) LobstersFrontpage(ctx context.Context, req *pb.LobFrontpageReq)
 }
 
 // LobstersStoryVote ...
-func (s *Server) LobstersStoryVote(ctx context.Context, req *pb.LobStoryVoteReq) (*pb.LobStoryVoteResp, error) {
+func (s *Server) LobstersStoryVote(ctx context.Context, req *qpuextapi.LobStoryVoteReq) (*qpuextapi.LobStoryVoteResp, error) {
 	work := &JobStoryVote{
 		server: s,
 		ctx:    ctx,
@@ -225,11 +225,11 @@ func (s *Server) LobstersStoryVote(ctx context.Context, req *pb.LobStoryVoteReq)
 
 	<-work.done
 
-	return &pb.LobStoryVoteResp{}, work.result.err
+	return &qpuextapi.LobStoryVoteResp{}, work.result.err
 }
 
 // LobstersStoryVoteInsert ...
-func (s *Server) LobstersStoryVoteInsert(ctx context.Context, req *pb.LobStoryVoteReq) (*pb.LobStoryVoteResp, error) {
+func (s *Server) LobstersStoryVoteInsert(ctx context.Context, req *qpuextapi.LobStoryVoteReq) (*qpuextapi.LobStoryVoteResp, error) {
 	work := &JobStoryVoteInsert{
 		server: s,
 		ctx:    ctx,
@@ -242,7 +242,7 @@ func (s *Server) LobstersStoryVoteInsert(ctx context.Context, req *pb.LobStoryVo
 
 	<-work.done
 
-	return &pb.LobStoryVoteResp{}, work.result.err
+	return &qpuextapi.LobStoryVoteResp{}, work.result.err
 }
 
 // JobFrontPage ...
@@ -268,7 +268,7 @@ func (j *JobFrontPage) do(ctx context.Context, s *Server) {
 
 // JobFrontPageResult ...
 type JobFrontPageResult struct {
-	response *pb.LobFrontpageResp
+	response *qpuextapi.LobFrontpageResp
 	err      error
 }
 
@@ -276,7 +276,7 @@ type JobFrontPageResult struct {
 type JobStoryVote struct {
 	server *Server
 	ctx    context.Context
-	req    *pb.LobStoryVoteReq
+	req    *qpuextapi.LobStoryVoteReq
 	result *JobStoryVoteResult
 	done   chan bool
 }
@@ -301,7 +301,7 @@ type JobStoryVoteResult struct {
 type JobStoryVoteInsert struct {
 	server *Server
 	ctx    context.Context
-	req    *pb.LobStoryVoteReq
+	req    *qpuextapi.LobStoryVoteReq
 	result *JobStoryVoteInsertResult
 	done   chan bool
 }

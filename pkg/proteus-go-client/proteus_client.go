@@ -7,9 +7,9 @@ import (
 	//"runtime/debug"
 	"strconv"
 
+	qpuextapi "github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	"github.com/dvasilas/proteus/internal/tracer"
 	connpool "github.com/dvasilas/proteus/pkg/proteus-go-client/connection_pool"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -53,13 +53,13 @@ func (c *Client) Close() error {
 }
 
 // Query ...
-func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
+func (c *Client) Query(queryStmt string) (*qpuextapi.QueryResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	r := &pb.QueryReq{
+	r := &qpuextapi.QueryReq{
 		QueryStr: queryStmt,
 	}
 
@@ -68,10 +68,10 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 
 	resp, err := client.Cli.QueryUnary(ctx, r)
 
-//	if err != nil {
-//		fmt.Println(err)
-//		debug.PrintStack()
-//	}
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		debug.PrintStack()
+	//	}
 
 	c.pool.Return(client)
 
@@ -79,13 +79,13 @@ func (c *Client) Query(queryStmt string) (*pb.QueryResp, error) {
 }
 
 // GetMetrics ...
-func (c *Client) GetMetrics() (*pb.MetricsResponse, error) {
+func (c *Client) GetMetrics() (*qpuextapi.MetricsResponse, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	r := &pb.MetricsRequest{}
+	r := &qpuextapi.MetricsRequest{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -98,13 +98,13 @@ func (c *Client) GetMetrics() (*pb.MetricsResponse, error) {
 }
 
 // LobstersFrontpage ...
-func (c *Client) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
+func (c *Client) LobstersFrontpage() (*qpuextapi.LobFrontpageResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	r := &pb.LobFrontpageReq{}
+	r := &qpuextapi.LobFrontpageReq{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -117,13 +117,13 @@ func (c *Client) LobstersFrontpage() (*pb.LobFrontpageResp, error) {
 }
 
 // LobstersStoryVote ...
-func (c *Client) LobstersStoryVote(storyID int64, vote int) (*pb.LobStoryVoteResp, error) {
+func (c *Client) LobstersStoryVote(storyID int64, vote int) (*qpuextapi.LobStoryVoteResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	r := &pb.LobStoryVoteReq{
+	r := &qpuextapi.LobStoryVoteReq{
 		StoryID: storyID,
 		Vote:    int64(vote),
 	}
@@ -139,13 +139,13 @@ func (c *Client) LobstersStoryVote(storyID int64, vote int) (*pb.LobStoryVoteRes
 }
 
 // LobstersStoryVoteInsert ...
-func (c *Client) LobstersStoryVoteInsert(storyID int64, vote int) (*pb.LobStoryVoteResp, error) {
+func (c *Client) LobstersStoryVoteInsert(storyID int64, vote int) (*qpuextapi.LobStoryVoteResp, error) {
 	client, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	r := &pb.LobStoryVoteReq{
+	r := &qpuextapi.LobStoryVoteReq{
 		StoryID: storyID,
 		Vote:    int64(vote),
 	}

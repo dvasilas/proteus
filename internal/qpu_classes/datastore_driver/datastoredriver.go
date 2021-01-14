@@ -4,14 +4,15 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -152,8 +153,17 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 }
 
 // ClientQuery ...
-func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
-	return nil, nil
+func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+	fmt.Println("ClientQuery", query)
+
+	respRecords := make([]*qpuextapi.QueryRespRecord, 0)
+	respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
+		RecordId: "test",
+	})
+
+	return &qpuextapi.QueryResp{
+		RespRecord: respRecords,
+	}, nil
 }
 
 // RemovePersistentQuery ...
@@ -166,22 +176,22 @@ func (q *DsDriverQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetConfig ...
-func (q *DsDriverQPU) GetConfig() *qpu_api.ConfigResponse {
+func (q *DsDriverQPU) GetConfig() *qpuapi.ConfigResponse {
 	schemaTables := make([]string, len(q.inputSchema))
 	i := 0
 	for table := range q.inputSchema {
 		schemaTables[i] = table
 		i++
 	}
-	return &qpu_api.ConfigResponse{
+	return &qpuapi.ConfigResponse{
 		Schema: schemaTables,
 	}
 }
 
 // GetMetrics ...
-func (q *DsDriverQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (q *DsDriverQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	p50, p90, p95, p99 := q.datastore.GetNotificationLanency()
-	return &pb.MetricsResponse{
+	return &qpuextapi.MetricsResponse{
 		NotificationLatencyP50: p50,
 		NotificationLatencyP90: p90,
 		NotificationLatencyP95: p95,

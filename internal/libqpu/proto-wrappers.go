@@ -7,7 +7,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 )
 
@@ -87,7 +87,7 @@ func (op LogOperation) IsDelta() bool {
 
 // ResponseStream ...
 type ResponseStream struct {
-	Stream     qpu_api.QPUAPI_QueryClient
+	Stream     qpuapi.QPUAPI_QueryClient
 	CancelFunc context.CancelFunc
 }
 
@@ -108,25 +108,25 @@ func (str ResponseStream) Cancel() {
 
 // RequestStream ...
 type RequestStream struct {
-	Stream qpu_api.QPUAPI_QueryServer
+	Stream qpuapi.QPUAPI_QueryServer
 }
 
 // Send ...
 func (s RequestStream) Send(seqID int64, recordType ResponseRecordType, logOp LogOperation) error {
-	var recType qpu_api.ResponseStreamRecord_StreamRecordType
+	var recType qpuapi.ResponseStreamRecord_StreamRecordType
 	switch recordType {
 	case Delta:
-		recType = qpu_api.ResponseStreamRecord_UPDATEDELTA
+		recType = qpuapi.ResponseStreamRecord_UPDATEDELTA
 	case EndOfStream:
-		recType = qpu_api.ResponseStreamRecord_END_OF_STREAM
+		recType = qpuapi.ResponseStreamRecord_END_OF_STREAM
 	case State:
-		recType = qpu_api.ResponseStreamRecord_STATE
+		recType = qpuapi.ResponseStreamRecord_STATE
 	default:
 		return utils.Error(errors.New("Unknown StreamRecordType"))
 	}
 
 	return s.Stream.Send(
-		&qpu_api.ResponseStreamRecord{
+		&qpuapi.ResponseStreamRecord{
 			SequenceId: seqID,
 			Type:       recType,
 			LogOp:      logOp.Op,
@@ -150,7 +150,7 @@ const (
 
 // ResponseRecord ...
 type ResponseRecord struct {
-	Rec  *qpu_api.ResponseStreamRecord
+	Rec  *qpuapi.ResponseStreamRecord
 	InTs time.Time
 }
 
@@ -168,11 +168,11 @@ func (r ResponseRecord) GetAttributes() map[string]*qpu.Value {
 // GetType ...
 func (r ResponseRecord) GetType() (ResponseRecordType, error) {
 	switch r.Rec.GetType() {
-	case qpu_api.ResponseStreamRecord_STATE:
+	case qpuapi.ResponseStreamRecord_STATE:
 		return State, nil
-	case qpu_api.ResponseStreamRecord_UPDATEDELTA:
+	case qpuapi.ResponseStreamRecord_UPDATEDELTA:
 		return Delta, nil
-	case qpu_api.ResponseStreamRecord_END_OF_STREAM:
+	case qpuapi.ResponseStreamRecord_END_OF_STREAM:
 		return EndOfStream, nil
 	default:
 		return 0, utils.Error(errors.New("unknown ResponseStreamRecord type"))
@@ -185,8 +185,8 @@ func (r ResponseRecord) GetRecordID() string {
 }
 
 // ResponseStreamRecord ...
-func ResponseStreamRecord(seqID int64, t qpu_api.ResponseStreamRecord_StreamRecordType, logOp *qpu.LogOperation) *qpu_api.ResponseStreamRecord {
-	return &qpu_api.ResponseStreamRecord{
+func ResponseStreamRecord(seqID int64, t qpuapi.ResponseStreamRecord_StreamRecordType, logOp *qpu.LogOperation) *qpuapi.ResponseStreamRecord {
+	return &qpuapi.ResponseStreamRecord{
 		SequenceId: seqID,
 		Type:       t,
 		LogOp:      logOp,
@@ -209,10 +209,10 @@ func Attribute(key string, val *qpu.Value) *qpu.Attribute {
 }
 
 //RequestStreamRequest creates a protos/qpu/RequestStream{Request} object
-func RequestStreamRequest(query *qpu_api.Query, metadata map[string]string, sync bool) *qpu_api.RequestStreamRecord {
-	return &qpu_api.RequestStreamRecord{
-		Request: &qpu_api.RequestStreamRecord_QueryRequest{
-			QueryRequest: &qpu_api.QueryRequest{
+func RequestStreamRequest(query *qpuapi.Query, metadata map[string]string, sync bool) *qpuapi.RequestStreamRecord {
+	return &qpuapi.RequestStreamRecord{
+		Request: &qpuapi.RequestStreamRecord_QueryRequest{
+			QueryRequest: &qpuapi.QueryRequest{
 				Query:    query,
 				Metadata: metadata,
 				Sync:     sync,
@@ -222,10 +222,10 @@ func RequestStreamRequest(query *qpu_api.Query, metadata map[string]string, sync
 }
 
 //RequestStreamAck creates a protos/qpu/RequestStream{Ack} object
-func RequestStreamAck(sID int64) *qpu_api.RequestStreamRecord {
-	return &qpu_api.RequestStreamRecord{
-		Request: &qpu_api.RequestStreamRecord_Ack{
-			Ack: &qpu_api.AckMsg{
+func RequestStreamAck(sID int64) *qpuapi.RequestStreamRecord {
+	return &qpuapi.RequestStreamRecord{
+		Request: &qpuapi.RequestStreamRecord_Ack{
+			Ack: &qpuapi.AckMsg{
 				SequenceId: sID,
 			},
 		},
@@ -233,8 +233,8 @@ func RequestStreamAck(sID int64) *qpu_api.RequestStreamRecord {
 }
 
 //ConfigRequest creates a protos/qpu/ConfigRequest object
-func ConfigRequest() *qpu_api.ConfigRequest {
-	return &qpu_api.ConfigRequest{}
+func ConfigRequest() *qpuapi.ConfigRequest {
+	return &qpuapi.ConfigRequest{}
 }
 
 //AttributePredicate create a protos/utils/AttributePredicate object

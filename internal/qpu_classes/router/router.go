@@ -6,12 +6,12 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
 	"github.com/opentracing/opentracing-go"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 )
 
 // RouterQPU ...
@@ -44,7 +44,7 @@ func (q *RouterQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]st
 }
 
 // ClientQuery ...
-func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
+func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	var forwardTo *libqpu.AdjacentQPU
 	found := false
 	for _, adjQPU := range q.adjacentQPUs {
@@ -73,7 +73,7 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 		}
 	}()
 
-	respRecords := make([]*pb.QueryRespRecord, 0)
+	respRecords := make([]*qpuextapi.QueryRespRecord, 0)
 
 	for record := range respCh {
 		attributes := make(map[string]string)
@@ -85,14 +85,14 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Sp
 			attributes[k] = valStr
 		}
 
-		respRecords = append(respRecords, &pb.QueryRespRecord{
+		respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
 			RecordId:   record.GetRecordID(),
 			Attributes: attributes,
 			Timestamp:  record.GetLogOp().GetTimestamp().GetVc(),
 		})
 	}
 
-	return &pb.QueryResp{
+	return &qpuextapi.QueryResp{
 		RespRecord: respRecords,
 	}, nil
 }
@@ -107,7 +107,7 @@ func (q *RouterQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetMetrics ...
-func (q *RouterQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (q *RouterQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	return nil, nil
 }
 
@@ -129,6 +129,6 @@ func (q *RouterQPU) processRespRecord(respRecord libqpu.ResponseRecord, data int
 }
 
 // GetConfig ...
-func (q RouterQPU) GetConfig() *qpu_api.ConfigResponse {
-	return &qpu_api.ConfigResponse{}
+func (q RouterQPU) GetConfig() *qpuapi.ConfigResponse {
+	return &qpuapi.ConfigResponse{}
 }

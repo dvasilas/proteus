@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"google.golang.org/grpc"
 )
 
@@ -14,7 +14,7 @@ import (
 
 // QPUAPIClient represents a connection to an adjacent QPU
 type QPUAPIClient struct {
-	cli  qpu_api.QPUAPIClient
+	cli  qpuapi.QPUAPIClient
 	conn *grpc.ClientConn
 }
 
@@ -26,7 +26,7 @@ func NewClient(address string) (QPUAPIClient, error) {
 		return QPUAPIClient{}, err
 	}
 	return QPUAPIClient{
-		cli:  qpu_api.NewQPUAPIClient(conn),
+		cli:  qpuapi.NewQPUAPIClient(conn),
 		conn: conn,
 	}, nil
 }
@@ -41,8 +41,8 @@ func (c QPUAPIClient) Query(queryReq libqpu.QueryRequest) (libqpu.ResponseStream
 		return libqpu.ResponseStream{}, nil
 	}
 	err = stream.Send(
-		&qpu_api.RequestStreamRecord{
-			Request: &qpu_api.RequestStreamRecord_QueryRequest{
+		&qpuapi.RequestStreamRecord{
+			Request: &qpuapi.RequestStreamRecord_QueryRequest{
 				QueryRequest: queryReq.Req,
 			},
 		},
@@ -75,28 +75,28 @@ func (c QPUAPIClient) QuerySQL(query string, metadata map[string]string, sync bo
 }
 
 // QueryUnary ...
-func (c QPUAPIClient) QueryUnary(req libqpu.QueryRequest) (*qpu_api.QueryResponse, error) {
+func (c QPUAPIClient) QueryUnary(req libqpu.QueryRequest) (*qpuapi.QueryResponse, error) {
 	// ctx := context.TODO()
 	// resp, err := c.cli.QueryUnary(ctx, req.Req)
 	return nil, nil
 }
 
 // GetConfig implements the QPU's API GetConfig method.
-func (c QPUAPIClient) GetConfig() (*qpu_api.ConfigResponse, error) {
+func (c QPUAPIClient) GetConfig() (*qpuapi.ConfigResponse, error) {
 	ctx := context.TODO()
 	resp, err := c.cli.GetConfig(ctx, libqpu.ConfigRequest())
 	return resp, err
 }
 
 // GetDataTransfer implements the QPU's API GetDataTransfer method.
-// func (c QPUAPIClient) GetDataTransfer() (*qpu_api.DataTransferResponse, error) {
+// func (c QPUAPIClient) GetDataTransfer() (*qpuapi.DataTransferResponse, error) {
 // 	ctx := context.TODO()
-// 	resp, err := c.cli.GetDataTransfer(ctx, &qpu_api.GetDataRequest{})
+// 	resp, err := c.cli.GetDataTransfer(ctx, &qpuapi.GetDataRequest{})
 // 	return resp, err
 // }
 
 // Forward implements the QPU's API Forward method.
-func (c *QPUAPIClient) Forward() (qpu_api.QPUAPI_QueryClient, context.CancelFunc, error) {
+func (c *QPUAPIClient) Forward() (qpuapi.QPUAPI_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := c.cli.Query(ctx)
 	if err != nil {

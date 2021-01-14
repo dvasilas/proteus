@@ -11,16 +11,16 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/metrics"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpu"
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/golang/protobuf/ptypes"
-	tspb "github.com/golang/protobuf/ptypes/timestamp"
 
 	//
 	_ "github.com/go-sql-driver/mysql"
@@ -195,8 +195,8 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 }
 
 // ClientQuery ...
-func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*pb.QueryResp, error) {
-	var respRecords []*pb.QueryRespRecord
+func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+	var respRecords []*qpuextapi.QueryRespRecord
 
 	// prepare the state.Get predicate
 	var predicate []string
@@ -223,7 +223,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		return nil, err
 	}
 
-	respRecords = make([]*pb.QueryRespRecord, query.GetLimit())
+	respRecords = make([]*qpuextapi.QueryRespRecord, query.GetLimit())
 	i := 0
 	for record := range stateCh {
 		// process timestamp
@@ -245,7 +245,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 			attribs[k] = v.(string)
 		}
 
-		respRecords[i] = &pb.QueryRespRecord{
+		respRecords[i] = &qpuextapi.QueryRespRecord{
 			RecordId:   string(attribs[q.joinAttributeKey]),
 			Attributes: attribs,
 			Timestamp:  map[string]*tspb.Timestamp{vectorClockKey: timestamp},
@@ -266,7 +266,7 @@ func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span
 		q.queryLog.entries = append(q.queryLog.entries, qLogEntry)
 	}
 
-	return &pb.QueryResp{
+	return &qpuextapi.QueryResp{
 		RespRecord: respRecords,
 	}, nil
 }
@@ -281,14 +281,14 @@ func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
 // GetConfig ...
-func (q *JoinQPU) GetConfig() *qpu_api.ConfigResponse {
-	return &qpu_api.ConfigResponse{
+func (q *JoinQPU) GetConfig() *qpuapi.ConfigResponse {
+	return &qpuapi.ConfigResponse{
 		Schema: []string{q.stateTable},
 	}
 }
 
 // GetMetrics ...
-func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
+func (q *JoinQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
 	var err error
 	var FL50, FL90, FL95, FL99 float64
 	var FV0, FV1, FV2, FV4 float64
@@ -314,7 +314,7 @@ func (q *JoinQPU) GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error) {
 		UL50, UL90, UL95, UL99 = q.stateUpdateM.GetMetrics()
 	}
 
-	return &pb.MetricsResponse{
+	return &qpuextapi.MetricsResponse{
 		NotificationLatencyP50: NL50,
 		NotificationLatencyP90: NL90,
 		NotificationLatencyP95: NL95,

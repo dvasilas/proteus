@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/dvasilas/proteus/internal/proto/qpu_api"
-	"github.com/dvasilas/proteus/pkg/proteus-go-client/pb"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opentracing/opentracing-go"
 )
@@ -29,20 +29,20 @@ type QPU struct {
 // APIProcessor ...
 type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
-	QueryUnary(QueryRequest, opentracing.Span) (*pb.QueryResp, error)
-	GetConfig(context.Context, *qpu_api.ConfigRequest) (*qpu_api.ConfigResponse, error)
-	GetMetrics(context.Context, *pb.MetricsRequest) (*pb.MetricsResponse, error)
-	// GetDataTransfer(context.Context, *qpu_api.GetDataRequest) (*qpu_api.DataTransferResponse, error)
+	QueryUnary(QueryRequest, opentracing.Span) (*qpuextapi.QueryResp, error)
+	GetConfig(context.Context, *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error)
+	GetMetrics(context.Context, *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
+	// GetDataTransfer(context.Context, *qpuapi.GetDataRequest) (*qpuapi.DataTransferResponse, error)
 }
 
 // QPUClass ...
 type QPUClass interface {
-	ClientQuery(ASTQuery, opentracing.Span) (*pb.QueryResp, error)
+	ClientQuery(ASTQuery, opentracing.Span) (*qpuextapi.QueryResp, error)
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
-	GetConfig() *qpu_api.ConfigResponse
-	GetMetrics(*pb.MetricsRequest) (*pb.MetricsResponse, error)
+	GetConfig() *qpuapi.ConfigResponse
+	GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
 }
 
 // AdjacentQPU ...
@@ -55,10 +55,10 @@ type AdjacentQPU struct {
 // APIClient ...
 type APIClient interface {
 	Query(QueryRequest) (ResponseStream, error)
-	QueryUnary(QueryRequest) (*qpu_api.QueryResponse, error)
+	QueryUnary(QueryRequest) (*qpuapi.QueryResponse, error)
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
 	CloseConnection() error
-	GetConfig() (*qpu_api.ConfigResponse, error)
+	GetConfig() (*qpuapi.ConfigResponse, error)
 }
 
 // QPUState ...
@@ -69,9 +69,9 @@ type QPUState interface {
 	Get(string, []string, []string, string, int64, opentracing.Span) (<-chan map[string]interface{}, error)
 	GetRow(string, []string, []string, opentracing.Span) *sql.Row
 	Cleanup()
-	LobstersFrontpage() (*pb.LobFrontpageResp, error)
-	LobstersStoryVote(*pb.LobStoryVoteReq) error
-	LobstersStoryVoteInsert(*pb.LobStoryVoteReq) error
+	LobstersFrontpage() (*qpuextapi.LobFrontpageResp, error)
+	LobstersStoryVote(*qpuextapi.LobStoryVoteReq) error
+	LobstersStoryVoteInsert(*qpuextapi.LobStoryVoteReq) error
 }
 
 // OperatorType ...
