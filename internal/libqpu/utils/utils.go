@@ -75,7 +75,7 @@ func ValueToStr(v *qpu.Value) (string, error) {
 // Compare ...
 func Compare(a, b *qpu.Value) (int, error) {
 	if valueType(a) != valueType(b) {
-		return 0, errors.New("cannot compare different types of Value")
+		return -1, nil
 	}
 	const TOLERANCE = 0.000001
 	switch a.GetVal().(type) {

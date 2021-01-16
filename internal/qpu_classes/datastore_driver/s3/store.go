@@ -1,21 +1,18 @@
 package s3driver
 
 import (
-	"bytes"
 	"context"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
@@ -37,6 +34,7 @@ type S3DataStore struct {
 	secretAccessKey      string
 	endpoint             string
 	subscriptionEndpoint string
+	s3                   *s3.S3
 
 	// subscriptionEndpoint string
 	// cli                  mysql.PublishUpdatesClient
@@ -95,6 +93,16 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (S3DataStor
 	if err != nil {
 		return S3DataStore{}, err
 	}
+	awsRegion := "us-east-1"
+	s3ForcePathStyle := true
+	awsConf := aws.Config{
+		Endpoint:         aws.String("http://127.0.0.1:8001"),
+		Region:           &awsRegion,
+		S3ForcePathStyle: &s3ForcePathStyle,
+		Credentials:      credentials.NewStaticCredentials("accessKey1", "verySecretKey1", ""),
+	}
+	sess := session.Must(session.NewSession(&awsConf))
+	svc := s3.New(sess)
 
 	s := S3DataStore{
 		inputSchema:          inputSchema,
@@ -104,83 +112,10 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (S3DataStor
 		secretAccessKey:      conf.DatastoreConfig.Credentials.SecretAccessKey,
 		endpoint:             conf.DatastoreConfig.Endpoint,
 		subscriptionEndpoint: conf.DatastoreConfig.LogStreamEndpoint,
+		s3:                   svc,
 	}
 
-	// err = errors.New("not tried yet")
-	// for err != nil {
-	// 	ctx, cancel := context.WithCancel(context.Background())
-	// 	_, err = s.cli.SubscribeNotifications(ctx)
-	// 	time.Sleep(2 * time.Second)
-	// 	cancel()
-	// 	fmt.Println("retying a test query", err)
-	// }
-
-	// s := S3DataStore{
-	// 	inputSchema:          inputSchema,
-	// 	conn:                 conn,
-	// 	accessKeyID:          conf.DatastoreConfig.Credentials.AccessKeyID,
-	// 	secretAccessKey:      conf.DatastoreConfig.Credentials.SecretAccessKey,
-	// 	endpoint:             conf.DatastoreConfig.Endpoint,
-	// 	subscriptionEndpoint: conf.DatastoreConfig.LogStreamEndpoint,
-	// }
-
 	return s, nil
-	// for {
-	// 	c, err := net.DialTimeout("tcp", conf.DatastoreConfig.Endpoint, time.Duration(time.Second))
-	// 	if err != nil {
-	// 		time.Sleep(2 * time.Second)
-	// 		fmt.Println("retying connecting to: ", conf.DatastoreConfig.Endpoint)
-	// 	} else {
-	// 		c.Close()
-	// 		break
-	// 	}
-	// }
-
-	// for {
-	// 	c, err := net.DialTimeout("tcp", conf.DatastoreConfig.LogStreamEndpoint, time.Duration(time.Second))
-	// 	if err != nil {
-	// 		time.Sleep(2 * time.Second)
-	// 		fmt.Println("retying connecting to: ", conf.DatastoreConfig.LogStreamEndpoint)
-	// 	} else {
-	// 		c.Close()
-	// 		break
-	// 	}
-	// }
-
-	// connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
-	// 	conf.DatastoreConfig.Credentials.AccessKeyID,
-	// 	conf.DatastoreConfig.Credentials.SecretAccessKey,
-	// 	conf.DatastoreConfig.Endpoint,
-	// 	conf.DatastoreConfig.DBName,
-	// )
-	// db, err := sql.Open("mysql", connStr)
-	// if err != nil {
-	// 	return MySQLDataStore{}, err
-	// }
-
-	// conn, err := grpc.Dial(conf.DatastoreConfig.LogStreamEndpoint, grpc.WithInsecure())
-	// if err != nil {
-	// 	return MySQLDataStore{}, err
-	// }
-
-	// s := MySQLDataStore{
-	// 	subscriptionEndpoint: conf.DatastoreConfig.LogStreamEndpoint,
-	// 	cli:                  mysql.NewPublishUpdatesClient(conn),
-	// 	inputSchema:          inputSchema,
-	// 	conn:                 conn,
-	// 	db:                   db,
-	// }
-
-	// err = errors.New("not tried yet")
-	// for err != nil {
-	// 	ctx, cancel := context.WithCancel(context.Background())
-	// 	_, err = s.cli.SubscribeToUpdates(ctx)
-	// 	time.Sleep(2 * time.Second)
-	// 	cancel()
-	// 	fmt.Println("retying a test query", err)
-	// }
-
-	// return s, nil
 }
 
 // SubscribeOps ...
@@ -202,24 +137,6 @@ func (ds S3DataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation, co
 		return logOpCh, nil, errCh
 	}
 
-	// err = stream.Send(
-	// 	&mysql.Request{
-	// 		Val: &mysql.Request_Request{
-	// 			Request: &mysql.SubRequest{
-	// 				// Timestamp: 0,
-	// 				Sync:  false,
-	// 				Table: table,
-	// 			},
-	// 		},
-	// 	},
-	// )
-
-	// if err != nil {
-	// 	errCh <- utils.Error(err)
-	// 	cancel()
-	// 	return logOpCh, nil, errCh
-	// }
-
 	go ds.opConsumer(stream, logOpCh, errCh)
 
 	return logOpCh, cancel, errCh
@@ -230,133 +147,54 @@ func (ds S3DataStore) GetSnapshot(table string, projection, isNull, isNotNull []
 	logOpCh := make(chan libqpu.LogOperation)
 	errCh := make(chan error)
 
-	// prepare request url
-	requestURL := fmt.Sprintf("%s/%s", ds.endpoint, table)
+	listObjectsIn := s3.ListObjectsV2Input{
+		Bucket: aws.String(table),
+	}
 
-	// buffer to store response in
-	listBuff := bytes.NewBuffer([]byte{})
-
-	// prepare http request
-	request, err := http.NewRequest("GET", requestURL, listBuff)
+	listObjectsRes, err := ds.s3.ListObjectsV2(&listObjectsIn)
 	if err != nil {
 		errCh <- utils.Error(err)
 		return logOpCh, errCh
 	}
-
-	// reader for reading response
-	reader := bytes.NewReader(listBuff.Bytes())
-
-	// connection credentials
-	credentials := credentials.NewStaticCredentials(ds.accessKeyID, ds.secretAccessKey, "")
-	signer := v4.NewSigner(credentials)
-	signer.Sign(request, reader, "s3", "us-east-1", time.Now())
-
-	// send request
-	client := &http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		resp.Body.Close()
-		errCh <- utils.Error(err)
-		return logOpCh, errCh
-	}
-	defer resp.Body.Close()
-
-	// get response body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		errCh <- utils.Error(err)
-		return logOpCh, errCh
-	}
-
-	// unmarshal into listBucketResult
-	var res listBucketResult
-	xml.Unmarshal(body, &res)
 
 	go func() {
-		// for each object in listBucketResult
-		// to a HEAD get its metadata tags
-		for _, r := range res.Contents {
+		// for each object in listObjectsRes
+		// get object's metadata tags
+		for _, object := range listObjectsRes.Contents {
+			headObjectIn := s3.HeadObjectInput{
+				Bucket: aws.String(table),
+				Key:    object.Key,
+			}
 
-			mdBuff := bytes.NewBuffer([]byte{})
-			requestURL = fmt.Sprintf("%s/%s/%s", ds.endpoint, table, r.Key)
-			request, err = http.NewRequest("HEAD", requestURL, mdBuff)
+			headObjectRes, err := ds.s3.HeadObject(&headObjectIn)
 			if err != nil {
 				errCh <- utils.Error(err)
 				break
 			}
 
-			reader := bytes.NewReader(mdBuff.Bytes())
-			signer.Sign(request, reader, "s3", "us-east-1", time.Now())
-
-			resp, err = client.Do(request)
-			if err != nil {
-				resp.Body.Close()
-				errCh <- utils.Error(err)
-				break
-			}
-			defer resp.Body.Close()
-
-			attributes, ts, err := ds.formatLogOpState(table, r.Key, resp.Header)
+			attributes, err := ds.formatLogOpState(table, headObjectRes.Metadata)
 			if err != nil {
 				errCh <- utils.Error(err)
 				break
 			}
 
-			timestamp, err := ptypes.TimestampProto(ts)
+			timestamp, err := ptypes.TimestampProto(*headObjectRes.LastModified)
 			if err != nil {
 				errCh <- utils.Error(err)
 				break
 			}
 
 			logOpCh <- libqpu.LogOperationState(
-				r.Key,
+				*object.Key,
 				table,
 				libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
 				attributes,
 			)
 		}
+
+		close(logOpCh)
+		close(errCh)
 	}()
-	// 	defer rows.Close()
-	// 	for rows.Next() {
-	// 		err = rows.Scan(scanArgs...)
-	// 		if err != nil {
-	// 			errCh <- utils.Error(err)
-	// 			break
-	// 		}
-	// 		var recordID string
-	// 		attributes := make(map[string]*qpu.Value)
-
-	// 		for i, col := range values {
-	// 			if col != nil {
-	// 				if columns[i] == "ts" {
-	// 					ts = col.(time.Time)
-	// 				} else {
-	// 					value, err := ds.inputSchema.InterfaceToValue(table, columns[i], col)
-	// 					if err != nil {
-	// 						errCh <- err
-	// 						break
-	// 					}
-	// 					attributes[projection[i]] = value
-	// 				}
-	// 			}
-	// 		}
-
-	// 		timestamp, err := ptypes.TimestampProto(ts)
-	// 		if err != nil {
-	// 			errCh <- err
-	// 			break
-	// 		}
-
-	// 		logOpCh <- libqpu.LogOperationState(
-	// 			recordID,
-	// 			table,
-	// 			libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
-	// 			attributes)
-
-	// 	}
-	// 	close(logOpCh)
-	// 	close(errCh)
-	// }()
 
 	return logOpCh, errCh
 }
@@ -371,7 +209,6 @@ func (ds S3DataStore) GetNotificationLanency() (float64, float64, float64, float
 func (ds S3DataStore) opConsumer(stream pbS3.NotificationService_SubscribeNotificationsClient, msg chan libqpu.LogOperation, errCh chan error) {
 	for {
 		op, err := stream.Recv()
-		fmt.Println("received", op, err)
 		if err == io.EOF {
 			errCh <- utils.Error(errors.New("opConsumer received EOF"))
 			break
@@ -442,32 +279,32 @@ func (ds S3DataStore) formatLogOpDelta(notificationMsg *pbS3.NotificationStream)
 	), nil
 }
 
-func (ds S3DataStore) formatLogOpState(table, recordID string, attributes http.Header) (map[string]*qpu.Value, time.Time, error) {
+func (ds S3DataStore) formatLogOpState(table string, attributes map[string]*string) (map[string]*qpu.Value, error) {
 	attrs := make(map[string]*qpu.Value)
-	var ts time.Time
+	// var ts time.Time
 
 	// attributesNew := make(map[string]*qpu.Value)
 	for k := range attributes {
 		// fmt.Println(attributeKey, attributes[attributeKey])
 		attributeKey := strings.ToLower(k)
-		if strings.HasPrefix(attributeKey, "x-amz-meta-") && !strings.Contains(attributeKey, "s3cmd-attrs") {
-			value, err := ds.inputSchema.StrToValue(table, attributeKey, attributes[k][0])
+		if !strings.Contains(attributeKey, "s3cmd-attrs") {
+			value, err := ds.inputSchema.StrToValue(table, attributeKey, *attributes[k])
 			if err != nil {
-				return nil, time.Time{}, err
+				return nil, err
 			}
 			attrs[attributeKey] = value
 		}
-		if attributeKey == "last-modified" {
-			fmt.Println(attributeKey, attributes[k])
-			var err error
-			ts, err = time.Parse("Mon, 02 Jan 2006 15:04:05 MST", attributes[k][0])
-			if err != nil {
-				log.Fatalf("time.Parse failed:%s", err)
-				return nil, time.Time{}, err
-			}
-			fmt.Println(ts, err)
+		// if attributeKey == "last-modified" {
+		// 	fmt.Println(attributeKey, attributes[k])
+		// 	var err error
+		// 	ts, err = time.Parse("Mon, 02 Jan 2006 15:04:05 MST", attributes[k][0])
+		// 	if err != nil {
+		// 		log.Fatalf("time.Parse failed:%s", err)
+		// 		return nil, time.Time{}, err
+		// 	}
+		// 	fmt.Println(ts, err)
 
-		}
+		// }
 	}
 	// for _, attribute := range notificationMsg.Attributes {
 	// 	if attribute.ValueOld != "" {
@@ -486,5 +323,5 @@ func (ds S3DataStore) formatLogOpState(table, recordID string, attributes http.H
 	// 	}
 	// }
 
-	return attrs, ts, nil
+	return attrs, nil
 }

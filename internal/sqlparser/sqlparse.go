@@ -454,7 +454,7 @@ func (ctx *sqlParseCtx) buildProteusAST() error {
 			if optr == "=" {
 				pred.Lbound = expr.(value).v
 				pred.Ubound = expr.(value).v
-				pred.Type = qpu.AttributePredicate_RANGE
+				pred.Type = qpu.AttributePredicate_EQ
 			}
 		case op:
 			optr = string(expr.(operator))

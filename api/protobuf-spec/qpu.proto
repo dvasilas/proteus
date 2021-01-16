@@ -53,8 +53,10 @@ message AttributePredicate {
     ISNULL = 0;
     // Used to implement the SQL 'IS NOT NULL'
     ISNOTNULL = 1;
-    // Implements the SQL WHERE attr >= lbound AND attr < ubound
+    // Represents the >, <, >=, <= operators
     RANGE = 2;
+    // Represents the = operator
+    EQ = 3;
   }
   Attribute attr = 1;
   PredicateType type = 2;
