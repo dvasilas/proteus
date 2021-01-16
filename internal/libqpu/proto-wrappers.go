@@ -58,6 +58,11 @@ func LogOperationState(recordID, table string, ts *qpu.Vectorclock,
 	}
 }
 
+// GetObjectId ...
+func (op LogOperation) GetObjectId() string {
+	return op.Op.GetObjectId()
+}
+
 // GetTable ...
 func (op LogOperation) GetTable() string {
 	return op.Op.GetBucket()

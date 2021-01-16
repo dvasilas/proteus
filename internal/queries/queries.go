@@ -153,7 +153,6 @@ func QueryType(query libqpu.ASTQuery) (bool, bool) {
 
 // SatisfiesPredicate ...
 func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool, error) {
-
 	for _, pred := range query.GetPredicate() {
 		attributes := logOp.GetAttributes()
 		if attributes == nil {
@@ -162,23 +161,35 @@ func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool,
 		val, found := attributes[pred.GetAttr().GetAttrKey()]
 		switch pred.GetType() {
 		case qpu.AttributePredicate_ISNULL:
-			return !found, nil
+			if found {
+				return false, nil
+			}
 		case qpu.AttributePredicate_ISNOTNULL:
-			return found, nil
-		case qpu.AttributePredicate_RANGE:
-			c, err := utils.Compare(pred.GetLbound(), pred.GetUbound())
+			if !found {
+				return false, nil
+			}
+		case qpu.AttributePredicate_EQ:
+			c, err := utils.Compare(pred.GetLbound(), val)
 			if err != nil {
 				return false, err
 			}
-			if c == 0 {
-				c, err := utils.Compare(pred.GetLbound(), val)
-				if err != nil {
-					return false, err
-				}
-				return c == 0, nil
+			if c != 0 {
+				return false, nil
 			}
+		case qpu.AttributePredicate_RANGE:
+			// c, err := utils.Compare(pred.GetLbound(), pred.GetUbound())
+			// if err != nil {
+			// 	return false, err
+			// }
+			// if c == 0 {
+			// 	c, err := utils.Compare(pred.GetLbound(), val)
+			// 	if err != nil {
+			// 		return false, err
+			// 	}
+			// 	return c == 0, nil
 			panic(errors.New("RANGE check not implemented"))
 		}
+		// }
 	}
 	return true, nil
 }

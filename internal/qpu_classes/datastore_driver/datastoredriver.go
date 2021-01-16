@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -13,6 +12,7 @@ import (
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
+	"github.com/dvasilas/proteus/internal/queries"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -154,12 +154,49 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 
 // ClientQuery ...
 func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
-	fmt.Println("ClientQuery", query)
-
 	respRecords := make([]*qpuextapi.QueryRespRecord, 0)
-	respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
-		RecordId: "test",
-	})
+
+	isNull, isNotNull := query.GetPredicateContains()
+	snapshotCh, errCh := q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
+	for {
+		select {
+		case logOp, ok := <-snapshotCh:
+			if !ok {
+				snapshotCh = nil
+			} else {
+				// utils.Trace("datastore driver received", map[string]interface{}{"dataItem": logOp})
+				ok, err := queries.SatisfiesPredicate(logOp, query)
+				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"dataItem": logOp, "ok": ok})
+				if err != nil {
+					return nil, utils.Error(err)
+				}
+				if ok {
+					attributes := make(map[string]string)
+					for k, v := range logOp.GetAttributes() {
+						valStr, err := utils.ValueToStr(v)
+						if err != nil {
+							return nil, err
+						}
+						attributes[k] = valStr
+					}
+					respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
+						RecordId:   logOp.GetObjectId(),
+						Attributes: attributes,
+						Timestamp:  logOp.GetTimestamp().GetVc(),
+					})
+				}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else {
+				return nil, err
+			}
+		}
+		if snapshotCh == nil && errCh == nil {
+			break
+		}
+	}
 
 	return &qpuextapi.QueryResp{
 		RespRecord: respRecords,

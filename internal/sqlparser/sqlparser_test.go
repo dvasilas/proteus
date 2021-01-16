@@ -27,7 +27,7 @@ var filterTests = []struct {
 			Predicate: []*qpu.AttributePredicate{
 				&qpu.AttributePredicate{
 					Attr:   libqpu.Attribute("x", nil),
-					Type:   qpu.AttributePredicate_RANGE,
+					Type:   qpu.AttributePredicate_EQ,
 					Lbound: libqpu.ValueInt(42),
 					Ubound: libqpu.ValueInt(42),
 				},
