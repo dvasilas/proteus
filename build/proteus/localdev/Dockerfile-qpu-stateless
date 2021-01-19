@@ -10,6 +10,6 @@ COPY . .
 
 RUN make qpu
 
-FROM mysql
-COPY --from=proteus /app/proteus/bin/qpu /proteus
+COPY build/proteus/localdev/ /
 
+ENTRYPOINT ["/start.sh"]
