@@ -68,6 +68,14 @@ func (op LogOperation) GetTable() string {
 	return op.Op.GetBucket()
 }
 
+// HasOldState ...
+func (op LogOperation) HasOldState() bool {
+	if op.Op.GetPayload().GetDelta().GetOld().GetAttributes() != nil {
+		return true
+	}
+	return false
+}
+
 // GetAttributes ...
 func (op LogOperation) GetAttributes() map[string]*qpu.Value {
 	if op.Op.GetPayload().GetState() != nil {
