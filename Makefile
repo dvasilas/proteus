@@ -60,7 +60,7 @@ proto: $(PROTOC_CMD)
 .PHONY: image-build
 ## image-build:
 image-build:
-	docker build -f build/proteus/localdev/Dockerfile-qpu -t qpu/dev .
+	# docker build -f build/proteus/localdev/Dockerfile-qpu -t qpu/dev .
 	docker build -f build/proteus/localdev/Dockerfile-qpu-stateless -t qpu/stateless .
 
 .PHONY: image-push

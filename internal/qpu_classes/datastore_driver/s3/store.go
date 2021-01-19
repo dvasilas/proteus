@@ -96,10 +96,10 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (S3DataStor
 	awsRegion := "us-east-1"
 	s3ForcePathStyle := true
 	awsConf := aws.Config{
-		Endpoint:         aws.String("http://127.0.0.1:8001"),
+		Endpoint:         aws.String(conf.DatastoreConfig.Endpoint),
 		Region:           &awsRegion,
 		S3ForcePathStyle: &s3ForcePathStyle,
-		Credentials:      credentials.NewStaticCredentials("accessKey1", "verySecretKey1", ""),
+		Credentials:      credentials.NewStaticCredentials(conf.DatastoreConfig.Credentials.AccessKeyID, conf.DatastoreConfig.Credentials.SecretAccessKey, ""),
 	}
 	sess := session.Must(session.NewSession(&awsConf))
 	svc := s3.New(sess)
