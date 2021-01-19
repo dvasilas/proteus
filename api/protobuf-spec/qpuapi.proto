@@ -145,6 +145,7 @@ message ConfigResponse {
     DATASTORE_DRIVER = 0;
     SUM = 1;
     JOIN = 2;
+    INDEX = 3;
   }
   QPUType qpu_type = 1;
   repeated string schema = 2;

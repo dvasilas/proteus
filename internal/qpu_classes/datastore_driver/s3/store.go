@@ -233,59 +233,64 @@ func (ds S3DataStore) formatLogOpDelta(notificationMsg *pbS3.NotificationStream)
 	attributesOld := make(map[string]*qpu.Value)
 	attributesNew := make(map[string]*qpu.Value)
 
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, notificationMsg.GetTimestamp()))
+	if err != nil {
+		return libqpu.LogOperation{}, err
+	}
+
+	for attributeKey, val := range notificationMsg.GetPayload().GetNewState().GetAttributes() {
+		var k string
+		if strings.HasPrefix(attributeKey, "x-amz-meta-") {
+			attrK := strings.Split(attributeKey, "x-amz-meta-")
+			k = attrK[1]
+		} else {
+			k = attributeKey
+		}
+		value, err := ds.inputSchema.StrToValue(notificationMsg.GetPayload().GetBucket(), k, val)
+		if err != nil {
+			return libqpu.LogOperation{}, err
+		}
+		attributesNew[k] = value
+	}
+
 	if notificationMsg.GetPayload().GetOldState() != nil {
 		for attributeKey, val := range notificationMsg.GetPayload().GetOldState().GetAttributes() {
-			value, err := ds.inputSchema.StrToValue(notificationMsg.GetPayload().GetBucket(), attributeKey, val)
+			var k string
+			if strings.HasPrefix(attributeKey, "x-amz-meta-") {
+				attrK := strings.Split(attributeKey, "x-amz-meta-")
+				k = attrK[1]
+			} else {
+				k = attributeKey
+			}
+			value, err := ds.inputSchema.StrToValue(notificationMsg.GetPayload().GetBucket(), k, val)
 			if err != nil {
 				return libqpu.LogOperation{}, err
 			}
-			attributesOld[attributeKey] = value
+			attributesOld[k] = value
 		}
-	}
 
-	if notificationMsg.GetPayload().GetNewState() != nil {
-		for attributeKey, val := range notificationMsg.GetPayload().GetNewState().GetAttributes() {
-			value, err := ds.inputSchema.StrToValue(notificationMsg.GetPayload().GetBucket(), attributeKey, val)
-			if err != nil {
-				return libqpu.LogOperation{}, err
-			}
-			attributesNew[attributeKey] = value
-		}
+		return libqpu.LogOperationDelta(
+			notificationMsg.GetPayload().GetObjectId(),
+			notificationMsg.GetPayload().GetBucket(),
+			libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
+			attributesOld,
+			attributesNew,
+		), nil
 	}
-
-	// for _, attribute := range notificationMsg.GetPayload(). {
-	// 	if attribute.ValueOld != "" {
-	// 		value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
-	// 		if err != nil {
-	// 			return libqpu.LogOperation{}, err
-	// 		}
-	// 		attributesOld[attribute.Key] = value
-	// 	}
-	// 	if attribute.ValueNew != "" {
-	// 		value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
-	// 		if err != nil {
-	// 			return libqpu.LogOperation{}, err
-	// 		}
-	// 		attributesNew[attribute.Key] = value
-	// 	}
 
 	return libqpu.LogOperationDelta(
 		notificationMsg.GetPayload().GetObjectId(),
 		notificationMsg.GetPayload().GetBucket(),
-		// libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: notificationMsg.Timestamp}),
+		libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
 		nil,
-		attributesOld,
 		attributesNew,
 	), nil
 }
 
 func (ds S3DataStore) formatLogOpState(table string, attributes map[string]*string) (map[string]*qpu.Value, error) {
 	attrs := make(map[string]*qpu.Value)
-	// var ts time.Time
 
-	// attributesNew := make(map[string]*qpu.Value)
 	for k := range attributes {
-		// fmt.Println(attributeKey, attributes[attributeKey])
 		attributeKey := strings.ToLower(k)
 		if !strings.Contains(attributeKey, "s3cmd-attrs") {
 			value, err := ds.inputSchema.StrToValue(table, attributeKey, *attributes[k])
@@ -294,34 +299,7 @@ func (ds S3DataStore) formatLogOpState(table string, attributes map[string]*stri
 			}
 			attrs[attributeKey] = value
 		}
-		// if attributeKey == "last-modified" {
-		// 	fmt.Println(attributeKey, attributes[k])
-		// 	var err error
-		// 	ts, err = time.Parse("Mon, 02 Jan 2006 15:04:05 MST", attributes[k][0])
-		// 	if err != nil {
-		// 		log.Fatalf("time.Parse failed:%s", err)
-		// 		return nil, time.Time{}, err
-		// 	}
-		// 	fmt.Println(ts, err)
-
-		// }
 	}
-	// for _, attribute := range notificationMsg.Attributes {
-	// 	if attribute.ValueOld != "" {
-	// 		value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueOld)
-	// 		if err != nil {
-	// 			return libqpu.LogOperation{}, err
-	// 		}
-	// 		attributesOld[attribute.Key] = value
-	// 	}
-	// 	if attribute.ValueNew != "" {
-	// 		value, err := ds.inputSchema.StrToValue(notificationMsg.Table, attribute.Key, attribute.ValueNew)
-	// 		if err != nil {
-	// 			return libqpu.LogOperation{}, err
-	// 		}
-	// 		attributesNew[attribute.Key] = value
-	// 	}
-	// }
 
 	return attrs, nil
 }

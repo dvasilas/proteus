@@ -195,6 +195,8 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.Operator = libqpu.Aggregation
 	case "join":
 		config.Operator = libqpu.Join
+	case "index":
+		config.Operator = libqpu.Index
 	case "router":
 		config.Operator = libqpu.Router
 	case "lobsters":
