@@ -189,7 +189,7 @@ func (q *SumQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]stri
 }
 
 // ClientQuery ...
-func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	return nil, errors.New("not implemented")
 }
 

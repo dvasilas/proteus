@@ -5,6 +5,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
+	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	"google.golang.org/grpc"
 )
 
@@ -75,10 +76,10 @@ func (c QPUAPIClient) QuerySQL(query string, metadata map[string]string, sync bo
 }
 
 // QueryUnary ...
-func (c QPUAPIClient) QueryUnary(req libqpu.QueryRequest) (*qpuapi.QueryResponse, error) {
-	// ctx := context.TODO()
-	// resp, err := c.cli.QueryUnary(ctx, req.Req)
-	return nil, nil
+func (c QPUAPIClient) QueryUnary(query string) (*qpuextapi.QueryResp, error) {
+	return c.cli.QueryUnary(context.Background(), &qpuextapi.QueryReq{
+		QueryStr: query,
+	})
 }
 
 // GetConfig implements the QPU's API GetConfig method.

@@ -74,22 +74,22 @@ message Query {
 
 message SQLQuery {
     string queryStr = 1;
-  }
+}
   // Internal query representation.
-  message ASTQuery {
-    string table = 1;
-    // Like the SQL PROJECTION.
-    repeated string projection = 2;
-    // Like the SQL WHERE statement.
-    repeated qpu.AttributePredicate predicate = 3;
-    // Timespamp predicate.
-    // Has the same form as AttributePredicate, but it is separate simply
-    // to allow as to refer to this with a specific name (tsPredicate).
-    qpu.SnapshotTimePredicate tsPredicate = 4;
-    OrderBy orderBy = 5;
-    // Like the SQL LIMIT
-    int64 limit = 6;
-  }
+message ASTQuery {
+  string table = 1;
+  // Like the SQL PROJECTION.
+  repeated string projection = 2;
+  // Like the SQL WHERE statement.
+  repeated qpu.AttributePredicate predicate = 3;
+  // Timespamp predicate.
+  // Has the same form as AttributePredicate, but it is separate simply
+  // to allow as to refer to this with a specific name (tsPredicate).
+  qpu.SnapshotTimePredicate tsPredicate = 4;
+  OrderBy orderBy = 5;
+  // Like the SQL LIMIT
+  int64 limit = 6;
+}
 
 message OrderBy {
   enum Order {

@@ -37,7 +37,7 @@ type APIProcessor interface {
 
 // QPUClass ...
 type QPUClass interface {
-	ClientQuery(ASTQuery, opentracing.Span) (*qpuextapi.QueryResp, error)
+	ClientQuery(ASTQuery, string, opentracing.Span) (*qpuextapi.QueryResp, error)
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	RemovePersistentQuery(string, int)
@@ -55,7 +55,7 @@ type AdjacentQPU struct {
 // APIClient ...
 type APIClient interface {
 	Query(QueryRequest) (ResponseStream, error)
-	QueryUnary(QueryRequest) (*qpuapi.QueryResponse, error)
+	QueryUnary(string) (*qpuextapi.QueryResp, error)
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
 	CloseConnection() error
 	GetConfig() (*qpuapi.ConfigResponse, error)

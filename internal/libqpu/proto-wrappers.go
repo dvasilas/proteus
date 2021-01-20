@@ -167,6 +167,11 @@ type ResponseRecord struct {
 	InTs time.Time
 }
 
+// GetSequenceID ...
+func (r ResponseRecord) GetSequenceID() int64 {
+	return r.Rec.GetSequenceId()
+}
+
 // GetLogOp ...
 func (r ResponseRecord) GetLogOp() LogOperation {
 	return LogOperation{Op: r.Rec.GetLogOp()}
