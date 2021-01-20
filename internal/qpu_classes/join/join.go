@@ -195,7 +195,7 @@ func (q *JoinQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]stri
 }
 
 // ClientQuery ...
-func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+func (q *JoinQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	var respRecords []*qpuextapi.QueryRespRecord
 
 	// prepare the state.Get predicate

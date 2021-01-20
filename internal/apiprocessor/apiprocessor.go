@@ -220,7 +220,7 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 		s.sqlCache.put(req.GetSQLStr(), astQuery)
 	}
 
-	resp, err := s.qpuClass.ClientQuery(astQuery, parentSpan)
+	resp, err := s.qpuClass.ClientQuery(astQuery, req.GetSQLStr(), parentSpan)
 
 	if s.measureDataTransfer {
 		respSize, err := getQueryRespSize(resp)

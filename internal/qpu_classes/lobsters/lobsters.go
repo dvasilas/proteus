@@ -121,7 +121,7 @@ func (q *LobQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 }
 
 // ClientQuery ...
-func (q *LobQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+func (q *LobQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 
 	return nil, nil
 }

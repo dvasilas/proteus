@@ -1,14 +1,10 @@
 package routerqpu
 
 import (
-	"errors"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
-	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
-	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
-	responsestream "github.com/dvasilas/proteus/internal/responseStream"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
@@ -44,57 +40,41 @@ func (q *RouterQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]st
 }
 
 // ClientQuery ...
-func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
-	var forwardTo *libqpu.AdjacentQPU
-	found := false
-	for _, adjQPU := range q.adjacentQPUs {
-		for _, table := range adjQPU.OutputSchema {
-			if table == query.GetTable() {
-				forwardTo = adjQPU
-				found = true
-				break
-			}
-		}
-	}
-
-	if !found {
-		return nil, utils.Error(errors.New("unknown table"))
-	}
-
-	subQueryResponseStream, err := qpugraph.SendQuery(libqpu.NewQuery(nil, query.Q), forwardTo)
-	if err != nil {
-		return nil, err
-	}
-
-	respCh := make(chan libqpu.ResponseRecord)
-	go func() {
-		if err = responsestream.StreamConsumer(subQueryResponseStream, q.conf.ProcessingConfig.Input.MaxWorkers, q.conf.ProcessingConfig.Input.MaxJobQueue, q.processRespRecord, nil, respCh); err != nil {
-			panic(err)
-		}
-	}()
+func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+	queryRespCh := make(chan qpuextapi.QueryResp)
+	errorCh := make(chan error)
 
 	respRecords := make([]*qpuextapi.QueryRespRecord, 0)
+	subQueryCount := len(q.adjacentQPUs)
 
-	for record := range respCh {
-		attributes := make(map[string]string)
-		for k, v := range record.GetAttributes() {
-			valStr, err := utils.ValueToStr(v)
+	for _, adjQPU := range q.adjacentQPUs {
+		go func(to *libqpu.AdjacentQPU) {
+			resp, err := to.APIClient.QueryUnary(queryStr)
 			if err != nil {
-				return nil, err
+				errorCh <- err
+				return
 			}
-			attributes[k] = valStr
-		}
-
-		respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
-			RecordId:   record.GetRecordID(),
-			Attributes: attributes,
-			Timestamp:  record.GetLogOp().GetTimestamp().GetVc(),
-		})
+			queryRespCh <- *resp
+		}(adjQPU)
 	}
 
-	return &qpuextapi.QueryResp{
-		RespRecord: respRecords,
-	}, nil
+	returnedCount := 0
+	for {
+		select {
+		case resp := <-queryRespCh:
+			respRecords = append(respRecords, resp.GetRespRecord()...)
+			returnedCount++
+			if returnedCount == subQueryCount {
+				close(queryRespCh)
+				close(errorCh)
+				return &qpuextapi.QueryResp{
+					RespRecord: respRecords,
+				}, nil
+			}
+		case err := <-errorCh:
+			return nil, err
+		}
+	}
 }
 
 // ProcessQuerySubscribe ...

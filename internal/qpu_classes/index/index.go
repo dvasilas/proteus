@@ -61,8 +61,10 @@ type IndexQPU struct {
 	outputSchema               libqpu.Schema
 	stateTable                 string
 	inMemState                 *inMemState
+	dbCollection               string
 	endOfStreamCnt             int
 	catchUpDoneCh              chan int
+	catchUpSeqID               int64
 	port                       string
 	logTimestamps              bool
 	catchUpDone                bool
@@ -99,7 +101,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 		inputSchema:                qpu.InputSchema,
 		outputSchema:               make(map[string]libqpu.SchemaTable),
 		inMemState:                 &inMemState{entries: make(map[string][]interface{})},
-		stateTable:                 qpu.Config.JoinConfig.OutputTableAlias,
+		dbCollection:               stateDatabase + qpu.Config.Port,
 		catchUpDoneCh:              catchUpDoneCh,
 		port:                       qpu.Config.Port,
 		logTimestamps:              qpu.Config.Evaluation.LogTimestamps,
@@ -177,7 +179,7 @@ func (q *IndexQPU) initializeState(config *libqpu.QPUConfig) error {
 		return err
 	}
 
-	q.database = client.Database(stateDatabase)
+	q.database = client.Database(q.dbCollection)
 
 	return nil
 }
@@ -231,7 +233,7 @@ func (q *IndexQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]str
 }
 
 // ClientQuery ...
-func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
+func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	col, err := q.collection(query.GetTable())
 	if err != nil {
 		return nil, utils.Error(err)
@@ -242,8 +244,7 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, parentSpan opentracing.Spa
 
 	query.GetPredicate()[0].GetAttr().GetAttrKey()
 
-	queryStr := fmt.Sprintf("attributes.%s.intval", query.GetPredicate()[0].GetAttr().GetAttrKey())
-	filter := bson.M{queryStr: query.GetPredicate()[0].GetLbound().GetInt()}
+	filter := bson.M{fmt.Sprintf("attributes.%s.intval", query.GetPredicate()[0].GetAttr().GetAttrKey()): query.GetPredicate()[0].GetLbound().GetInt()}
 
 	cur, err := col.Find(context.Background(), filter, findOptions)
 	if err != nil {
@@ -365,19 +366,23 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 
 	if respRecordType == libqpu.EndOfStream {
 		q.catchUpDone = true
+		q.catchUpSeqID = respRecord.GetSequenceID()
 
-		err := q.flushState()
-		if err != nil {
-			return err
-		}
-
-		go func() {
-			q.catchUpDoneCh <- 0
-		}()
 	} else if respRecordType == libqpu.State {
 		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
 			return err
 		}
+		if respRecord.GetSequenceID()+1 == q.catchUpSeqID {
+			err := q.flushState()
+			if err != nil {
+				return err
+			}
+
+			go func() {
+				q.catchUpDoneCh <- 0
+			}()
+		}
+
 	} else if respRecordType == libqpu.Delta {
 		if respRecord.GetLogOp().HasOldState() {
 			attributes := make(map[string]Value)
