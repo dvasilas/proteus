@@ -86,6 +86,8 @@ const (
 	Join OperatorType = iota
 	// Index ...
 	Index OperatorType = iota
+	// Cache ...
+	Cache OperatorType = iota
 	// Router ...
 	Router OperatorType = iota
 	// Lobsters ...
@@ -100,6 +102,8 @@ const (
 	Stateless StateType = iota
 	// MaterializedView ...
 	MaterializedView StateType = iota
+	// Cache ...
+	CacheState StateType = iota
 )
 
 // QPUConfig specifies the configuration structure of a QPU
@@ -134,6 +138,10 @@ type QPUConfig struct {
 		OutputTableAlias     string
 		JoinedAttributeAlias string
 		JoinAttribute        map[string]string
+	}
+	CacheConfig struct {
+		Size int
+		Ttl  int
 	}
 	Evaluation struct {
 		Tracing                    bool
