@@ -69,6 +69,7 @@ type IndexQPU struct {
 	logTimestamps              bool
 	catchUpDone                bool
 	measureNotificationLatency bool
+	downstreamQPUs             int
 	notificationLatencyM       metrics.LatencyM
 	stateUpdateM               metrics.LatencyM
 	writeLog                   writeLog
@@ -107,6 +108,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 		logTimestamps:              qpu.Config.Evaluation.LogTimestamps,
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
 		catchUpDone:                false,
+		downstreamQPUs:             len(qpu.AdjacentQPUs),
 		writeLog: writeLog{
 			entries: make([]libqpu.WriteLogEntry, 0),
 		},
@@ -365,8 +367,11 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	}
 
 	if respRecordType == libqpu.EndOfStream {
-		q.catchUpDone = true
-		q.catchUpSeqID = respRecord.GetSequenceID()
+		q.endOfStreamCnt++
+		if q.endOfStreamCnt == q.downstreamQPUs {
+			q.catchUpDone = true
+			q.catchUpSeqID = respRecord.GetSequenceID()
+		}
 
 	} else if respRecordType == libqpu.State {
 		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
