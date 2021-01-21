@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -74,6 +75,8 @@ type queryLog struct {
 
 // InitClass ...
 func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	jqpu := &JoinQPU{
 		state:                      qpu.State,
 		inputSchema:                qpu.InputSchema,
@@ -126,8 +129,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 					if err != nil {
 						return nil, err
 					}
+					queryID := rand.Int()
 					go func() {
-						if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil); err != nil {
+						if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil, queryID); err != nil {
 							panic(err)
 						}
 					}()
@@ -340,7 +344,7 @@ func (q *JoinQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespo
 
 // ---------------- Internal Functions --------------
 
-func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
 	if q.catchUpDone && q.measureNotificationLatency {
 		if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 			return err

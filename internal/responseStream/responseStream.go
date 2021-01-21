@@ -18,12 +18,13 @@ type Job struct {
 	respRecord   libqpu.ResponseRecord
 	data         interface{}
 	recordCh     chan libqpu.ResponseRecord
-	processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord) error
+	processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord, int) error
+	queryID      int
 }
 
 // Do ...
 func (j *Job) Do() {
-	err := j.processLogOp(j.respRecord, j.data, j.recordCh)
+	err := j.processLogOp(j.respRecord, j.data, j.recordCh, j.queryID)
 	if err != nil {
 		utils.Error(err)
 	}
@@ -33,7 +34,7 @@ func (j *Job) Do() {
 // For each record, it invokes the processLogOp function.
 // When a record of type libqpu.EndOfStream is received, it closes the stream
 // using the streams cancel function.
-func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord) error, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord, int) error, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
 	dispatcher := workerpool.NewDispatcher(maxWorkers, maxQueue)
 	dispatcher.Run()
 
@@ -54,6 +55,7 @@ func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, proc
 				data:         data,
 				recordCh:     recordCh,
 				processLogOp: processLogOp,
+				queryID:      queryID,
 			}
 
 			dispatcher.JobQueue <- work

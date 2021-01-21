@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -53,6 +55,18 @@ type Value struct {
 	StrVal  string
 	IntVal  int64
 }
+type catchUp struct {
+	sync.Mutex
+	catchUpDoneCh  chan int
+	catchupQueries map[int]*catchupQuery
+	catchUpDone    bool
+}
+
+type catchupQuery struct {
+	endOfStreamSeqID int64
+	catchupDone      bool
+	appliedSeqID     int64
+}
 
 // IndexQPU ...
 type IndexQPU struct {
@@ -62,12 +76,8 @@ type IndexQPU struct {
 	stateTable                 string
 	inMemState                 *inMemState
 	dbCollection               string
-	endOfStreamCnt             int
-	catchUpDoneCh              chan int
-	catchUpSeqID               int64
 	port                       string
 	logTimestamps              bool
-	catchUpDone                bool
 	measureNotificationLatency bool
 	downstreamQPUs             int
 	notificationLatencyM       metrics.LatencyM
@@ -76,6 +86,7 @@ type IndexQPU struct {
 	queryLog                   queryLog
 	collections                map[string]*mongo.Collection
 	database                   *mongo.Database
+	catchUp                    catchUp
 }
 
 type inMemState struct {
@@ -97,17 +108,17 @@ type queryLog struct {
 
 // InitClass ...
 func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	jqpu := &IndexQPU{
 		state:                      qpu.State,
 		inputSchema:                qpu.InputSchema,
 		outputSchema:               make(map[string]libqpu.SchemaTable),
 		inMemState:                 &inMemState{entries: make(map[string][]interface{})},
 		dbCollection:               stateDatabase + qpu.Config.Port,
-		catchUpDoneCh:              catchUpDoneCh,
 		port:                       qpu.Config.Port,
 		logTimestamps:              qpu.Config.Evaluation.LogTimestamps,
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
-		catchUpDone:                false,
 		downstreamQPUs:             len(qpu.AdjacentQPUs),
 		writeLog: writeLog{
 			entries: make([]libqpu.WriteLogEntry, 0),
@@ -116,6 +127,10 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 			entries: make([]libqpu.QueryLogEntry, 0),
 		},
 		collections: make(map[string]*mongo.Collection),
+		catchUp: catchUp{
+			catchupQueries: make(map[int]*catchupQuery),
+			catchUpDoneCh:  catchUpDoneCh,
+		},
 	}
 
 	if jqpu.measureNotificationLatency {
@@ -149,8 +164,13 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 					if err != nil {
 						return nil, err
 					}
+					queryID := rand.Int()
+					jqpu.catchUp.catchupQueries[queryID] = &catchupQuery{
+						appliedSeqID:     -1,
+						endOfStreamSeqID: -1,
+					}
 					go func() {
-						if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil); err != nil {
+						if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil, queryID); err != nil {
 							panic(err)
 						}
 					}()
@@ -159,6 +179,40 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 			}
 		}
 	}
+
+	go func() {
+		for {
+			time.Sleep(time.Second)
+
+			jqpu.catchUp.Lock()
+			if jqpu.catchUp.catchUpDone {
+				break
+			}
+
+			done := true
+			for _, q := range jqpu.catchUp.catchupQueries {
+				if q.appliedSeqID < 0 || q.endOfStreamSeqID < 0 || q.appliedSeqID+1 != q.endOfStreamSeqID {
+					done = false
+					break
+				}
+			}
+
+			if done {
+				jqpu.catchUp.catchUpDone = true
+
+				err := jqpu.flushState()
+
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				jqpu.catchUp.catchUpDoneCh <- 0
+				jqpu.catchUp.Unlock()
+				return
+			}
+			jqpu.catchUp.Unlock()
+		}
+	}()
 
 	return jqpu, nil
 }
@@ -176,9 +230,14 @@ func (q *IndexQPU) initializeState(config *libqpu.QPUConfig) error {
 		return err
 	}
 
-	err = client.Ping(context.Background(), nil)
-	if err != nil {
-		return err
+	for {
+		err = client.Ping(context.Background(), nil)
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			fmt.Println("retrying connecting to: ", config.StateBackend.Endpoint)
+		} else {
+			break
+		}
 	}
 
 	q.database = client.Database(q.dbCollection)
@@ -354,8 +413,8 @@ func (q *IndexQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 
 // ---------------- Internal Functions --------------
 
-func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
-	if q.catchUpDone && q.measureNotificationLatency {
+func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
+	if q.catchUp.catchUpDone && q.measureNotificationLatency {
 		if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 			return err
 		}
@@ -367,26 +426,16 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	}
 
 	if respRecordType == libqpu.EndOfStream {
-		q.endOfStreamCnt++
-		if q.endOfStreamCnt == q.downstreamQPUs {
-			q.catchUpDone = true
-			q.catchUpSeqID = respRecord.GetSequenceID()
-		}
-
+		q.catchUp.Lock()
+		q.catchUp.catchupQueries[queryID].endOfStreamSeqID = respRecord.GetSequenceID()
+		q.catchUp.Unlock()
 	} else if respRecordType == libqpu.State {
 		if err := q.processRespRecordInMem(respRecord, data, recordCh); err != nil {
 			return err
 		}
-		if respRecord.GetSequenceID()+1 == q.catchUpSeqID {
-			err := q.flushState()
-			if err != nil {
-				return err
-			}
-
-			go func() {
-				q.catchUpDoneCh <- 0
-			}()
-		}
+		q.catchUp.Lock()
+		q.catchUp.catchupQueries[queryID].appliedSeqID = respRecord.GetSequenceID()
+		q.catchUp.Unlock()
 
 	} else if respRecordType == libqpu.Delta {
 		if respRecord.GetLogOp().HasOldState() {
