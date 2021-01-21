@@ -94,8 +94,9 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 		if err != nil {
 			return &SumQPU{}, err
 		}
+		queryID := rand.Int()
 		go func() {
-			if err = responsestream.StreamConsumer(responseStream, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, sqpu.processRespRecord, nil, nil); err != nil {
+			if err = responsestream.StreamConsumer(responseStream, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, sqpu.processRespRecord, nil, nil, queryID); err != nil {
 				panic(err)
 			}
 		}()
@@ -223,7 +224,7 @@ func (q *SumQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespon
 
 // ---------------- Internal Functions --------------
 
-func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
 	if q.catchUpDone && q.measureNotificationLatency {
 		if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 			return err

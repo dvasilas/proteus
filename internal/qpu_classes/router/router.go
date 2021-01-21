@@ -93,7 +93,7 @@ func (q *RouterQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRes
 
 // ---------------- Internal Functions --------------
 
-func (q *RouterQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord) error {
+func (q *RouterQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
 	respRecordType, err := respRecord.GetType()
 	if err != nil {
 		return err
