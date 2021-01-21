@@ -78,6 +78,7 @@ type inputQPUConfig struct {
 	}
 	CacheConfig struct {
 		Size int
+		Ttl  int
 	}
 	NetworkQPUConfig struct {
 		Function string
@@ -158,6 +159,10 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 		if err := getJoinConfig(inputConfig, config); err != nil {
 			return err
 		}
+	case libqpu.Cache:
+		if err := getCacheConfig(inputConfig, config); err != nil {
+			return err
+		}
 	}
 
 	// Evaluation
@@ -197,6 +202,8 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.Operator = libqpu.Join
 	case "index":
 		config.Operator = libqpu.Index
+	case "cache":
+		config.Operator = libqpu.Cache
 	case "router":
 		config.Operator = libqpu.Router
 	case "lobsters":
@@ -213,6 +220,8 @@ func getStateType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.State = libqpu.Stateless
 	case "materialized_view":
 		config.State = libqpu.MaterializedView
+	case "cache":
+		config.State = libqpu.CacheState
 	default:
 		return utils.Error(errors.New("unknown state type"))
 	}
@@ -307,6 +316,13 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.JoinConfig.JoinedAttributeAlias = inputConf.JoinConfig.JoinedAttributeAlias
 
 	config.JoinConfig.JoinAttribute = joinConfig
+
+	return nil
+}
+
+func getCacheConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	config.CacheConfig.Size = inputConf.CacheConfig.Size
+	config.CacheConfig.Ttl = inputConf.CacheConfig.Ttl
 
 	return nil
 }
