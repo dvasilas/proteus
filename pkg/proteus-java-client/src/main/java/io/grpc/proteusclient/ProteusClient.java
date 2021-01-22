@@ -56,8 +56,8 @@ public final class ProteusClient {
   }
 
   public void shutdown() throws InterruptedException {
-    for (int i = 0; i < currentPoolSize; i++) {
-      Connection connection = pool.take();
+    while (pool.peek()!=null) {
+      Connection connection = pool.poll();
       connection.shutdown();
     }
   }
