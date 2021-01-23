@@ -16,7 +16,9 @@ import (
 
 var load = false
 var execTime = 20
-var threadCnt = 2
+var threadCnt = 1
+var dbSize = 1000
+var attributeCard = dbSize / 20
 
 var (
 	histogramOpts = stats.HistogramOptions{
@@ -25,27 +27,6 @@ var (
 		GrowthFactor: .01,
 	}
 )
-
-// DataItem ...
-type DataItem struct {
-	ID         string
-	Table      string
-	Attributes map[string]Value
-	Ts         Timestamp
-}
-
-// Value ...
-type Value struct {
-	ValType int
-	StrVal  string
-	IntVal  int64
-}
-
-// Timestamp ..
-type Timestamp struct {
-	Key string
-	Ts  time.Time
-}
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -103,17 +84,11 @@ func main() {
 			log.Fatal(err)
 		}
 
-		entries := make([]interface{}, 1000)
+		entries := make([]interface{}, dbSize)
 		for i := range entries {
-			entries[i] = DataItem{
-				ID:    fmt.Sprintf("dataitem%d", i),
-				Table: "ycsbbuck",
-				Attributes: map[string]Value{
-					"attribute0": Value{
-						ValType: 1,
-						IntVal:  int64(rand.Intn(20)),
-					},
-				},
+			entries[i] = map[string]interface{}{
+				"id":         fmt.Sprintf("dataitem%d", i),
+				"attribute0": int64(rand.Intn(attributeCard)),
 			}
 		}
 
@@ -137,9 +112,9 @@ func main() {
 			defer wg.Done()
 			opCnt := int64(0)
 			for time.Now().UnixNano() < end.UnixNano() {
-				var results []*DataItem
+				var results []*map[string]interface{}
 				findOptions := options.Find()
-				filter := bson.M{"attributes.attribute0.intval": rand.Intn(20)}
+				filter := bson.M{"attribute0": rand.Intn(attributeCard)}
 
 				t0 := time.Now()
 				cur, err := col.Find(context.Background(), filter, findOptions)
@@ -149,9 +124,14 @@ func main() {
 				if err = cur.All(context.Background(), &results); err != nil {
 					log.Fatal(err)
 				}
+
 				hist.Add(time.Since(t0).Nanoseconds())
 
 				opCnt++
+
+				// for _, r := range results {
+				// 	fmt.Println(r)
+				// }
 			}
 			end = time.Now()
 			fmt.Println("operations: ", opCnt)
@@ -188,15 +168,11 @@ func main() {
 	wg.Wait()
 
 	fmt.Println("operations: ", aggOpCnt)
-	// fmt.Println("runtime: ", end.Sub(start))
 	fmt.Println("throughput: ", float64(aggOpCnt)/aggRuntime.Seconds()*float64(threadCnt))
 	fmt.Println("responseTime p50: ", durationToMillis(time.Duration(pepcentile(.5, hist))))
 	fmt.Println("responseTime p90: ", durationToMillis(time.Duration(pepcentile(.90, hist))))
 	fmt.Println("responseTime p99: ", durationToMillis(time.Duration(pepcentile(.99, hist))))
 
-	// for _, r := range results {
-	// 	fmt.Println(r)
-	// }
 }
 
 func pepcentile(percentile float64, h *stats.Histogram) int64 {
