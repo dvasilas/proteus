@@ -29,32 +29,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const stateDatabase = "stateDB"
 
-// DataItem ...
-type DataItem struct {
-	ID         string
-	Table      string
-	Attributes map[string]Value
-	Ts         Timestamp
-}
-
-// Timestamp ..
-type Timestamp struct {
-	Key string
-	Ts  time.Time
-}
-
-// Value ...
-type Value struct {
-	ValType int
-	StrVal  string
-	IntVal  int64
-}
 type catchUp struct {
 	sync.Mutex
 	catchUpDoneCh  chan int
@@ -300,12 +281,12 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 		return nil, utils.Error(err)
 	}
 
-	var results []*DataItem
+	var results []*map[string]interface{}
 	findOptions := options.Find()
 
 	query.GetPredicate()[0].GetAttr().GetAttrKey()
 
-	filter := bson.M{fmt.Sprintf("attributes.%s.intval", query.GetPredicate()[0].GetAttr().GetAttrKey()): query.GetPredicate()[0].GetLbound().GetInt()}
+	filter := bson.M{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetInt()}
 
 	cur, err := col.Find(context.Background(), filter, findOptions)
 	if err != nil {
@@ -317,25 +298,36 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 
 	respRecords := make([]*qpuextapi.QueryRespRecord, len(results))
 	for i, result := range results {
-		attributes := make(map[string]string)
-		for k, v := range result.Attributes {
-			switch v.ValType {
-			case 0:
-				attributes[k] = v.StrVal
-			case 1:
-				attributes[k] = strconv.Itoa(int(v.IntVal))
-			}
-		}
 
-		timestamp, err := ptypes.TimestampProto(result.Ts.Ts)
+		id := (*result)["id"].(string)
+		vc := (*result)["ts"].(map[string]interface{})
+		ts := vc["ts"].(primitive.DateTime).Time()
+
+		delete(*result, "_id")
+		delete(*result, "id")
+		delete(*result, "ts")
+
+		timestamp, err := ptypes.TimestampProto(ts)
 		if err != nil {
 			return nil, utils.Error(err)
 		}
 
+		attributes := make(map[string]string)
+		for k, v := range *result {
+			switch v.(type) {
+			case string:
+				attributes[k] = v.(string)
+			case int:
+				attributes[k] = strconv.Itoa(v.(int))
+			case int64:
+				attributes[k] = strconv.FormatInt(v.(int64), 10)
+			}
+		}
+
 		respRecords[i] = &qpuextapi.QueryRespRecord{
-			RecordId:   result.ID,
+			RecordId:   id,
 			Attributes: attributes,
-			Timestamp:  map[string]*tspb.Timestamp{result.Ts.Key: timestamp},
+			Timestamp:  map[string]*tspb.Timestamp{vc["key"].(string): timestamp},
 		}
 	}
 
@@ -439,21 +431,15 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 
 	} else if respRecordType == libqpu.Delta {
 		if respRecord.GetLogOp().HasOldState() {
-			attributes := make(map[string]Value)
+			update := bson.M{}
 			for k, v := range respRecord.GetAttributes() {
 				switch v.GetVal().(type) {
 				case *qpu.Value_Str:
-					attributes[k] = Value{
-						ValType: 0,
-						StrVal:  v.GetStr(),
-					}
+					update[k] = v.GetStr()
 				case *qpu.Value_Int:
-					attributes[k] = Value{
-						ValType: 1,
-						IntVal:  v.GetInt(),
-					}
+					update[k] = v.GetInt()
 				case *qpu.Value_Flt:
-					return utils.Error(errors.New("float value not implemented"))
+					update[k] = v.GetFlt()
 				default:
 					return utils.Error(errors.New("unknown value type"))
 				}
@@ -466,9 +452,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 
 			_, err = col.UpdateOne(context.Background(),
 				bson.D{{"id", respRecord.GetLogOp().GetObjectId()}},
-				bson.D{{"$set",
-					bson.M{"attributes": attributes},
-				}},
+				bson.M{"$set": update},
 			)
 			if err != nil {
 				return utils.Error(err)
@@ -525,7 +509,7 @@ func (q *IndexQPU) flushState() error {
 	return nil
 }
 
-func (q *IndexQPU) encodeDataItem(respRecord libqpu.ResponseRecord) (DataItem, error) {
+func (q *IndexQPU) encodeDataItem(respRecord libqpu.ResponseRecord) (map[string]interface{}, error) {
 	var timestamp *timestamp.Timestamp
 	var timestampKey string
 	for k, t := range respRecord.GetLogOp().GetTimestamp().GetVc() {
@@ -535,37 +519,27 @@ func (q *IndexQPU) encodeDataItem(respRecord libqpu.ResponseRecord) (DataItem, e
 
 	ts, err := ptypes.Timestamp(timestamp)
 	if err != nil {
-		return DataItem{}, err
+		return nil, err
 	}
 
-	di := DataItem{
-		ID:         respRecord.GetLogOp().GetObjectId(),
-		Table:      respRecord.GetLogOp().GetTable(),
-		Attributes: make(map[string]Value),
-		Ts: Timestamp{
-			Key: timestampKey,
-			Ts:  ts,
+	di := map[string]interface{}{
+		"id": respRecord.GetLogOp().GetObjectId(),
+		"ts": map[string]interface{}{
+			"key": timestampKey,
+			"ts":  ts,
 		},
 	}
 
 	for k, v := range respRecord.GetAttributes() {
 		switch v.GetVal().(type) {
 		case *qpu.Value_Str:
-			val := Value{
-				ValType: 0,
-				StrVal:  v.GetStr(),
-			}
-			di.Attributes[k] = val
+			di[k] = v.GetStr()
 		case *qpu.Value_Int:
-			val := Value{
-				ValType: 1,
-				IntVal:  v.GetInt(),
-			}
-			di.Attributes[k] = val
+			di[k] = v.GetInt()
 		case *qpu.Value_Flt:
-			return DataItem{}, utils.Error(errors.New("float value not implemented"))
+			di[k] = v.GetFlt()
 		default:
-			return DataItem{}, utils.Error(errors.New("unknown value type"))
+			return nil, utils.Error(errors.New("unknown value type"))
 		}
 	}
 
