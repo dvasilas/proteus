@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"os"
+	"strconv"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,8 +17,8 @@ import (
 )
 
 var load = false
-var execTime = 20
-var threadCnt = 1
+var execTime = 40
+//var threadCnt = 1
 var dbSize = 1000
 var attributeCard = dbSize / 20
 
@@ -31,12 +33,18 @@ var (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	t, err := strconv.ParseInt(os.Args[1], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	threadCnt := int(t)
+
 	clientOptions := options.MergeClientOptions(
 		&options.ClientOptions{
 			Auth: &options.Credential{
 				Username: "root",
 				Password: "example",
-			}}).ApplyURI("mongodb://localhost:27017")
+			}}).ApplyURI("mongodb://127.0.0.1:27017")
 
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
@@ -134,9 +142,6 @@ func main() {
 				// }
 			}
 			end = time.Now()
-			fmt.Println("operations: ", opCnt)
-			fmt.Println("runtime: ", end.Sub(start))
-			fmt.Println("throughput: ", float64(opCnt)/end.Sub(start).Seconds())
 			opCntCh <- opCnt
 			runtimeCh <- end.Sub(start)
 		}()
@@ -150,11 +155,9 @@ func main() {
 	for {
 		select {
 		case opCnt := <-opCntCh:
-			fmt.Println("got ", opCnt)
 			aggOpCnt += opCnt
 			opCntThreadCnt++
 		case runtime := <-runtimeCh:
-			fmt.Println("got ", runtime)
 			aggRuntime += runtime
 			runtimeThreadCnt++
 		}
@@ -167,6 +170,7 @@ func main() {
 
 	wg.Wait()
 
+	fmt.Println("threads: ", threadCnt)
 	fmt.Println("operations: ", aggOpCnt)
 	fmt.Println("throughput: ", float64(aggOpCnt)/aggRuntime.Seconds()*float64(threadCnt))
 	fmt.Println("responseTime p50: ", durationToMillis(time.Duration(pepcentile(.5, hist))))
