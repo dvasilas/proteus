@@ -14,8 +14,8 @@ import (
 	"google.golang.org/grpc/benchmark/stats"
 )
 
-var execTime = 10
-var attributeCard = 20
+var execTime = 40
+var attributeCard = 50
 
 var (
 	histogramOpts = stats.HistogramOptions{
@@ -35,17 +35,17 @@ func main() {
 	threadCnt := int(t)
 
 	for {
-		c, err := net.DialTimeout("tcp", "127.0.0.1:50350", time.Duration(time.Second))
+		c, err := net.DialTimeout("tcp", "127.0.0.1:50450", time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retrying connecting to: 127.0.0.1:50350")
+			fmt.Println("retrying connecting to: 127.0.0.1:50450")
 		} else {
 			c.Close()
 			break
 		}
 	}
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50350}, 256, 256, false)
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50450}, 256, 256, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,11 +67,10 @@ func main() {
 			for time.Now().UnixNano() < end.UnixNano() {
 
 				t0 := time.Now()
-				resp, err := c.Query(fmt.Sprintf("select * from testbuck1 where attribute0 = %d", int64(rand.Intn(attributeCard))))
+				_, err := c.Query(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
 				if err != nil {
 					log.Fatal(err)
 				}
-				fmt.Println(resp)
 
 				hist.Add(time.Since(t0).Nanoseconds())
 
@@ -79,9 +78,6 @@ func main() {
 
 			}
 			end = time.Now()
-			fmt.Println("operations: ", opCnt)
-			fmt.Println("runtime: ", end.Sub(start))
-			fmt.Println("throughput: ", float64(opCnt)/end.Sub(start).Seconds())
 			opCntCh <- opCnt
 			runtimeCh <- end.Sub(start)
 		}()
@@ -95,11 +91,9 @@ func main() {
 	for {
 		select {
 		case opCnt := <-opCntCh:
-			fmt.Println("got ", opCnt)
 			aggOpCnt += opCnt
 			opCntThreadCnt++
 		case runtime := <-runtimeCh:
-			fmt.Println("got ", runtime)
 			aggRuntime += runtime
 			runtimeThreadCnt++
 		}
@@ -112,6 +106,7 @@ func main() {
 
 	wg.Wait()
 
+	fmt.Println("threads: ", threadCnt)
 	fmt.Println("operations: ", aggOpCnt)
 	fmt.Println("throughput: ", float64(aggOpCnt)/aggRuntime.Seconds()*float64(threadCnt))
 	fmt.Println("responseTime p50: ", durationToMillis(time.Duration(pepcentile(.5, hist))))

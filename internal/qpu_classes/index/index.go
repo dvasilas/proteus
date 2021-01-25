@@ -68,6 +68,7 @@ type IndexQPU struct {
 	collections                map[string]*mongo.Collection
 	database                   *mongo.Database
 	catchUp                    catchUp
+	findOptions		   *options.FindOptions
 }
 
 type inMemState struct {
@@ -112,6 +113,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 			catchupQueries: make(map[int]*catchupQuery),
 			catchUpDoneCh:  catchUpDoneCh,
 		},
+		findOptions: options.Find(),
 	}
 
 	if jqpu.measureNotificationLatency {
@@ -282,13 +284,10 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	}
 
 	var results []*map[string]interface{}
-	findOptions := options.Find()
-
-	query.GetPredicate()[0].GetAttr().GetAttrKey()
 
 	filter := bson.M{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetInt()}
 
-	cur, err := col.Find(context.Background(), filter, findOptions)
+	cur, err := col.Find(context.Background(), filter, q.findOptions)
 	if err != nil {
 		return nil, utils.Error(err)
 	}
@@ -314,13 +313,15 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 
 		attributes := make(map[string]string)
 		for k, v := range *result {
-			switch v.(type) {
-			case string:
-				attributes[k] = v.(string)
-			case int:
-				attributes[k] = strconv.Itoa(v.(int))
-			case int64:
-				attributes[k] = strconv.FormatInt(v.(int64), 10)
+			if k != "_id" && k != "id" && k != "ts" {
+				switch v.(type) {
+				case string:
+					attributes[k] = v.(string)
+				case int:
+					attributes[k] = strconv.Itoa(v.(int))
+				case int64:
+					attributes[k] = strconv.FormatInt(v.(int64), 10)
+				}
 			}
 		}
 

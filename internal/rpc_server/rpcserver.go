@@ -8,7 +8,7 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"time"
+//	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -56,7 +56,7 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 	}
 
 	server.dispatcher = workerpool.NewDispatcher(conf.ProcessingConfig.API.MaxWorkers, conf.ProcessingConfig.API.MaxJobQueue)
-	server.dispatcher.Run()
+//	server.dispatcher.Run()
 
 	for _, s := range grpcServers {
 		qpuapi.RegisterQPUAPIServer(s.Server, &server)
@@ -145,29 +145,37 @@ type jobResult struct {
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpuextapi.QueryReq) (*qpuextapi.QueryResp, error) {
-	t0 := time.Now()
+//	t0 := time.Now()
 
-	work := &Job{
-		server: s,
-		ctx:    ctx,
-		req: libqpu.NewQueryRequest(
-			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
-			nil,
-			false,
-			false),
-		result: &jobResult{},
-		done:   make(chan bool),
-	}
+//	work := &Job{
+//		server: s,
+//		ctx:    ctx,
+//		req: libqpu.NewQueryRequest(
+//			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
+//			nil,
+//			false,
+//			false),
+//		result: &jobResult{},
+//		done:   make(chan bool),
+//	}
 
-	s.dispatcher.JobQueue <- work
+//	s.dispatcher.JobQueue <- work
 
-	<-work.done
+//	<-work.done
 
-	if err := s.responseTimeM.AddFromTs(t0); err != nil {
-		return nil, err
-	}
+	return s.api.QueryUnary(libqpu.NewQueryRequest(
+		libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
+		nil,
+		false,
+		false),
+	nil)
 
-	return work.result.response, work.result.err
+//	if err := s.responseTimeM.AddFromTs(t0); err != nil {
+//		return nil, err
+//	}
+
+//	return work.result.response, work.result.err
+//	return resp, err
 }
 
 // GetConfig implements the QPU's low level GetConfig API.

@@ -72,9 +72,9 @@ image-push:
 .PHONY: image-push-registry
 ## image-push-registry: Pushes image to registry service
 image-push-registry:
-	docker tag qpu/dev ${IMG_REG}
-	docker push ${IMG_REG}
-	docker tag qpu/dev ${IMG_REG_SL}
+#	docker tag qpu/dev ${IMG_REG}
+#	docker push ${IMG_REG}
+	docker tag qpu/stateless ${IMG_REG_SL}
 	docker push ${IMG_REG_SL}
 
 .PHONY: clean
