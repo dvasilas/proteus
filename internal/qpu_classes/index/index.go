@@ -2,6 +2,7 @@ package indexqpu
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -68,7 +69,7 @@ type IndexQPU struct {
 	collections                map[string]*mongo.Collection
 	database                   *mongo.Database
 	catchUp                    catchUp
-	findOptions		   *options.FindOptions
+	findOptions                *options.FindOptions
 }
 
 type inMemState struct {
@@ -337,6 +338,72 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	}, nil
 }
 
+// ClientQuery1 ...
+func (q *IndexQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
+	col, err := q.collection(query.GetTable())
+	if err != nil {
+		return nil, utils.Error(err)
+	}
+
+	var results []*map[string]interface{}
+
+	filter := bson.M{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetInt()}
+
+	cur, err := col.Find(context.Background(), filter, q.findOptions)
+	if err != nil {
+		return nil, utils.Error(err)
+	}
+	if err = cur.All(context.Background(), &results); err != nil {
+		return nil, utils.Error(err)
+	}
+
+	respRecords := make([]*qpuextapi.QueryRespRecord1, len(results))
+	for i, result := range results {
+		response := make(map[string]*qpuextapi.Payload)
+		response["id"] = &qpuextapi.Payload{
+			Value: []byte((*result)["id"].(string)),
+		}
+		// 	id := (*result)["id"].(string)
+		// 	vc := (*result)["ts"].(map[string]interface{})
+		// 	ts := vc["ts"].(primitive.DateTime).Time()
+
+		// 	delete(*result, "_id")
+		// 	delete(*result, "id")
+		// 	delete(*result, "ts")
+
+		// 	timestamp, err := ptypes.TimestampProto(ts)
+		// 	if err != nil {
+		// 		return nil, utils.Error(err)
+		// 	}
+
+		// 	attributes := make(map[string]string)
+		for k, v := range *result {
+			if k != "_id" && k != "id" && k != "ts" {
+				switch v.(type) {
+				case int64:
+					b := make([]byte, 8)
+					binary.LittleEndian.PutUint64(b, uint64(v.(int64)))
+					response[k] = &qpuextapi.Payload{
+						Value: b,
+					}
+				}
+			}
+		}
+
+		respRecords[i] = &qpuextapi.QueryRespRecord1{
+			Response: response,
+		}
+		// 		RecordId:   id,
+		// 		Attributes: attributes,
+		// 		Timestamp:  map[string]*tspb.Timestamp{vc["key"].(string): timestamp},
+		// 	}
+	}
+
+	return &qpuextapi.QueryResp1{
+		RespRecord: respRecords,
+	}, nil
+}
+
 // ProcessQuerySubscribe ...
 func (q *IndexQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	return -1, nil, nil
@@ -452,7 +519,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 			}
 
 			_, err = col.UpdateOne(context.Background(),
-				bson.D{{"id", respRecord.GetLogOp().GetObjectId()}},
+				bson.D{{"id", respRecord.GetLogOp().GetObjectID()}},
 				bson.M{"$set": update},
 			)
 			if err != nil {
@@ -524,7 +591,7 @@ func (q *IndexQPU) encodeDataItem(respRecord libqpu.ResponseRecord) (map[string]
 	}
 
 	di := map[string]interface{}{
-		"id": respRecord.GetLogOp().GetObjectId(),
+		"id": respRecord.GetLogOp().GetObjectID(),
 		"ts": map[string]interface{}{
 			"key": timestampKey,
 			"ts":  ts,

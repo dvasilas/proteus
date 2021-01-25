@@ -58,8 +58,8 @@ func LogOperationState(recordID, table string, ts *qpu.Vectorclock,
 	}
 }
 
-// GetObjectId ...
-func (op LogOperation) GetObjectId() string {
+// GetObjectID ...
+func (op LogOperation) GetObjectID() string {
 	return op.Op.GetObjectId()
 }
 

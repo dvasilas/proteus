@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"math/rand"
@@ -67,9 +68,13 @@ func main() {
 			for time.Now().UnixNano() < end.UnixNano() {
 
 				t0 := time.Now()
-				_, err := c.Query(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
+				resp, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
 				if err != nil {
 					log.Fatal(err)
+				}
+
+				for _, r := range resp.GetRespRecord() {
+					fmt.Println(r.GetResponse()["id"], int64(binary.LittleEndian.Uint64(r.GetResponse()["attribute0"].GetValue())))
 				}
 
 				hist.Add(time.Since(t0).Nanoseconds())

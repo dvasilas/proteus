@@ -8,7 +8,8 @@ import (
 	"log"
 	"net"
 	"strconv"
-//	"time"
+
+	//	"time"
 
 	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -56,7 +57,7 @@ func NewServer(port string, tracing bool, api libqpu.APIProcessor, state libqpu.
 	}
 
 	server.dispatcher = workerpool.NewDispatcher(conf.ProcessingConfig.API.MaxWorkers, conf.ProcessingConfig.API.MaxJobQueue)
-//	server.dispatcher.Run()
+	//	server.dispatcher.Run()
 
 	for _, s := range grpcServers {
 		qpuapi.RegisterQPUAPIServer(s.Server, &server)
@@ -116,66 +117,71 @@ func (s *Server) Query(stream qpuapi.QPUAPI_QueryServer) error {
 	}
 }
 
-// Job ...
-type Job struct {
-	server *Server
-	ctx    context.Context
-	req    libqpu.QueryRequest
-	result *jobResult
-	done   chan bool
-}
+// // Job ...
+// type Job struct {
+// 	server *Server
+// 	ctx    context.Context
+// 	req    libqpu.QueryRequest
+// 	result *jobResult
+// 	done   chan bool
+// }
 
-// Do ...
-func (j *Job) Do() {
-	j.do(j.ctx, j.server, j.req)
-	j.done <- true
-}
+// // Do ...
+// func (j *Job) Do() {
+// 	j.do(j.ctx, j.server, j.req)
+// 	j.done <- true
+// }
 
-func (j *Job) do(ctx context.Context, s *Server, req libqpu.QueryRequest) {
-	resp, err := s.api.QueryUnary(req, nil)
+// func (j *Job) do(ctx context.Context, s *Server, req libqpu.QueryRequest) {
+// 	resp, err := s.api.QueryUnary(req, nil)
 
-	j.result.response = resp
-	j.result.err = err
-}
+// 	j.result.response = resp
+// 	j.result.err = err
+// }
 
-type jobResult struct {
-	response *qpuextapi.QueryResp
-	err      error
-}
+// type jobResult struct {
+// 	response *qpuextapi.QueryResp
+// 	err      error
+// }
 
 // QueryUnary ...
 func (s *Server) QueryUnary(ctx context.Context, req *qpuextapi.QueryReq) (*qpuextapi.QueryResp, error) {
-//	t0 := time.Now()
+	//	t0 := time.Now()
 
-//	work := &Job{
-//		server: s,
-//		ctx:    ctx,
-//		req: libqpu.NewQueryRequest(
-//			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
-//			nil,
-//			false,
-//			false),
-//		result: &jobResult{},
-//		done:   make(chan bool),
-//	}
+	//	work := &Job{
+	//		server: s,
+	//		ctx:    ctx,
+	//		req: libqpu.NewQueryRequest(
+	//			libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
+	//			nil,
+	//			false,
+	//			false),
+	//		result: &jobResult{},
+	//		done:   make(chan bool),
+	//	}
 
-//	s.dispatcher.JobQueue <- work
+	//	s.dispatcher.JobQueue <- work
 
-//	<-work.done
+	//	<-work.done
 
 	return s.api.QueryUnary(libqpu.NewQueryRequest(
 		libqpu.NewQuery(libqpu.NewSQLQuery(req.QueryStr), nil),
 		nil,
 		false,
 		false),
-	nil)
+		nil)
 
-//	if err := s.responseTimeM.AddFromTs(t0); err != nil {
-//		return nil, err
-//	}
+	//	if err := s.responseTimeM.AddFromTs(t0); err != nil {
+	//		return nil, err
+	//	}
 
-//	return work.result.response, work.result.err
-//	return resp, err
+	//	return work.result.response, work.result.err
+	//	return resp, err
+}
+
+// QueryUnary1 ...
+func (s *Server) QueryUnary1(ctx context.Context, req *qpuextapi.QueryReq) (*qpuextapi.QueryResp1, error) {
+	return s.api.QueryUnary1(req.GetQueryStr())
 }
 
 // GetConfig implements the QPU's low level GetConfig API.

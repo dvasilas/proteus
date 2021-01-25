@@ -322,7 +322,7 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 
 func getCacheConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.CacheConfig.Size = inputConf.CacheConfig.Size
-	config.CacheConfig.Ttl = inputConf.CacheConfig.Ttl
+	config.CacheConfig.TTL = inputConf.CacheConfig.Ttl
 
 	return nil
 }

@@ -82,6 +82,13 @@ func (c QPUAPIClient) QueryUnary(query string) (*qpuextapi.QueryResp, error) {
 	})
 }
 
+// QueryUnary1 ...
+func (c QPUAPIClient) QueryUnary1(query string) (*qpuextapi.QueryResp1, error) {
+	return c.cli.QueryUnary1(context.Background(), &qpuextapi.QueryReq{
+		QueryStr: query,
+	})
+}
+
 // GetConfig implements the QPU's API GetConfig method.
 func (c QPUAPIClient) GetConfig() (*qpuapi.ConfigResponse, error) {
 	ctx := context.TODO()

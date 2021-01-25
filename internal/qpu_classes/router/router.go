@@ -41,15 +41,20 @@ func (q *RouterQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]st
 
 // ClientQuery ...
 func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
-	queryRespCh := make(chan qpuextapi.QueryResp)
+	return nil, nil
+}
+
+// ClientQuery1 ...
+func (q *RouterQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
+	queryRespCh := make(chan qpuextapi.QueryResp1)
 	errorCh := make(chan error)
 
-	respRecords := make([]*qpuextapi.QueryRespRecord, 0)
+	respRecords := make([]*qpuextapi.QueryRespRecord1, 0)
 	subQueryCount := len(q.adjacentQPUs)
 
 	for _, adjQPU := range q.adjacentQPUs {
 		go func(to *libqpu.AdjacentQPU) {
-			resp, err := to.APIClient.QueryUnary(queryStr)
+			resp, err := to.APIClient.QueryUnary1(queryStr)
 			if err != nil {
 				errorCh <- err
 				return
@@ -67,7 +72,7 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSp
 			if returnedCount == subQueryCount {
 				close(queryRespCh)
 				close(errorCh)
-				return &qpuextapi.QueryResp{
+				return &qpuextapi.QueryResp1{
 					RespRecord: respRecords,
 				}, nil
 			}

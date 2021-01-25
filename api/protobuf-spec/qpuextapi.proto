@@ -11,6 +11,7 @@ import "google/protobuf/timestamp.proto";
 
 service QPUAPI {
   rpc QueryUnary(QueryReq) returns (QueryResp) {}
+  rpc QueryUnary1(QueryReq) returns (QueryResp1) {}
   rpc GetMetrics(MetricsRequest) returns (MetricsResponse) {}
 
   rpc LobstersFrontpage(LobFrontpageReq) returns (LobFrontpageResp) {}
@@ -24,6 +25,25 @@ message QueryReq {
 
 message QueryResp {
   repeated QueryRespRecord respRecord = 1;
+}
+
+message QueryResp1 {
+  repeated QueryRespRecord1 respRecord = 1;
+}
+
+message QueryRespRecord1 {
+  map<string, Payload> response = 1;
+  map<string, google.protobuf.Timestamp> timestamp = 2;
+}
+
+message Payload {
+  enum PayloadType {
+    STRING = 0;
+    INT = 1;
+    FLOAT = 2;
+  }
+  PayloadType type = 1;
+  bytes value = 2;
 }
 
 message QueryRespRecord {
