@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -32,6 +35,7 @@ import (
 // APIProcessor implements the libqpu.APIProcessor interface.
 // It provides access to the methods implemented by libqpu.QPUClass.
 type APIProcessor struct {
+	config                     *libqpu.QPUConfig
 	qpuClass                   libqpu.QPUClass
 	sqlCache                   *sqlToASTCache
 	measureNotificationLatency bool
@@ -62,6 +66,7 @@ func NewProcessor(qpu *libqpu.QPU, catchUpDoneCh chan int) (*APIProcessor, error
 
 	s := &APIProcessor{
 		qpuClass:                   qpuClass,
+		config:                     qpu.Config,
 		sqlCache:                   newSQLToASTCache(),
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
 		measureDataTransfer:        qpu.Config.Evaluation.MeasureDataTransfer,
@@ -211,7 +216,10 @@ func (s *APIProcessor) Query(queryReq libqpu.QueryRequest, stream libqpu.Request
 
 // QueryUnary ...
 func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
-	astQuery, found := s.sqlCache.get(req.GetSQLStr())
+	astQuery, found, err := s.sqlCache.get(req.GetSQLStr())
+	if err != nil {
+		return nil, err
+	}
 	if !found {
 		var err error
 		astQuery, err = sqlparser.Parse(req.GetSQLStr())
@@ -232,6 +240,38 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 	}
 
 	return resp, err
+}
+
+// QueryUnary1 ...
+func (s *APIProcessor) QueryUnary1(req string) (*qpuextapi.QueryResp1, error) {
+	switch s.config.Operator {
+	case libqpu.Router:
+		return s.qpuClass.ClientQuery1(libqpu.ASTQuery{}, req)
+	default:
+		astQuery, found, err := s.sqlCache.get(req)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			var err error
+			astQuery, err = sqlparser.Parse(req)
+			if err != nil {
+				return nil, err
+			}
+			s.sqlCache.put(req, astQuery)
+		}
+
+		return s.qpuClass.ClientQuery1(astQuery, req)
+	}
+
+	// if s.measureDataTransfer {
+	// 	respSize, err := getQueryRespSize(resp)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	s.dataTransferCh <- respSize
+	// }
+
 }
 
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
@@ -299,21 +339,47 @@ func newSQLToASTCache() *sqlToASTCache {
 }
 
 func (c *sqlToASTCache) put(sqlStmt string, ast libqpu.ASTQuery) {
+	var cacheKey string
+	if strings.Contains(sqlStmt, "=") {
+		queryStr := strings.Split(sqlStmt, "=")
+		cacheKey = fmt.Sprintf("%s = ", queryStr[0])
+	} else {
+		log.Fatal("sql caching implementation only supports point queries")
+	}
+
 	c.Lock()
-	if _, ok := c.m[sqlStmt]; ok {
+	if _, ok := c.m[cacheKey]; ok {
 		c.Unlock()
 		return
 	}
-	c.m[sqlStmt] = ast
+	c.m[cacheKey] = ast
 	c.Unlock()
 }
 
-func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool) {
-	c.RLock()
-	ast, found := c.m[sqlStmt]
-	c.RUnlock()
+func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool, error) {
+	var cacheKey string
+	if strings.Contains(sqlStmt, "=") {
+		queryStr := strings.Split(sqlStmt, "=")
+		cacheKey = fmt.Sprintf("%s = ", queryStr[0])
 
-	return ast, found
+		c.RLock()
+		ast, found := c.m[cacheKey]
+		c.RUnlock()
+		val, err := strconv.ParseInt(queryStr[1][1:], 10, 64)
+		if err != nil {
+			return libqpu.ASTQuery{}, false, utils.Error(err)
+		}
+
+		if found {
+			ast.Q.Predicate[0].Lbound = libqpu.ValueInt(val)
+			ast.Q.Predicate[0].Ubound = libqpu.ValueInt(val)
+		}
+
+		return ast, found, nil
+	}
+	return libqpu.ASTQuery{}, false, utils.Error(errors.New("sql caching implementation only supports point queries"))
+
+	// return libqpu.ASTQuery{}, false, utils.Error(errors.New("should not have reached here"))
 }
 
 func getQueryRespSize(resp *qpuextapi.QueryResp) (int64, error) {

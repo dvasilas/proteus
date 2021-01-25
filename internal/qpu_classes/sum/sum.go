@@ -194,6 +194,11 @@ func (q *SumQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan 
 	return nil, errors.New("not implemented")
 }
 
+// ClientQuery1 ...
+func (q *SumQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
+	return nil, nil
+}
+
 // GetConfig ...
 func (q *SumQPU) GetConfig() *qpuapi.ConfigResponse {
 	return &qpuapi.ConfigResponse{

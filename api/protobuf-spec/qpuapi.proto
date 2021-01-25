@@ -15,6 +15,8 @@ service QPUAPI {
   // that look like SELECT .. FROM .. WHERE .. LIMIT N
   // and so do not care about streaming anyways.
   rpc QueryUnary(qpuextapi.QueryReq) returns (qpuextapi.QueryResp) {}
+
+  rpc QueryUnary1(qpuextapi.QueryReq) returns (qpuextapi.QueryResp1) {}
   // The QPU GetConfig API.
   // Used by a 'parent' QPU to request the configuration and query processing
   // capabilities of a 'child` QPU.

@@ -73,6 +73,11 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	return resp, nil
 }
 
+// ClientQuery1 ...
+func (q *CacheQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
+	return nil, nil
+}
+
 // ProcessQuerySubscribe ...
 func (q *CacheQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	return -1, nil, nil

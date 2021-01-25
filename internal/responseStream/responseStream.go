@@ -6,7 +6,6 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	workerpool "github.com/dvasilas/proteus/internal/worker_pool"
 )
 
 // This package is responsible for implementing the functionality of receiving
@@ -35,8 +34,8 @@ func (j *Job) Do() {
 // When a record of type libqpu.EndOfStream is received, it closes the stream
 // using the streams cancel function.
 func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, processLogOp func(libqpu.ResponseRecord, interface{}, chan libqpu.ResponseRecord, int) error, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
-	dispatcher := workerpool.NewDispatcher(maxWorkers, maxQueue)
-	dispatcher.Run()
+	// dispatcher := workerpool.NewDispatcher(maxWorkers, maxQueue)
+	// dispatcher.Run()
 
 	for {
 		respRecord, err := stream.Recv()
@@ -49,16 +48,19 @@ func StreamConsumer(stream libqpu.ResponseStream, maxWorkers, maxQueue int, proc
 
 		respRecord.InTs = time.Now()
 
-		go func(respRecord libqpu.ResponseRecord) {
-			work := &Job{
-				respRecord:   respRecord,
-				data:         data,
-				recordCh:     recordCh,
-				processLogOp: processLogOp,
-				queryID:      queryID,
+		go func(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) {
+			// work := &Job{
+			// 	respRecord:   respRecord,
+			// 	data:         data,
+			// 	recordCh:     recordCh,
+			// 	processLogOp: processLogOp,
+			// 	queryID:      queryID,
+			// }
+			err := processLogOp(respRecord, data, recordCh, queryID)
+			if err != nil {
+				utils.Error(err)
 			}
-
-			dispatcher.JobQueue <- work
-		}(respRecord)
+			// dispatcher.JobQueue <- work
+		}(respRecord, data, recordCh, queryID)
 	}
 }

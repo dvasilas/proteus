@@ -180,7 +180,7 @@ func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parent
 						attributes[k] = valStr
 					}
 					respRecords = append(respRecords, &qpuextapi.QueryRespRecord{
-						RecordId:   logOp.GetObjectId(),
+						RecordId:   logOp.GetObjectID(),
 						Attributes: attributes,
 						Timestamp:  logOp.GetTimestamp().GetVc(),
 					})
@@ -201,6 +201,11 @@ func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parent
 	return &qpuextapi.QueryResp{
 		RespRecord: respRecords,
 	}, nil
+}
+
+// ClientQuery1 ...
+func (q *DsDriverQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
+	return nil, nil
 }
 
 // RemovePersistentQuery ...

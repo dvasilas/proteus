@@ -35,7 +35,7 @@ func (c *Cache) onEvictFunc(key string) {
 func New(config *libqpu.QPUConfig) *Cache {
 	c := &Cache{
 		maxSize: config.CacheConfig.Size,
-		ttl:     config.CacheConfig.Ttl,
+		ttl:     config.CacheConfig.TTL,
 		ll:      list.New(),
 		items:   make(map[string]*list.Element),
 	}
