@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
 	"math/rand"
@@ -11,6 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 	"google.golang.org/grpc/benchmark/stats"
 )
@@ -27,7 +30,7 @@ var (
 )
 
 func main() {
-	time.Now().UTC().UnixNano()
+	rand.Seed(time.Now().UTC().UnixNano())
 
 	t, err := strconv.ParseInt(os.Args[1], 10, 64)
 	if err != nil {
@@ -51,6 +54,31 @@ func main() {
 		log.Fatal(err)
 	}
 
+	awsRegion := "us-east-1"
+	s3ForcePathStyle := true
+	awsConf := aws.Config{
+		Endpoint:         aws.String("http://127.0.0.1:8000"),
+		Region:           &awsRegion,
+		S3ForcePathStyle: &s3ForcePathStyle,
+		Credentials:      credentials.NewStaticCredentials("accessKey1", "verySecretKey1", ""),
+	}
+	sess := session.Must(session.NewSession(&awsConf))
+	svc := s3.New(sess)
+
+	listObjectsIn := s3.ListObjectsV2Input{
+		Bucket: aws.String("ycsbbuck"),
+	}
+
+	listObjectsRes, err := svc.ListObjectsV2(&listObjectsIn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bucket := make([]string, len(listObjectsRes.Contents))
+	for i, object := range listObjectsRes.Contents {
+		bucket[i] = *object.Key
+	}
+
 	opCntCh := make(chan int64)
 	runtimeCh := make(chan time.Duration)
 
@@ -67,18 +95,50 @@ func main() {
 			opCnt := int64(0)
 			for time.Now().UnixNano() < end.UnixNano() {
 
-				t0 := time.Now()
-				resp, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
-				if err != nil {
-					log.Fatal(err)
+				r := rand.Float32()
+
+				if r < 0.01 {
+					key := strconv.Itoa(rand.Int())
+					putObjectIn := s3.PutObjectInput{
+						Bucket: aws.String("ycsbbuck"),
+						Key:    aws.String(key),
+						Metadata: map[string]*string{
+							"attribute0": aws.String(strconv.Itoa(rand.Intn(attributeCard))),
+						},
+					}
+					_, err := svc.PutObject(&putObjectIn)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+				} else if r < 0.05 {
+					key := bucket[rand.Intn(len(bucket))]
+					putObjectIn := s3.PutObjectInput{
+						Bucket: aws.String("ycsbbuck"),
+						Key:    aws.String(key),
+						Metadata: map[string]*string{
+							"attribute0": aws.String(strconv.Itoa(rand.Intn(attributeCard))),
+						},
+					}
+					_, err := svc.PutObject(&putObjectIn)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+				} else {
+
+					t0 := time.Now()
+					_, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					// for _, r := range resp.GetRespRecord() {
+					// 	fmt.Println(r.GetResponse()["id"], int64(binary.LittleEndian.Uint64(r.GetResponse()["attribute0"].GetValue())))
+					// }
+
+					hist.Add(time.Since(t0).Nanoseconds())
 				}
-
-				for _, r := range resp.GetRespRecord() {
-					fmt.Println(r.GetResponse()["id"], int64(binary.LittleEndian.Uint64(r.GetResponse()["attribute0"].GetValue())))
-				}
-
-				hist.Add(time.Since(t0).Nanoseconds())
-
 				opCnt++
 
 			}
