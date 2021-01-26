@@ -202,6 +202,8 @@ func getOperatorType(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 		config.Operator = libqpu.Join
 	case "index":
 		config.Operator = libqpu.Index
+	case "inMemIndex":
+		config.Operator = libqpu.InMemIndex
 	case "cache":
 		config.Operator = libqpu.Cache
 	case "router":

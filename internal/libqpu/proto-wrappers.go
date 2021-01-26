@@ -76,6 +76,14 @@ func (op LogOperation) HasOldState() bool {
 	return false
 }
 
+// GetAttributesOld ...
+func (op LogOperation) GetAttributesOld() map[string]*qpu.Value {
+	if op.Op.GetPayload().GetDelta().GetOld() != nil {
+		return op.Op.GetPayload().GetDelta().GetOld().GetAttributes()
+	}
+	return nil
+}
+
 // GetAttributes ...
 func (op LogOperation) GetAttributes() map[string]*qpu.Value {
 	if op.Op.GetPayload().GetState() != nil {
@@ -175,6 +183,12 @@ func (r ResponseRecord) GetSequenceID() int64 {
 // GetLogOp ...
 func (r ResponseRecord) GetLogOp() LogOperation {
 	return LogOperation{Op: r.Rec.GetLogOp()}
+}
+
+// GetAttributesOld ...
+func (r ResponseRecord) GetAttributesOld() map[string]*qpu.Value {
+	op := LogOperation{Op: r.Rec.GetLogOp()}
+	return op.GetAttributesOld()
 }
 
 // GetAttributes ...
