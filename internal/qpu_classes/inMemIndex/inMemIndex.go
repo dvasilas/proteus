@@ -39,7 +39,7 @@ type catchUp struct {
 type catchupQuery struct {
 	endOfStreamSeqID int64
 	catchupDone      bool
-	appliedSeqID     int64
+	catchUpSeqID     map[int64]bool
 }
 
 // InMemIndex represents a generic B-Tree index.
@@ -154,7 +154,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 					}
 					queryID := rand.Int()
 					jqpu.catchUp.catchupQueries[queryID] = &catchupQuery{
-						appliedSeqID:     -1,
+						catchUpSeqID:     make(map[int64]bool),
 						endOfStreamSeqID: -1,
 					}
 					go func() {
@@ -179,9 +179,19 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 
 			done := true
 			for _, q := range jqpu.catchUp.catchupQueries {
-				if q.appliedSeqID < 0 || q.endOfStreamSeqID < 0 || q.appliedSeqID+1 != q.endOfStreamSeqID {
+				if q.endOfStreamSeqID < 0 {
 					done = false
 					break
+				} else if len(q.catchUpSeqID) < int(q.endOfStreamSeqID) {
+					done = false
+
+				} else {
+					for _, v := range q.catchUpSeqID {
+						if !v {
+							done = false
+							break
+						}
+					}
 				}
 			}
 
@@ -297,6 +307,10 @@ func (q *IndexQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 // ---------------- Internal Functions --------------
 
 func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
+	q.catchUp.Lock()
+	q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = false
+	q.catchUp.Unlock()
+
 	respRecordType, err := respRecord.GetType()
 	if err != nil {
 		return err
@@ -305,6 +319,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	if respRecordType == libqpu.EndOfStream {
 		q.catchUp.Lock()
 		q.catchUp.catchupQueries[queryID].endOfStreamSeqID = respRecord.GetSequenceID()
+		q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = true
 		q.catchUp.Unlock()
 	} else {
 
@@ -330,7 +345,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 			}
 
 			q.catchUp.Lock()
-			q.catchUp.catchupQueries[queryID].appliedSeqID = respRecord.GetSequenceID()
+			q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = true
 			q.catchUp.Unlock()
 
 		} else if respRecordType == libqpu.Delta {
