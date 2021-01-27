@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
+	mongodriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mongo"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
 	"github.com/dvasilas/proteus/internal/queries"
@@ -52,6 +53,11 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		}
 	case libqpu.S3:
 		ds, err = s3driver.NewDatastore(qpu.Config, qpu.InputSchema)
+		if err != nil {
+			return &DsDriverQPU{}, err
+		}
+	case libqpu.MONGO:
+		ds, err = mongodriver.NewDatastore(qpu.Config, qpu.InputSchema)
 		if err != nil {
 			return &DsDriverQPU{}, err
 		}

@@ -181,6 +181,8 @@ const (
 	MYSQL DatastoreType = iota
 	// S3 is the enum value for a S3 storage tier
 	S3 DatastoreType = iota
+	// MONGO is the enum value for a MongoDB storage tier
+	MONGO DatastoreType = iota
 )
 
 // AggregationType ...
