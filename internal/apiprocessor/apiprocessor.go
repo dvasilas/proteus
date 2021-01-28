@@ -374,8 +374,8 @@ func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool, error) {
 		}
 
 		if found {
-			ast.Q.Predicate[0].Lbound = libqpu.ValueInt(val)
-			ast.Q.Predicate[0].Ubound = libqpu.ValueInt(val)
+			ast.Q.Predicate[0].Lbound = libqpu.ValueInt(int32(val))
+			ast.Q.Predicate[0].Ubound = libqpu.ValueInt(int32(val))
 		}
 
 		return ast, found, nil

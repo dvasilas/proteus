@@ -308,7 +308,7 @@ func Vectorclock(vc map[string]*timestamp.Timestamp) *qpu.Vectorclock {
 }
 
 //ValueInt creates a protos/utils/Value{Int} object
-func ValueInt(i int64) *qpu.Value {
+func ValueInt(i int32) *qpu.Value {
 	return &qpu.Value{
 		Val: &qpu.Value_Int{
 			Int: i,

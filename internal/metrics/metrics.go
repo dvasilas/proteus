@@ -32,8 +32,8 @@ const (
 )
 
 type opLogEntry struct {
-	recordWritten int64
-	recordsRead   []int64
+	recordWritten int32
+	recordsRead   []int32
 	ts            time.Time
 	opType        opType
 }
@@ -149,7 +149,7 @@ func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogE
 
 	for _, entry := range queryLog {
 		rec := opLogEntry{
-			recordsRead: make([]int64, len(entry.RowIDs)),
+			recordsRead: make([]int32, len(entry.RowIDs)),
 			ts:          entry.Ts,
 			opType:      query,
 		}
@@ -159,7 +159,7 @@ func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogE
 			if err != nil {
 				return log, err
 			}
-			rec.recordsRead[j] = rID
+			rec.recordsRead[j] = int32(rID)
 		}
 		log[i] = rec
 		i++
@@ -171,8 +171,8 @@ func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogE
 }
 
 func postMortem(opLog opLog) []int {
-	snapshotDatastore := make(map[int64]int)
-	snapshotQPU := make(map[int64]int)
+	snapshotDatastore := make(map[int32]int)
+	snapshotQPU := make(map[int32]int)
 	stalenessLog := make([]int, 0)
 
 	for _, entry := range opLog {

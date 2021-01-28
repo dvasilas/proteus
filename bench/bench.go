@@ -9,26 +9,29 @@ import (
 	"strconv"
 	"sync"
 	"time"
-//	"encoding/binary"
+
+	//	"encoding/binary"
 	"context"
 
+	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	proteusclient "github.com/dvasilas/proteus/pkg/proteus-go-client"
 	"google.golang.org/grpc/benchmark/stats"
 )
 
 var dbName = "cloudServer"
 var collectionName = "ycsbbuck"
 
-var load = true
+var load = false
 var insertOne = false
 var updateOne = false
 var execTime = 40
 
 var dbSize = 33000
 var attributeCard = dbSize / 10
+
+var port = 50450
 
 var (
 	histogramOpts = stats.HistogramOptions{
@@ -48,17 +51,17 @@ func main() {
 	threadCnt := int(t)
 
 	for {
-		c, err := net.DialTimeout("tcp", "127.0.0.1:50450", time.Duration(time.Second))
+		c, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), time.Duration(time.Second))
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retrying connecting to: 127.0.0.1:50450")
+			fmt.Println(fmt.Sprintf("retrying connecting to: 127.0.0.1:%d", port))
 		} else {
 			c.Close()
 			break
 		}
 	}
 
-	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: 50450}, 256, 256, false)
+	c, err := proteusclient.NewClient(proteusclient.Host{Name: "127.0.0.1", Port: port}, 256, 256, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,7 +106,6 @@ func main() {
 		dataItems[i] = (*result)["_id"].(string)
 	}
 
-
 	opCntCh := make(chan int64)
 	runtimeCh := make(chan time.Duration)
 
@@ -124,11 +126,11 @@ func main() {
 				if r < 0.01 {
 					_, err := col.InsertOne(context.TODO(), map[string]interface{}{
 						"_id":        strconv.Itoa(rand.Int()),
-						"attribute0": int64(rand.Intn(attributeCard)),
-				//		"attribute1": int64(rand.Intn(attributeCard)),
-				//		"attribute2": int64(rand.Intn(attributeCard)),
-				//		"attribute3": int64(rand.Intn(attributeCard)),
-				//		"attribute4": int64(rand.Intn(attributeCard)),
+						"attribute0": rand.Intn(attributeCard),
+						//		"attribute1": int64(rand.Intn(attributeCard)),
+						//		"attribute2": int64(rand.Intn(attributeCard)),
+						//		"attribute3": int64(rand.Intn(attributeCard)),
+						//		"attribute4": int64(rand.Intn(attributeCard)),
 					})
 					if err != nil {
 						log.Fatal(err)
@@ -145,15 +147,15 @@ func main() {
 					}
 				} else {
 					t0 := time.Now()
-					_, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int64(rand.Intn(attributeCard))))
+					_, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int32(rand.Intn(attributeCard))))
 					if err != nil {
 						log.Fatal(err)
 					}
 
 					//fmt.Println(len(resp.GetRespRecord()))
-					 //for _, r := range resp.GetRespRecord() {
-					//	fmt.Println(r.GetResponse()["id"], int64(binary.LittleEndian.Uint64(r.GetResponse()["attribute0"].GetValue())))
-					//}
+					// for _, r := range resp.GetRespRecord() {
+					// 	fmt.Println(r.GetResponse()["id"], int32(binary.LittleEndian.Uint32(r.GetResponse()["attribute0"].GetValue())))
+					// }
 
 					hist.Add(time.Since(t0).Nanoseconds())
 				}
