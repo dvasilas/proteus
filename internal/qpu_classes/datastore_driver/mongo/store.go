@@ -43,7 +43,7 @@ func NewDatastore(config *libqpu.QPUConfig, inputSchema libqpu.Schema) (MongoDat
 		err = client.Ping(context.Background(), nil)
 		if err != nil {
 			time.Sleep(2 * time.Second)
-			fmt.Println("retrying connecting to: ", config.StateBackend.Endpoint)
+			fmt.Println("retrying connecting to: ", config.DatastoreConfig.Endpoint)
 		} else {
 			break
 		}
