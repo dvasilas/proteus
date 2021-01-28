@@ -215,7 +215,7 @@ func (ds MongoDataStore) formatInsertRecord(table string, record bson.Raw) (libq
 	attributesNew := make(map[string]*qpu.Value)
 	for _, elem := range elems {
 		if strings.HasPrefix(elem.Key(), "attribute") {
-			attributesNew[elem.Key()] = libqpu.ValueInt(elem.Value().Int64())
+			attributesNew[elem.Key()] = libqpu.ValueInt(elem.Value().Int32())
 		}
 	}
 
@@ -240,7 +240,7 @@ func (ds MongoDataStore) formatUpdateRecord(table string, record bson.Raw) (libq
 	attributesNew := make(map[string]*qpu.Value)
 	for _, elem := range elems {
 		if strings.HasPrefix(elem.Key(), "attribute") {
-			attributesNew[elem.Key()] = libqpu.ValueInt(elem.Value().Int64())
+			attributesNew[elem.Key()] = libqpu.ValueInt(elem.Value().Int32())
 		}
 	}
 
@@ -260,9 +260,9 @@ func (ds MongoDataStore) formatFindResult(record map[string]interface{}) (string
 		if k != "_id" {
 			switch v.(type) {
 			case int64:
-				attrs[k] = libqpu.ValueInt(v.(int64))
+				attrs[k] = libqpu.ValueInt(int32(v.(int64)))
 			case int32:
-				attrs[k] = libqpu.ValueInt(int64(v.(int32)))
+				attrs[k] = libqpu.ValueInt(v.(int32))
 			}
 		}
 	}

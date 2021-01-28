@@ -57,7 +57,7 @@ type stateEntry struct {
 }
 
 type inMemState struct {
-	entries map[int64]*stateEntry
+	entries map[int32]*stateEntry
 	mutex   sync.RWMutex
 }
 
@@ -82,7 +82,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*JoinQPU, error) {
 		inputSchema:                qpu.InputSchema,
 		outputSchema:               make(map[string]libqpu.SchemaTable),
 		joinAttributes:             qpu.Config.JoinConfig.JoinAttribute,
-		inMemState:                 &inMemState{entries: make(map[int64]*stateEntry)},
+		inMemState:                 &inMemState{entries: make(map[int32]*stateEntry)},
 		stateTable:                 qpu.Config.JoinConfig.OutputTableAlias,
 		joinAttributeKey:           qpu.Config.JoinConfig.JoinedAttributeAlias,
 		catchUpDoneCh:              catchUpDoneCh,
@@ -440,7 +440,7 @@ func (q *JoinQPU) flushState() error {
 	return nil
 }
 
-func (q *JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
+func (q *JoinQPU) updateState(joinID int32, values map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (map[string]*qpu.Value, error) {
 	row := make(map[string]interface{})
 	for attributeKey := range values {
 		val, err := q.outputSchema.GetValue(values, q.stateTable, attributeKey)
@@ -453,7 +453,7 @@ func (q *JoinQPU) updateState(joinID int64, values map[string]*qpu.Value, vc map
 	res := q.state.GetRow(
 		q.stateTable+q.port,
 		[]string{q.joinAttributeKey},
-		[]string{fmt.Sprintf("%s = %s", q.joinAttributeKey, strconv.FormatInt(joinID, 10))},
+		[]string{fmt.Sprintf("%s = %s", q.joinAttributeKey, strconv.FormatInt(int64(joinID), 10))},
 		nil,
 	)
 

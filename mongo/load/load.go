@@ -21,7 +21,7 @@ var insertOne = false
 var updateOne = false
 var execTime = 40
 
-var dbSize = 33000
+var dbSize = 100
 var attributeCnt = 10
 
 var attributeCard = dbSize / 10
@@ -73,12 +73,12 @@ func main() {
 		for i := range entries {
 			dataItem := map[string]interface{}{
 				"_id":        fmt.Sprintf("dataitem%d", i),
-				"attribute0": int64(rand.Intn(attributeCard)),
+				"attribute0": rand.Intn(attributeCard),
 			}
 			for j := 1; j <= rand.Intn(attributeCnt); j++ {
-				dataItem[fmt.Sprintf("attribute%d", j)] = int64(rand.Intn(attributeCard))
+				dataItem[fmt.Sprintf("attribute%d", j)] = rand.Intn(attributeCard)
 			}
-//			fmt.Println(dataItem)
+			//			fmt.Println(dataItem)
 			entries[i] = dataItem
 		}
 
@@ -88,21 +88,21 @@ func main() {
 		}
 	}
 
-//	var results []*map[string]interface{}
-//	cur, err := col.Find(context.Background(), bson.M{}, options.Find())
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	if err = cur.All(context.Background(), &results); err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	dataItems := make([]string, len(results))
-//	for i, result := range results {
-//		dataItems[i] = (*result)["_id"].(string)
-//	}
-//
-//	fmt.Println(dataItems)
+	//	var results []*map[string]interface{}
+	//	cur, err := col.Find(context.Background(), bson.M{}, options.Find())
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	if err = cur.All(context.Background(), &results); err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	dataItems := make([]string, len(results))
+	//	for i, result := range results {
+	//		dataItems[i] = (*result)["_id"].(string)
+	//	}
+	//
+	//	fmt.Println(dataItems)
 
 }
 
