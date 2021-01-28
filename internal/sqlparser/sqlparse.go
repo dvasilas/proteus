@@ -408,7 +408,7 @@ func (ctx *sqlParseCtx) parseSQLVal(node sqlparser.SQLNode) (err error) {
 			return err
 		}
 		if ctx.walkState[0] == where {
-			ctx.whereExprPush(value{v: libqpu.ValueInt(valInt)})
+			ctx.whereExprPush(value{v: libqpu.ValueInt(int32(valInt))})
 		}
 
 	case sqlparser.FloatVal:

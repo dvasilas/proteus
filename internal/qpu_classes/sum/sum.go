@@ -48,12 +48,12 @@ type SumQPU struct {
 
 type inMemState struct {
 	sync.RWMutex
-	entries map[int64]*stateEntry
+	entries map[int32]*stateEntry
 }
 
 type stateEntry struct {
 	sync.RWMutex
-	val        int64
+	val        int32
 	attributes map[string]*qpu.Value
 	ts         *qpu.Vectorclock
 }
@@ -71,7 +71,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*SumQPU, error) {
 		subscribeQueries:           make(map[int]chan libqpu.LogOperation),
 		aggregationAttribute:       qpu.Config.AggregationConfig.AggregationAttribute,
 		groupBy:                    qpu.Config.AggregationConfig.GroupBy,
-		inMemState:                 &inMemState{entries: make(map[int64]*stateEntry)},
+		inMemState:                 &inMemState{entries: make(map[int32]*stateEntry)},
 		port:                       qpu.Config.Port,
 		catchUpDoneCh:              catchUpDoneCh,
 		measureNotificationLatency: qpu.Config.Evaluation.MeasureNotificationLatency,
@@ -152,7 +152,7 @@ func (q *SumQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]strin
 	go func() {
 		q.inMemState.Lock()
 		for k, e := range q.inMemState.entries {
-			recordID := strconv.FormatInt(k, 10)
+			recordID := strconv.FormatInt(int64(k), 10)
 
 			attributes := make(map[string]*qpu.Value)
 			attributes[q.groupBy] = libqpu.ValueInt(k)
@@ -315,14 +315,14 @@ func (q *SumQPU) flushState() error {
 // if no, it inserts an entry for the new groupByVal
 // if yes, it updates the entry with the new sumVal
 // it returns the new sumVal
-func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (int64, error) {
+func (q *SumQPU) updateState(groupByVal, sumVal int32, attributes map[string]*qpu.Value, vc map[string]*tspb.Timestamp) (int32, error) {
 	res := q.state.GetRow(q.schemaTable+q.port,
 		[]string{q.aggregationAttribute + "_sum"},
-		[]string{fmt.Sprintf("%s = %s", q.groupBy, strconv.FormatInt(groupByVal, 10))},
+		[]string{fmt.Sprintf("%s = %s", q.groupBy, strconv.FormatInt(int64(groupByVal), 10))},
 		nil,
 	)
 
-	var storedSumValue int64
+	var storedSumValue int32
 	errScan := res.Scan(&storedSumValue)
 	if errScan != nil && errScan != sql.ErrNoRows {
 		return -1, errScan
@@ -341,7 +341,7 @@ func (q *SumQPU) updateState(groupByVal, sumVal int64, attributes map[string]*qp
 		row[k] = val
 	}
 
-	var newSumValue int64
+	var newSumValue int32
 	var err error
 	if errScan == sql.ErrNoRows {
 		// insert the new value

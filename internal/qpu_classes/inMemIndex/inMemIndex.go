@@ -596,7 +596,7 @@ type comparable interface {
 
 // valueInt implements comparable
 type valueInt struct {
-	Val int64
+	Val int32
 }
 
 func (x valueInt) less(than comparable) bool {

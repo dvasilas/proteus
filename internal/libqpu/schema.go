@@ -121,11 +121,11 @@ func (s Schema) StrToValue(table, attributeKey, valueStr string) (*qpu.Value, er
 	case STR:
 		return ValueStr(valueStr), nil
 	case INT:
-		val, err := strconv.ParseInt(valueStr, 10, 0)
+		val, err := strconv.ParseInt(valueStr, 10, 32)
 		if err != nil {
 			return nil, err
 		}
-		return ValueInt(val), nil
+		return ValueInt(int32(val)), nil
 	case FLT:
 		val, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
@@ -157,7 +157,7 @@ func (s Schema) InterfaceToValue(table, attributeKey string, val interface{}) (*
 	case STR:
 		return ValueStr(string(val.([]byte))), nil
 	case INT:
-		return ValueInt(val.(int64)), nil
+		return ValueInt(val.(int32)), nil
 	case FLT:
 		return ValueFlt(val.(float64)), nil
 	default:

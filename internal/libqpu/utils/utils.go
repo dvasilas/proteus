@@ -64,7 +64,7 @@ func ValueToStr(v *qpu.Value) (string, error) {
 	case *qpu.Value_Str:
 		return v.GetStr(), nil
 	case *qpu.Value_Int:
-		return strconv.FormatInt(v.GetInt(), 10), nil
+		return strconv.FormatInt(int64(v.GetInt()), 10), nil
 	case *qpu.Value_Flt:
 		return "", Error(errors.New("not implemented"))
 	default:
