@@ -25,10 +25,7 @@ var updateOne = false
 var execTime = 40
 
 var dbSize = 1000
-
 var attributeCard = dbSize / 20
-
-// var attributeCard = 10
 
 var (
 	histogramOpts = stats.HistogramOptions{
@@ -73,30 +70,6 @@ func main() {
 	database := client.Database(dbName)
 	col := database.Collection(collectionName)
 
-	if load {
-		_, err := col.DeleteMany(context.TODO(), bson.D{{}})
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		entries := make([]interface{}, dbSize)
-		for i := range entries {
-			entries[i] = map[string]interface{}{
-				"_id":        fmt.Sprintf("dataitem%d", i),
-				"attribute0": int64(rand.Intn(attributeCard)),
-				"attribute1": int64(rand.Intn(attributeCard)),
-				"attribute2": int64(rand.Intn(attributeCard)),
-				"attribute3": int64(rand.Intn(attributeCard)),
-				"attribute4": int64(rand.Intn(attributeCard)),
-			}
-		}
-
-		_, err = col.InsertMany(context.TODO(), entries)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	var results []*map[string]interface{}
 	cur, err := col.Find(context.Background(), bson.M{}, options.Find())
 	if err != nil {
@@ -111,7 +84,6 @@ func main() {
 		dataItems[i] = (*result)["_id"].(string)
 	}
 
-	// fmt.Println(dataItems)
 
 	if insertOne {
 		_, err := col.InsertOne(context.TODO(), map[string]interface{}{
@@ -128,15 +100,6 @@ func main() {
 	}
 
 	if updateOne {
-		var results []*map[string]interface{}
-		cur, err := col.Find(context.Background(), bson.M{}, options.Find())
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err = cur.All(context.Background(), &results); err != nil {
-			log.Fatal(err)
-		}
-
 		dataItemID := dataItems[rand.Intn(len(dataItems))]
 
 		_, err = col.UpdateOne(context.Background(),
@@ -155,19 +118,6 @@ func main() {
 	start := time.Now()
 	end := start.Add(time.Duration(execTime) * time.Second)
 	var wg sync.WaitGroup
-	// matchStage := bson.D{{"$match", bson.D{{"operationType", "insert"}}}}
-	// ctx := context.Background()
-	// cs, err := col.Watch(ctx, mongo.Pipeline{matchStage})
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// go func() {
-	// 	for cs.Next(ctx) {
-	// 		next := cs.Current
-	// 		fmt.Println(next)
-	// 	}
-	// }()
 
 	for i := 0; i < threadCnt; i++ {
 		wg.Add(1)
@@ -177,7 +127,8 @@ func main() {
 			for time.Now().UnixNano() < end.UnixNano() {
 				r := rand.Float32()
 
-				if r < 0.01 {
+				if r < 0 {
+				//if r < 0.01 {
 					_, err := col.InsertOne(context.TODO(), map[string]interface{}{
 						"_id":        strconv.Itoa(rand.Int()),
 						"attribute0": int64(rand.Intn(attributeCard)),
@@ -189,7 +140,8 @@ func main() {
 					if err != nil {
 						log.Fatal(err)
 					}
-				} else if r < 0.05 {
+				//} else if r < 0.05 {
+				} else if r < 0 {
 					dataItemID := dataItems[rand.Intn(len(dataItems))]
 
 					_, err = col.UpdateOne(context.Background(),
@@ -200,7 +152,6 @@ func main() {
 						log.Fatal(err)
 					}
 				} else {
-
 					var results []*map[string]interface{}
 					findOptions := options.Find()
 					filter := bson.M{"attribute0": rand.Intn(attributeCard)}
@@ -210,6 +161,7 @@ func main() {
 					if err != nil {
 						log.Fatal(err)
 					}
+
 					if err = cur.All(context.Background(), &results); err != nil {
 						log.Fatal(err)
 					}
@@ -218,9 +170,9 @@ func main() {
 
 					opCnt++
 
-					// for _, r := range results {
-					// 	fmt.Println(r)
-					// }
+//					for _, r := range results {
+//						fmt.Println(r)
+//					}
 				}
 			}
 			end = time.Now()
