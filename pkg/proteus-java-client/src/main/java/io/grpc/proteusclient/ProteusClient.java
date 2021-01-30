@@ -62,9 +62,9 @@ public final class ProteusClient {
     }
   }
 
-  public QueryResp query(java.lang.String queryStr) throws InterruptedException {
+  public QueryResp1 query(java.lang.String queryStr) throws InterruptedException {
     Connection connection = getConnection();
-    QueryResp resp = connection.query(queryStr);
+    QueryResp1 resp = connection.query(queryStr);
     releaseConnection(connection);
     return resp;
   }
