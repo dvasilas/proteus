@@ -2,9 +2,9 @@ package inmemindexqpu
 
 import (
 	"container/list"
-	"encoding/binary"
 	"errors"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 
@@ -54,7 +54,7 @@ type InMemIndex struct {
 type indexImplementation interface {
 	update(*qpu.Value, *qpu.Value, libqpu.LogOperation) error
 	updateCatchUp(*qpu.Value, libqpu.LogOperation) error
-	lookup(libqpu.ASTQuery) []*qpuextapi.QueryRespRecord1
+	lookup(libqpu.ASTQuery) []*qpuextapi.QueryRespRecord
 	print()
 }
 
@@ -225,16 +225,22 @@ func (q *IndexQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]str
 
 // ClientQuery ...
 func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
-	return &qpuextapi.QueryResp{}, nil
+	// return &qpuextapi.QueryResp{}, nil
+	result := q.index.index.lookup(query)
+
+	return &qpuextapi.QueryResp{
+		RespRecord: result,
+	}, nil
 }
 
 // ClientQuery1 ...
 func (q *IndexQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
-	result := q.index.index.lookup(query)
+	return &qpuextapi.QueryResp1{}, nil
+	// result := q.index.index.lookup(query)
 
-	return &qpuextapi.QueryResp1{
-		RespRecord: result,
-	}, nil
+	// return &qpuextapi.QueryResp1{
+	// 	RespRecord: result,
+	// }, nil
 }
 
 // ProcessQuerySubscribe ...
@@ -366,32 +372,35 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	return nil
 }
 
-func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value) (string, *qpuextapi.QueryRespRecord1, error) {
-	di := make(map[string]*qpuextapi.Payload)
-	di["id"] = &qpuextapi.Payload{
-		Value: []byte(dataItemID),
-	}
+func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value) (string, *qpuextapi.QueryRespRecord, error) {
+	// di := make(map[string]*qpuextapi.Payload)
+	// di["id"] = &qpuextapi.Payload{
+	// 	Value: []byte(dataItemID),
+	// }
 
+	attrs := make(map[string]string)
 	for k, v := range attributes {
 		switch v.GetVal().(type) {
+
 		case *qpu.Value_Str:
-			di[k] = &qpuextapi.Payload{
-				Value: []byte(v.GetStr()),
-			}
+			attrs[k] = v.GetStr()
+
 		case *qpu.Value_Int:
-			b := make([]byte, 8)
-			binary.LittleEndian.PutUint64(b, uint64(v.GetInt()))
-			di[k] = &qpuextapi.Payload{
-				Value: b,
-			}
+			attrs[k] = strconv.Itoa(int(v.GetInt()))
+			// b := make([]byte, 8)
+			// binary.LittleEndian.PutUint64(b, uint64())
+			// di[k] = &qpuextapi.Payload{
+			// 	Value: b,
+			// }
 		default:
 			return "", nil, utils.Error(errors.New("unknown value type"))
 		}
 	}
 
 	return dataItemID,
-		&qpuextapi.QueryRespRecord1{
-			Response: di,
+		&qpuextapi.QueryRespRecord{
+			RecordId:   dataItemID,
+			Attributes: attrs,
 		}, nil
 }
 
@@ -463,8 +472,8 @@ func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) 
 	return nil
 }
 
-func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord1 {
-	res := make([]*qpuextapi.QueryRespRecord1, 0)
+func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord {
+	res := make([]*qpuextapi.QueryRespRecord, 0)
 
 	it := func(node btree.Item) bool {
 		postings := node.(treeNode).getLatestVersion()
@@ -488,11 +497,11 @@ func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord1
 	return res
 }
 
-func (i *bTreeIndex) newIndexEntry(value *qpu.Value, dataItemID string, dataItem *qpuextapi.QueryRespRecord1) btree.Item {
+func (i *bTreeIndex) newIndexEntry(value *qpu.Value, dataItemID string, dataItem *qpuextapi.QueryRespRecord) btree.Item {
 	item := i.entry.newIndexEntry(value)
 
 	posting := Posting{
-		DataItems: map[string]*qpuextapi.QueryRespRecord1{
+		DataItems: map[string]*qpuextapi.QueryRespRecord{
 			dataItemID: dataItem,
 		},
 	}
@@ -565,7 +574,7 @@ type treeNode struct {
 
 // Posting ...
 type Posting struct {
-	DataItems map[string]*qpuextapi.QueryRespRecord1
+	DataItems map[string]*qpuextapi.QueryRespRecord
 }
 
 func (n treeNode) Less(than btree.Item) bool {
@@ -584,7 +593,7 @@ func (n treeNode) removeObjFromEntry(dataItemID string) {
 	delete(n.getLatestVersion().DataItems, dataItemID)
 }
 
-func (n treeNode) addToPosting(dataItemID string, dataItem *qpuextapi.QueryRespRecord1) {
+func (n treeNode) addToPosting(dataItemID string, dataItem *qpuextapi.QueryRespRecord) {
 	n.Postings.Front().Value.(Posting).DataItems[dataItemID] = dataItem
 }
 
