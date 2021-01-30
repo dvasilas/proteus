@@ -26,7 +26,7 @@ public final class Connection {
     channel.shutdown().shutdownNow();
   }
 
-  public QueryResp query(java.lang.String queryStr) {
-    return stub.queryUnary(QueryReq.newBuilder().setQueryStr(queryStr).build());
+  public QueryResp1 query(java.lang.String queryStr) {
+    return stub.queryUnary1(QueryReq.newBuilder().setQueryStr(queryStr).build());
   }
 }
