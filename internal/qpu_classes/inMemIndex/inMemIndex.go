@@ -227,6 +227,9 @@ func (q *IndexQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]str
 func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	// return &qpuextapi.QueryResp{}, nil
 	result := q.index.index.lookup(query)
+	if result != nil && len(result) > 20 {
+		result = result[:20]
+	}
 
 	return &qpuextapi.QueryResp{
 		RespRecord: result,
