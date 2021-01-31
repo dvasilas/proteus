@@ -195,7 +195,7 @@ const (
 
 // WriteLogEntry ...
 type WriteLogEntry struct {
-	RowID int32
+	RowID string
 	T0    time.Time
 	T1    time.Time
 }

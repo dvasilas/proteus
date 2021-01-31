@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
@@ -32,8 +31,8 @@ const (
 )
 
 type opLogEntry struct {
-	recordWritten int32
-	recordsRead   []int32
+	recordWritten string
+	recordsRead   []string
 	ts            time.Time
 	opType        opType
 }
@@ -149,17 +148,13 @@ func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogE
 
 	for _, entry := range queryLog {
 		rec := opLogEntry{
-			recordsRead: make([]int32, len(entry.RowIDs)),
+			recordsRead: make([]string, len(entry.RowIDs)),
 			ts:          entry.Ts,
 			opType:      query,
 		}
 
 		for j, id := range entry.RowIDs {
-			rID, err := strconv.ParseInt(id, 10, 64)
-			if err != nil {
-				return log, err
-			}
-			rec.recordsRead[j] = int32(rID)
+			rec.recordsRead[j] = id
 		}
 		log[i] = rec
 		i++
@@ -171,8 +166,8 @@ func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogE
 }
 
 func postMortem(opLog opLog) []int {
-	snapshotDatastore := make(map[int32]int)
-	snapshotQPU := make(map[int32]int)
+	snapshotDatastore := make(map[string]int)
+	snapshotQPU := make(map[string]int)
 	stalenessLog := make([]int, 0)
 
 	for _, entry := range opLog {

@@ -9,10 +9,13 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
+	"github.com/golang/protobuf/ptypes"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // MongoDataStore ...
@@ -210,6 +213,8 @@ func (ds MongoDataStore) formatInsertRecord(table string, record bson.Raw) (libq
 
 	id := record.Lookup("fullDocument").Document().Lookup("_id").String()
 
+	ts := record.Lookup("fullDocument").Document().Lookup("timestamp").Int64()
+
 	id = id[1 : len(id)-1]
 
 	attributesNew := make(map[string]*qpu.Value)
@@ -219,17 +224,22 @@ func (ds MongoDataStore) formatInsertRecord(table string, record bson.Raw) (libq
 		}
 	}
 
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts))
+	if err != nil {
+		return libqpu.LogOperation{}, err
+	}
+
 	return libqpu.LogOperationDelta(
 		id,
 		table,
-		nil,
+		libqpu.Vectorclock(map[string]*tspb.Timestamp{"mongo": timestamp}),
 		nil,
 		attributesNew,
 	), nil
 }
 
 func (ds MongoDataStore) formatUpdateRecord(table string, record bson.Raw) (libqpu.LogOperation, error) {
-	elems, err := record.Lookup("updateDescription").Document().Elements()
+	elems, err := record.Lookup("updateDescription").Document().Lookup("updatedFields").Document().Elements()
 	if err != nil {
 		return libqpu.LogOperation{}, err
 	}
@@ -237,17 +247,25 @@ func (ds MongoDataStore) formatUpdateRecord(table string, record bson.Raw) (libq
 	id := record.Lookup("documentKey").Document().Lookup("_id").String()
 	id = id[1 : len(id)-1]
 
+	var ts int64
 	attributesNew := make(map[string]*qpu.Value)
 	for _, elem := range elems {
 		if strings.HasPrefix(elem.Key(), "attribute") {
 			attributesNew[elem.Key()] = libqpu.ValueInt(elem.Value().Int32())
+		} else if elem.Key() == "timestamp" {
+			ts = elem.Value().Int64()
 		}
+	}
+
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts))
+	if err != nil {
+		return libqpu.LogOperation{}, err
 	}
 
 	return libqpu.LogOperationDelta(
 		id,
 		table,
-		nil,
+		libqpu.Vectorclock(map[string]*tspb.Timestamp{"mongo": timestamp}),
 		nil,
 		attributesNew,
 	), nil

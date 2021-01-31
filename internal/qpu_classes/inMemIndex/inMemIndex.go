@@ -16,6 +16,7 @@ import (
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
 	responsestream "github.com/dvasilas/proteus/internal/responseStream"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/google/btree"
 	"github.com/opentracing/opentracing-go"
 
@@ -226,7 +227,25 @@ func (q *IndexQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]str
 // ClientQuery ...
 func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	// return &qpuextapi.QueryResp{}, nil
+	snapshotTs := time.Now()
+
 	result := q.index.index.lookup(query)
+
+	if q.logTimestamps && len(result) > 0 {
+		qLogEntry := libqpu.QueryLogEntry{
+			RowIDs: make([]string, 0),
+			Ts:     snapshotTs,
+		}
+		for _, rec := range result {
+			qLogEntry.RowIDs = append(qLogEntry.RowIDs, rec.RecordId)
+		}
+
+		q.queryLog.Lock()
+		q.queryLog.entries = append(q.queryLog.entries, qLogEntry)
+		q.queryLog.Unlock()
+
+	}
+
 	if result != nil && len(result) > 20 {
 		result = result[:20]
 	}
@@ -363,12 +382,34 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 				if err := q.index.index.update(respRecord.GetAttributesOld()["attribute0"], respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
 					return err
 				}
-
 			} else {
 				if err := q.index.index.update(nil, respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
 					return err
 				}
 			}
+
+			if q.logTimestamps {
+				var t0, t1 time.Time
+				t1 = time.Now()
+
+				q.writeLog.Lock()
+
+				for _, v := range respRecord.GetLogOp().GetTimestamp().GetVc() {
+					t0, err = ptypes.Timestamp(v)
+					if err != nil {
+						return err
+					}
+				}
+				q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+					RowID: respRecord.GetLogOp().GetObjectID(),
+					T0:    t0,
+					T1:    t1,
+				})
+				q.writeLog.Unlock()
+
+				// fmt.Println(q.writeLog.entries)
+			}
+
 		}
 	}
 
