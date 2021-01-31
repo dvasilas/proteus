@@ -22,7 +22,10 @@ type QPUAPIClient struct {
 // NewClient creates an instance of QPUAPIClient and initiates a connection
 // with QPU at the given address
 func NewClient(address string) (QPUAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	maxMsgSize := 1024*1024*256
+	conn, err := grpc.Dial(address,
+	grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+	grpc.WithInsecure())
 	if err != nil {
 		return QPUAPIClient{}, err
 	}
