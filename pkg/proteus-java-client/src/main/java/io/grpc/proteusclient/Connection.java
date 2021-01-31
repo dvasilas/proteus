@@ -26,7 +26,7 @@ public final class Connection {
     channel.shutdown().shutdownNow();
   }
 
-  public QueryResp query(java.lang.String queryStr) {
+  public QueryResp query(java.lang.String queryStr) throws io.grpc.StatusRuntimeException {
     return stub.queryUnary(QueryReq.newBuilder().setQueryStr(queryStr).build());
   }
 }
