@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc/benchmark/stats"
 )
 
-var dbName = "cloudServer"
+var dbName = "ycsb"
 var collectionName = "ycsbbuck"
 
 var load = false
@@ -29,6 +29,7 @@ var updateOne = false
 var execTime = 40
 
 var dbSize = 33000
+
 var attributeCard = dbSize / 10
 
 var port = 50450
@@ -124,37 +125,40 @@ func main() {
 				r := rand.Float32()
 
 				if r < 0.01 {
-					_, err := col.InsertOne(context.TODO(), map[string]interface{}{
-						"_id":        strconv.Itoa(rand.Int()),
-						"attribute0": rand.Intn(attributeCard),
-						//		"attribute1": int64(rand.Intn(attributeCard)),
-						//		"attribute2": int64(rand.Intn(attributeCard)),
-						//		"attribute3": int64(rand.Intn(attributeCard)),
-						//		"attribute4": int64(rand.Intn(attributeCard)),
-					})
-					if err != nil {
-						log.Fatal(err)
-					}
+					// if r > 0 {
+					// _, err := col.InsertOne(context.TODO(), map[string]interface{}{
+					// 	"_id":        strconv.Itoa(rand.Int()),
+					// 	"attribute0": rand.Intn(attributeCard),
+					// 	"timestamp":  time.Now().UnixNano(),
+					// })
+					// if err != nil {
+					// 	log.Fatal(err)
+					// }
 				} else if r < 0.05 {
 					dataItemID := dataItems[rand.Intn(len(dataItems))]
 
 					_, err = col.UpdateOne(context.Background(),
 						bson.D{{"_id", dataItemID}},
-						bson.M{"$set": bson.M{"attribute0": rand.Intn(attributeCard)}},
+						bson.M{"$set": bson.M{
+							"attribute0": rand.Intn(attributeCard),
+							"timestamp":  time.Now().UnixNano(),
+						},
+						},
 					)
 					if err != nil {
 						log.Fatal(err)
 					}
 				} else {
 					t0 := time.Now()
-					_, err := c.Query1(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int32(rand.Intn(attributeCard))))
+					_, err := c.Query(fmt.Sprintf("select * from ycsbbuck where attribute0 = %d", int32(rand.Intn(attributeCard))))
+					// resp, err := c.Query(fmt.Sprintf("select * from ycsbbuck where attribute0 = 159"))
 					if err != nil {
 						log.Fatal(err)
 					}
 
-					//fmt.Println(len(resp.GetRespRecord()))
+					// fmt.Println(len(resp.GetRespRecord()))
 					// for _, r := range resp.GetRespRecord() {
-					// 	fmt.Println(r.GetResponse()["id"], int32(binary.LittleEndian.Uint32(r.GetResponse()["attribute0"].GetValue())))
+					// 	fmt.Println(r)
 					// }
 
 					hist.Add(time.Since(t0).Nanoseconds())

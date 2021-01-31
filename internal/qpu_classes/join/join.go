@@ -478,25 +478,25 @@ func (q *JoinQPU) updateState(joinID int32, values map[string]*qpu.Value, vc map
 			map[string]interface{}{q.joinAttributeKey: joinID},
 			row, vc)
 
-		if q.logTimestamps {
-			var t0, t1 time.Time
-			t1 = time.Now()
+		// if q.logTimestamps {
+		// 	var t0, t1 time.Time
+		// 	t1 = time.Now()
 
-			q.writeLog.Lock()
+		// 	q.writeLog.Lock()
 
-			for _, v := range vc {
-				t0, err = ptypes.Timestamp(v)
-				if err != nil {
-					return nil, err
-				}
-			}
-			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-				RowID: joinID,
-				T0:    t0,
-				T1:    t1,
-			})
-			q.writeLog.Unlock()
-		}
+		// 	for _, v := range vc {
+		// 		t0, err = ptypes.Timestamp(v)
+		// 		if err != nil {
+		// 			return nil, err
+		// 		}
+		// 	}
+		// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+		// 		RowID: joinID,
+		// 		T0:    t0,
+		// 		T1:    t1,
+		// 	})
+		// 	q.writeLog.Unlock()
+		// }
 	}
 	if err != nil {
 		return nil, err
