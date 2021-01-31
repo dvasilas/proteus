@@ -224,7 +224,7 @@ func (ds MongoDataStore) formatInsertRecord(table string, record bson.Raw) (libq
 		}
 	}
 
-	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts))
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts*int64(time.Millisecond)))
 	if err != nil {
 		return libqpu.LogOperation{}, err
 	}
@@ -257,7 +257,7 @@ func (ds MongoDataStore) formatUpdateRecord(table string, record bson.Raw) (libq
 		}
 	}
 
-	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts))
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts*int64(time.Millisecond)))
 	if err != nil {
 		return libqpu.LogOperation{}, err
 	}
