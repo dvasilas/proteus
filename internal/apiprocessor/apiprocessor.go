@@ -292,11 +292,12 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *qpuextapi.MetricsReq
 
 	if s.measureNotificationLatency {
 		p50, p90, p95, p99 = s.processingLatencyM.GetMetrics()
+
+		resp.ProcessingLatencyP50 = p50
+		resp.ProcessingLatencyP90 = p90
+		resp.ProcessingLatencyP95 = p95
+		resp.ProcessingLatencyP99 = p99
 	}
-	resp.ProcessingLatencyP50 = p50
-	resp.ProcessingLatencyP90 = p90
-	resp.ProcessingLatencyP95 = p95
-	resp.ProcessingLatencyP99 = p99
 
 	if s.measureDataTransfer {
 		resp.KBytesSent = float64(s.dataTransfer.count) / float64(1024)
