@@ -8,6 +8,7 @@ import (
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
+	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/golang/protobuf/ptypes"
 
@@ -20,9 +21,11 @@ import (
 
 // MongoDataStore ...
 type MongoDataStore struct {
-	inputSchema libqpu.Schema
-	database    *mongo.Database
-	endpoint    string
+	inputSchema                libqpu.Schema
+	database                   *mongo.Database
+	endpoint                   string
+	measureNotificationLatency bool
+	notificationLatencyM       metrics.LatencyM
 }
 
 //---------------- API Functions -------------------
@@ -55,9 +58,14 @@ func NewDatastore(config *libqpu.QPUConfig, inputSchema libqpu.Schema) (MongoDat
 	database := client.Database(config.DatastoreConfig.DBName)
 
 	s := MongoDataStore{
-		inputSchema: inputSchema,
-		database:    database,
-		endpoint:    config.DatastoreConfig.Endpoint,
+		inputSchema:                inputSchema,
+		database:                   database,
+		endpoint:                   config.DatastoreConfig.Endpoint,
+		measureNotificationLatency: config.Evaluation.MeasureNotificationLatency,
+	}
+
+	if s.measureNotificationLatency {
+		s.notificationLatencyM = metrics.NewLatencyM()
 	}
 
 	return s, nil
@@ -99,6 +107,13 @@ func (ds MongoDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 					cancel()
 					break
 				}
+				if ds.measureNotificationLatency {
+					if err = ds.notificationLatencyM.AddFromOp(formatted); err != nil {
+						errCh <- utils.Error(err)
+						cancel()
+						break
+					}
+				}
 				logOpCh <- formatted
 			case "\"update\"":
 				formatted, err := ds.formatUpdateRecord(table, next)
@@ -106,6 +121,13 @@ func (ds MongoDataStore) SubscribeOps(table string) (<-chan libqpu.LogOperation,
 					errCh <- utils.Error(err)
 					cancel()
 					break
+				}
+				if ds.measureNotificationLatency {
+					if err = ds.notificationLatencyM.AddFromOp(formatted); err != nil {
+						errCh <- utils.Error(err)
+						cancel()
+						break
+					}
 				}
 				logOpCh <- formatted
 			}
@@ -177,6 +199,9 @@ func (ds MongoDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 
 // GetNotificationLanency ...
 func (ds MongoDataStore) GetNotificationLanency() (float64, float64, float64, float64) {
+	if ds.measureNotificationLatency {
+		return ds.notificationLatencyM.GetMetrics()
+	}
 	return -1, -1, -1, -1
 }
 
