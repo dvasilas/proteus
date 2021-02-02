@@ -306,6 +306,11 @@ func (s *APIProcessor) GetMetrics(ctx context.Context, req *qpuextapi.MetricsReq
 	return resp, nil
 }
 
+// GetWriteLog ...
+func (s *APIProcessor) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return s.qpuClass.GetWriteLog(req, stream)
+}
+
 // ---------------- Internal Functions --------------
 
 func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, error) {

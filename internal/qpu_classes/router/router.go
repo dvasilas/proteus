@@ -129,6 +129,11 @@ func (q *RouterQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRes
 	return nil, nil
 }
 
+// GetWriteLog ...
+func (q *RouterQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *RouterQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {

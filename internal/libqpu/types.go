@@ -33,6 +33,7 @@ type APIProcessor interface {
 	QueryUnary1(string) (*qpuextapi.QueryResp1, error)
 	GetConfig(context.Context, *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error)
 	GetMetrics(context.Context, *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
+	GetWriteLog(*qpuextapi.GetWriteLogReq, qpuapi.QPUAPI_GetWriteLogServer) error
 	// GetDataTransfer(context.Context, *qpuapi.GetDataRequest) (*qpuapi.DataTransferResponse, error)
 }
 
@@ -45,6 +46,7 @@ type QPUClass interface {
 	RemovePersistentQuery(string, int)
 	GetConfig() *qpuapi.ConfigResponse
 	GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
+	GetWriteLog(*qpuextapi.GetWriteLogReq, qpuapi.QPUAPI_GetWriteLogServer) error
 }
 
 // AdjacentQPU ...
@@ -62,6 +64,7 @@ type APIClient interface {
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
 	CloseConnection() error
 	GetConfig() (*qpuapi.ConfigResponse, error)
+	GetWriteLog() (qpuapi.QPUAPI_GetWriteLogClient, error)
 }
 
 // QPUState ...

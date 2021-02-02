@@ -347,6 +347,11 @@ func (q *JoinQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespo
 	}, nil
 }
 
+// GetWriteLog ...
+func (q *JoinQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *JoinQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {

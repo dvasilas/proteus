@@ -246,3 +246,8 @@ func (q *DsDriverQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsR
 		NotificationLatencyP99: p99,
 	}, nil
 }
+
+// GetWriteLog ...
+func (q *DsDriverQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}

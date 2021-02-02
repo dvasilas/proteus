@@ -243,7 +243,6 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 		q.queryLog.Lock()
 		q.queryLog.entries = append(q.queryLog.entries, qLogEntry)
 		q.queryLog.Unlock()
-
 	}
 
 	if result != nil && len(result) > 20 {
@@ -330,6 +329,36 @@ func (q *IndexQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 		StateUpdateLatencyP95:  UL95,
 		StateUpdateLatencyP99:  UL99,
 	}, nil
+}
+
+// GetWriteLog ...
+func (q *IndexQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	q.writeLog.Lock()
+
+	for _, e := range q.writeLog.entries {
+		timestamp, err := ptypes.TimestampProto(e.T1)
+		if err != nil {
+			return utils.Error(err)
+		}
+
+		if err := stream.Send(&qpuextapi.WriteLogOp{
+			RowID: e.RowID,
+			T1:    timestamp,
+		}); err != nil {
+			return utils.Error(err)
+		}
+
+	}
+	// q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+	// 	RowID: respRecord.GetLogOp().GetObjectID(),
+	// 	T0:    t0,
+	// 	T1:    t1,
+	// })
+	q.writeLog.Unlock()
+
+	stream.Context().Done()
+
+	return nil
 }
 
 // ---------------- Internal Functions --------------

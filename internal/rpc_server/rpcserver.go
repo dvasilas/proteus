@@ -209,6 +209,11 @@ func (s *Server) GetMetrics(ctx context.Context, req *qpuextapi.MetricsRequest) 
 	return metrics, err
 }
 
+// GetWriteLog ...
+func (s *Server) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return s.api.GetWriteLog(req, stream)
+}
+
 // LobstersFrontpage ...
 func (s *Server) LobstersFrontpage(ctx context.Context, req *qpuextapi.LobFrontpageReq) (*qpuextapi.LobFrontpageResp, error) {
 	work := &JobFrontPage{

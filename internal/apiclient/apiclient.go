@@ -99,6 +99,12 @@ func (c QPUAPIClient) GetConfig() (*qpuapi.ConfigResponse, error) {
 	return resp, err
 }
 
+// GetWriteLog ...
+func (c QPUAPIClient) GetWriteLog() (qpuapi.QPUAPI_GetWriteLogClient, error) {
+	ctx, _ := context.WithCancel(context.Background())
+	return c.cli.GetWriteLog(ctx, &qpuextapi.GetWriteLogReq{})
+}
+
 // GetDataTransfer implements the QPU's API GetDataTransfer method.
 // func (c QPUAPIClient) GetDataTransfer() (*qpuapi.DataTransferResponse, error) {
 // 	ctx := context.TODO()

@@ -101,3 +101,9 @@ message LobStoryVoteReq {
 }
 
 message LobStoryVoteResp {}
+
+message GetWriteLogReq {}
+message WriteLogOp {
+  string rowID = 1;
+  google.protobuf.Timestamp t1 = 2;
+}
