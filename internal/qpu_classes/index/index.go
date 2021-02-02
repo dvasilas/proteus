@@ -471,6 +471,11 @@ func (q *IndexQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 	}, nil
 }
 
+// GetWriteLog ...
+func (q *IndexQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {

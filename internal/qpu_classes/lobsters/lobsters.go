@@ -150,4 +150,9 @@ func (q *LobQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespon
 	return nil, nil
 }
 
+// GetWriteLog ...
+func (q *LobQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}
+
 // ---------------- Internal Functions --------------

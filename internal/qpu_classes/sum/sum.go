@@ -227,6 +227,11 @@ func (q *SumQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespon
 	}, nil
 }
 
+// GetWriteLog ...
+func (q *SumQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
+	return nil
+}
+
 // ---------------- Internal Functions --------------
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
