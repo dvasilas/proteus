@@ -1,6 +1,7 @@
 package cacheqpu
 
 import (
+	"context"
 	"io"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ import (
 type cacheImplementation interface {
 	Put(query string, response *qpuextapi.QueryResp, size int, client libqpu.APIClient) error
 	Get(query string) (*qpuextapi.QueryResp, bool)
+	WaitInvalidate(qpuapi.QPUAPI_QuerySubscribeClient, context.CancelFunc, string)
 }
 
 // CacheQPU ...
@@ -109,6 +111,14 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 		return nil, utils.Error(err)
 	}
 
+	// QuerySubscribe
+	stream, cancel, err := q.adjacentQPUs[0].APIClient.QuerySubscribe(queryStr)
+	if err != nil {
+		return nil, utils.Error(err)
+	}
+
+	q.cache.WaitInvalidate(stream, cancel, queryStr)
+
 	if q.logTimestamps {
 		qLogEntry := libqpu.QueryLogEntry{
 			RowIDs: make([]string, len(cachedResult.GetRespRecord())),
@@ -138,6 +148,11 @@ func (q *CacheQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]st
 
 // RemovePersistentQuery ...
 func (q *CacheQPU) RemovePersistentQuery(table string, queryID int) {
+}
+
+// QuerySubscribe  ...
+func (q *CacheQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
 }
 
 // GetMetrics ...

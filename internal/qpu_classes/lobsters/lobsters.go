@@ -136,6 +136,11 @@ func (q *LobQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]stri
 	return -1, nil, nil
 }
 
+// QuerySubscribe  ...
+func (q *LobQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // RemovePersistentQuery ...
 func (q *LobQPU) RemovePersistentQuery(table string, queryID int) {
 }

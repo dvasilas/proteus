@@ -158,6 +158,11 @@ func (q *DsDriverQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string
 	return id, logOpCh, errCh
 }
 
+// QuerySubscribe  ...
+func (q *DsDriverQPU) QuerySubscribe(libqpu.ASTQuery, *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // ClientQuery ...
 func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpan opentracing.Span) (*qpuextapi.QueryResp, error) {
 	respRecords := make([]*qpuextapi.QueryRespRecord, 0)

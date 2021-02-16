@@ -199,6 +199,11 @@ func (q *SumQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextap
 	return nil, nil
 }
 
+// QuerySubscribe  ...
+func (q *SumQPU) QuerySubscribe(libqpu.ASTQuery, *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // GetConfig ...
 func (q *SumQPU) GetConfig() *qpuapi.ConfigResponse {
 	return &qpuapi.ConfigResponse{

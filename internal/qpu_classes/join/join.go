@@ -289,6 +289,11 @@ func (q *JoinQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]str
 func (q *JoinQPU) RemovePersistentQuery(table string, queryID int) {
 }
 
+// QuerySubscribe  ...
+func (q *JoinQPU) QuerySubscribe(libqpu.ASTQuery, *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // GetConfig ...
 func (q *JoinQPU) GetConfig() *qpuapi.ConfigResponse {
 	return &qpuapi.ConfigResponse{

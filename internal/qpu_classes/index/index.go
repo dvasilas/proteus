@@ -338,6 +338,11 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	}, nil
 }
 
+// QuerySubscribe  ...
+func (q *IndexQPU) QuerySubscribe(query libqpu.ASTQuery, req *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // ClientQuery1 ...
 func (q *IndexQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
 	col, err := q.collection(query.GetTable())

@@ -243,6 +243,61 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 	return resp, err
 }
 
+// QuerySubscribe ...
+func (s *APIProcessor) QuerySubscribe(queryReq *qpuextapi.QueryReq, stream qpuapi.QPUAPI_QuerySubscribeServer) error {
+	astQuery, err := sqlparser.Parse(queryReq.GetQueryStr())
+	if err != nil {
+		return utils.Error(err)
+	}
+
+	logOpSubscribeCh, doneCh, errSubscribeCh := s.qpuClass.QuerySubscribe(astQuery, queryReq)
+
+	var seqID int64
+
+	for {
+		select {
+		case logOp, ok := <-logOpSubscribeCh:
+			if !ok {
+				logOpSubscribeCh = nil
+			} else {
+				// utils.Trace("api processor received", map[string]interface{}{"logOp": logOp})
+				// ok, err := queries.SatisfiesPredicate(logOp, astQuery)
+				// utils.Trace("SatisfiesPredicate", map[string]interface{}{"ok": ok})
+				if err != nil {
+					return utils.Error(err)
+				}
+				if ok {
+					go func() {
+						if err := stream.Send(&qpuapi.ResponseStreamRecord{
+							SequenceId: seqID,
+							LogOp:      logOp.Op,
+						}); err != nil {
+							// utils.Warn(err)
+							doneCh <- true
+							return
+							// s.qpuClass.RemovePersistentQuery(astQuery.GetTable(), queryID)
+						}
+					}()
+					seqID++
+				}
+			}
+		case err, ok := <-errSubscribeCh:
+			if !ok {
+				errSubscribeCh = nil
+			} else {
+				utils.Trace("api processor received error", map[string]interface{}{"error": err})
+				// 			if cancel != nil {
+				// 				cancel()
+				// 			}
+				return err
+			}
+		}
+		if logOpSubscribeCh == nil && errSubscribeCh == nil {
+			return nil
+		}
+	}
+}
+
 // QueryUnary1 ...
 func (s *APIProcessor) QueryUnary1(req string) (*qpuextapi.QueryResp1, error) {
 	switch s.config.Operator {

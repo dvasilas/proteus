@@ -3,10 +3,12 @@ package lrucache
 import (
 	"container/list"
 	"context"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
+	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 )
 
@@ -58,10 +60,46 @@ func (c *Cache) Put(key string, response *qpuextapi.QueryResp, size int, client 
 		item := c.ll.PushFront(&entry{key: key, value: response, size: size})
 		c.items[key] = item
 		c.usedCapacity += size
-		go c.WaitInvalidation(key)
+		// go c.WaitInvalidation(key)
 	}
 	c.mutex.Unlock()
 	return nil
+}
+
+func (c *Cache) waitInvalidate(stream qpuapi.QPUAPI_QuerySubscribeClient, cancel context.CancelFunc, key string) {
+	for {
+		_, err := stream.Recv()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			break
+		} else {
+			break
+		}
+	}
+	cancel()
+	c.Invalidate(key)
+}
+
+// for {
+// 	streamRec, err := stream.Recv()
+// 	if err == io.EOF {
+// 		break
+// 	} else if err != nil {
+// 		break
+// 	} else {
+// 		if streamRec.GetType() == pbQPU.ResponseStreamRecord_UPDATEDELTA {
+// 			break
+// 		}
+// 	}
+// }
+// c.Invalidate(p)
+// cancel()
+// return nil
+
+// WaitInvalidate ...
+func (c *Cache) WaitInvalidate(stream qpuapi.QPUAPI_QuerySubscribeClient, cancel context.CancelFunc, key string) {
+	go c.waitInvalidate(stream, cancel, key)
 }
 
 // Get retrieves an entry from the cache
