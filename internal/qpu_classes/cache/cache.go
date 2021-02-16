@@ -2,6 +2,8 @@ package cacheqpu
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -32,6 +34,7 @@ type CacheQPU struct {
 	logTimestamps bool
 	writeLog      writeLog
 	queryLog      queryLog
+	putInCacheLog writeLog
 }
 
 type writeLog struct {
@@ -58,6 +61,10 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*CacheQPU, error) {
 		},
 		queryLog: queryLog{
 			entries: make([]libqpu.QueryLogEntry, 0),
+		},
+
+		putInCacheLog: writeLog{
+			entries: make([]libqpu.WriteLogEntry, 0),
 		},
 	}
 
@@ -104,35 +111,20 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	cacheEntrySize := 0
 
 	if q.logTimestamps {
-		q.writeLog.Lock()
+		q.putInCacheLog.Lock()
 	}
 	for _, e := range resp.GetRespRecord() {
 		cacheEntrySize += len(e.GetAttributes())
 
 		if q.logTimestamps {
-			var t0, t1 time.Time
-
-			t1, err = ptypes.Timestamp(e.GetTimestampReceived())
-			if err != nil {
-				return nil, utils.Error(err)
-			}
-
-			for _, v := range e.GetTimestamp() {
-				t0, err = ptypes.Timestamp(v)
-				if err != nil {
-					return nil, utils.Error(err)
-				}
-			}
-			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+			q.putInCacheLog.entries = append(q.putInCacheLog.entries, libqpu.WriteLogEntry{
 				RowID: e.GetRecordId(),
-				T0:    t0,
-				T1:    t1,
+				T1:    time.Now(),
 			})
-
 		}
 	}
 	if q.logTimestamps {
-		q.writeLog.Unlock()
+		q.putInCacheLog.Unlock()
 	}
 
 	if err := q.cache.Put(queryStr, resp, cacheEntrySize, q.adjacentQPUs[0].APIClient); err != nil {
@@ -185,34 +177,34 @@ func (q *CacheQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq
 
 // GetMetrics ...
 func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	// stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
-	// if err != nil {
-	// 	return nil, utils.Error(err)
-	// }
+	stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
+	if err != nil {
+		return nil, utils.Error(err)
+	}
 
-	// for {
-	// 	respRecord, err := stream.Recv()
-	// 	if err == io.EOF {
-	// 		break
-	// 	}
-	// 	if err != nil {
-	// 		return nil, utils.Error(err)
-	// 	}
+	for {
+		respRecord, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, utils.Error(err)
+		}
 
-	// 	t1, err := ptypes.Timestamp(respRecord.GetT1())
-	// 	if err != nil {
-	// 		return nil, utils.Error(err)
-	// 	}
+		t1, err := ptypes.Timestamp(respRecord.GetT1())
+		if err != nil {
+			return nil, utils.Error(err)
+		}
 
-	// 	q.writeLog.Lock()
-	// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-	// 		RowID: respRecord.GetRowID(),
-	// 		T1:    t1,
-	// 	})
-	// 	q.writeLog.Unlock()
-	// }
+		q.writeLog.Lock()
+		q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+			RowID: respRecord.GetRowID(),
+			T1:    t1,
+		})
+		q.writeLog.Unlock()
+	}
 
-	var err error
+	// var err error
 
 	var FL50, FL90, FL95, FL99 float64
 	var FV0, FV1, FV2, FV4 float64
@@ -220,7 +212,11 @@ func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 	if q.logTimestamps {
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
 
-		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries)
+		for _, e := range q.putInCacheLog.entries {
+			fmt.Println(e)
+		}
+
+		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries, q.putInCacheLog.entries)
 		if err != nil {
 			return nil, err
 		}

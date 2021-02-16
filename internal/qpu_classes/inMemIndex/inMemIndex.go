@@ -58,8 +58,8 @@ type InMemIndex struct {
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
 type indexImplementation interface {
-	update(*qpu.Value, *qpu.Value, libqpu.LogOperation) error
-	updateCatchUp(*qpu.Value, libqpu.LogOperation) error
+	update(*qpu.Value, *qpu.Value, libqpu.LogOperation) (time.Time, error)
+	updateCatchUp(*qpu.Value, libqpu.LogOperation) (time.Time, error)
 	lookup(libqpu.ASTQuery) []*qpuextapi.QueryRespRecord
 	print()
 }
@@ -307,7 +307,7 @@ func (q *IndexQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 	if q.logTimestamps {
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
 
-		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries)
+		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -375,6 +375,8 @@ func (q *IndexQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUA
 // ---------------- Internal Functions --------------
 
 func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
+	var t0, t1 time.Time
+
 	q.catchUp.Lock()
 	q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = false
 	q.catchUp.Unlock()
@@ -408,7 +410,8 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 		}
 
 		if respRecordType == libqpu.State {
-			if err := q.index.index.updateCatchUp(respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
+			t1, err = q.index.index.updateCatchUp(respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp())
+			if err != nil {
 				return err
 			}
 
@@ -422,11 +425,13 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 
 		} else if respRecordType == libqpu.Delta {
 			if respRecord.GetLogOp().HasOldState() {
-				if err := q.index.index.update(respRecord.GetAttributesOld()["attribute0"], respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
+				t1, err = q.index.index.update(respRecord.GetAttributesOld()["attribute0"], respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp())
+				if err != nil {
 					return err
 				}
 			} else {
-				if err := q.index.index.update(nil, respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
+				t1, err = q.index.index.update(nil, respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp())
+				if err != nil {
 					return err
 				}
 			}
@@ -451,9 +456,6 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 			q.db.Unlock()
 
 			if q.logTimestamps {
-				var t0, t1 time.Time
-				t1 = time.Now()
-
 				q.writeLog.Lock()
 
 				for _, v := range respRecord.GetLogOp().GetTimestamp().GetVc() {
@@ -469,7 +471,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 				})
 				q.writeLog.Unlock()
 
-				// fmt.Println(q.writeLog.entries)
+				// fmt.Println(t0, t1)
 			}
 
 		}
@@ -478,7 +480,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	return nil
 }
 
-func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qpu.Vectorclock) (string, *qpuextapi.QueryRespRecord, error) {
+func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qpu.Vectorclock) (string, *qpuextapi.QueryRespRecord, time.Time, error) {
 	// di := make(map[string]*qpuextapi.Payload)
 	// di["id"] = &qpuextapi.Payload{
 	// 	Value: []byte(dataItemID),
@@ -499,7 +501,7 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qp
 			// 	Value: b,
 			// }
 		default:
-			return "", nil, utils.Error(errors.New("unknown value type"))
+			return "", nil, time.Now(), utils.Error(errors.New("unknown value type"))
 		}
 	}
 
@@ -513,9 +515,10 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qp
 	// 	}
 	// }
 
-	t1, err := ptypes.TimestampProto(time.Now())
+	t := time.Now()
+	t1, err := ptypes.TimestampProto(t)
 	if err != nil {
-		return "", nil, utils.Error(err)
+		return "", nil, time.Now(), utils.Error(err)
 	}
 
 	return dataItemID,
@@ -524,7 +527,7 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qp
 			Attributes:        attrs,
 			Timestamp:         vc0.GetVc(),
 			TimestampReceived: t1,
-		}, nil
+		}, t, nil
 }
 
 // QuerySubscribe  ...
@@ -573,10 +576,10 @@ func newBTreeIndex() *bTreeIndex {
 	return index
 }
 
-func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOperation) error {
-	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
+func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOperation) (time.Time, error) {
+	dataItemID, dataItem, t1, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
-		return err
+		return t1, err
 	}
 
 	i.mutex.Lock()
@@ -592,24 +595,24 @@ func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOpera
 		if indexEntry, found := i.getIndexEntry(valueOld); found {
 			indexEntry.removeObjFromEntry(dataItemID)
 		} else {
-			return errors.New("index entry for old value not found")
+			return t1, errors.New("index entry for old value not found")
 		}
 		if indexEntry, found := i.getIndexEntry(valueNew); found {
 			indexEntry.addToPosting(dataItemID, dataItem)
 			i.updateIndexEntry(indexEntry)
 		} else {
-			return errors.New("index entry for new value not found")
+			return t1, errors.New("index entry for new value not found")
 		}
 	}
 	// i.print()
 	i.mutex.Unlock()
-	return nil
+	return t1, nil
 }
 
-func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) error {
-	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
+func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) (time.Time, error) {
+	dataItemID, dataItem, t1, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
-		return err
+		return t1, err
 	}
 
 	i.mutex.Lock()
@@ -623,7 +626,7 @@ func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) 
 	i.mutex.Unlock()
 	// i.print()
 
-	return nil
+	return t1, nil
 }
 
 func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord {

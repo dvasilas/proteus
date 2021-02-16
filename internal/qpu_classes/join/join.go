@@ -317,7 +317,7 @@ func (q *JoinQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsRespo
 	if q.logTimestamps {
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
 
-		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries)
+		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries, nil)
 		if err != nil {
 			return nil, err
 		}
