@@ -478,7 +478,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	return nil
 }
 
-func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value) (string, *qpuextapi.QueryRespRecord, error) {
+func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qpu.Vectorclock) (string, *qpuextapi.QueryRespRecord, error) {
 	// di := make(map[string]*qpuextapi.Payload)
 	// di["id"] = &qpuextapi.Payload{
 	// 	Value: []byte(dataItemID),
@@ -503,10 +503,27 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value) (string
 		}
 	}
 
+	// var t0 time.Time
+	// var err error
+
+	// for _, v := range vc0.GetVc() {
+	// 	t0, err = ptypes.Timestamp(v)
+	// 	if err != nil {
+	// 		return "", nil, utils.Error(err)
+	// 	}
+	// }
+
+	t1, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		return "", nil, utils.Error(err)
+	}
+
 	return dataItemID,
 		&qpuextapi.QueryRespRecord{
-			RecordId:   dataItemID,
-			Attributes: attrs,
+			RecordId:          dataItemID,
+			Attributes:        attrs,
+			Timestamp:         vc0.GetVc(),
+			TimestampReceived: t1,
 		}, nil
 }
 
@@ -557,7 +574,7 @@ func newBTreeIndex() *bTreeIndex {
 }
 
 func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOperation) error {
-	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes())
+	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
 		return err
 	}
@@ -590,7 +607,7 @@ func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOpera
 }
 
 func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) error {
-	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes())
+	dataItemID, dataItem, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
 		return err
 	}
