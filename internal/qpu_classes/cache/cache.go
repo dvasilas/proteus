@@ -2,6 +2,7 @@ package cacheqpu
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ type CacheQPU struct {
 	logTimestamps bool
 	writeLog      writeLog
 	queryLog      queryLog
+	putInCacheLog writeLog
 }
 
 type writeLog struct {
@@ -59,6 +61,10 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*CacheQPU, error) {
 		},
 		queryLog: queryLog{
 			entries: make([]libqpu.QueryLogEntry, 0),
+		},
+
+		putInCacheLog: writeLog{
+			entries: make([]libqpu.WriteLogEntry, 0),
 		},
 	}
 
@@ -104,39 +110,22 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 
 	cacheEntrySize := 0
 
-	// if q.logTimestamps {
-	// 	q.writeLog.Lock()
-	// }
+	if q.logTimestamps {
+		q.putInCacheLog.Lock()
+	}
 	for _, e := range resp.GetRespRecord() {
 		cacheEntrySize += len(e.GetAttributes())
 
-		// if q.logTimestamps {
-		// 	var t0, t1 time.Time
-
-		// 	t1, err = ptypes.Timestamp(e.GetTimestampReceived())
-		// 	if err != nil {
-		// 		return nil, utils.Error(err)
-		// 	}
-
-		// 	for _, v := range e.GetTimestamp() {
-		// 		t0, err = ptypes.Timestamp(v)
-		// 		if err != nil {
-		// 			return nil, utils.Error(err)
-		// 		}
-		// 	}
-		// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-		// 		RowID: e.GetRecordId(),
-		// 		T0:    t0,
-		// 		T1:    t1,
-		// 	})
-
-		// 	// fmt.Println(t0, t1)
-
-		// }
+		if q.logTimestamps {
+			q.putInCacheLog.entries = append(q.putInCacheLog.entries, libqpu.WriteLogEntry{
+				RowID: e.GetRecordId(),
+				T1:    time.Now(),
+			})
+		}
 	}
-	// if q.logTimestamps {
-	// 	q.writeLog.Unlock()
-	// }
+	if q.logTimestamps {
+		q.putInCacheLog.Unlock()
+	}
 
 	if err := q.cache.Put(queryStr, resp, cacheEntrySize, q.adjacentQPUs[0].APIClient); err != nil {
 		return nil, utils.Error(err)
@@ -223,7 +212,11 @@ func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResp
 	if q.logTimestamps {
 		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
 
-		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries)
+		for _, e := range q.putInCacheLog.entries {
+			fmt.Println(e)
+		}
+
+		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries, q.putInCacheLog.entries)
 		if err != nil {
 			return nil, err
 		}

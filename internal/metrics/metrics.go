@@ -28,6 +28,7 @@ const (
 	writeDB      opType = iota
 	writeApplied opType = iota
 	query        opType = iota
+	putInCache   opType = iota
 )
 
 type opLogEntry struct {
@@ -113,8 +114,8 @@ func FreshnessLatency(writeLog []libqpu.WriteLogEntry) (float64, float64, float6
 }
 
 // FreshnessVersions ...
-func FreshnessVersions(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry) (float64, float64, float64, float64, error) {
-	opLog, err := constructOpLog(queryLog, writeLog)
+func FreshnessVersions(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry, putInCacheLog []libqpu.WriteLogEntry) (float64, float64, float64, float64, error) {
+	opLog, err := constructOpLog(queryLog, writeLog, putInCacheLog)
 	if err != nil {
 		return -1, -1, -1, -1, err
 	}
@@ -136,13 +137,18 @@ func FreshnessVersions(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteL
 		nil
 }
 
-func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry) (opLog, error) {
-	log := make([]opLogEntry, 2*len(writeLog)+len(queryLog))
+func constructOpLog(queryLog []libqpu.QueryLogEntry, writeLog []libqpu.WriteLogEntry, putInCacheLog []libqpu.WriteLogEntry) (opLog, error) {
+	log := make([]opLogEntry, 2*len(writeLog)+len(queryLog)*len(putInCacheLog))
 	i := 0
 	for _, entry := range writeLog {
 		log[i] = opLogEntry{recordWritten: entry.RowID, ts: entry.T0, opType: writeDB}
 		i++
 		log[i] = opLogEntry{recordWritten: entry.RowID, ts: entry.T1, opType: writeApplied}
+		i++
+	}
+
+	for _, entry := range putInCacheLog {
+		log[i] = opLogEntry{recordWritten: entry.RowID, ts: entry.T1, opType: putInCache}
 		i++
 	}
 
@@ -169,8 +175,10 @@ func postMortem(opLog opLog) []int {
 	snapshotDatastore := make(map[string]int)
 	snapshotQPU := make(map[string]int)
 	stalenessLog := make([]int, 0)
+	snapshotCache := make(map[string]int)
 
 	for _, entry := range opLog {
+		// fmt.Println(entry)
 		switch entry.opType {
 		case writeDB:
 			_, ok := snapshotDatastore[entry.recordWritten]
@@ -186,10 +194,17 @@ func postMortem(opLog opLog) []int {
 			} else {
 				snapshotQPU[entry.recordWritten] = 1
 			}
+		case putInCache:
+			// fmt.Println("written in cache", entry.recordWritten, snapshotCache[entry.recordWritten])
+			// fmt.Println("snapshotDatastore", snapshotDatastore)
+			// fmt.Println("snapshotQPU", snapshotQPU)
+			// fmt.Println("snapshotCache", snapshotCache)
+			snapshotCache[entry.recordWritten] = snapshotQPU[entry.recordWritten]
 		case query:
 			for _, rID := range entry.recordsRead {
 				if _, ok := snapshotQPU[rID]; ok {
-					stalenessLog = append(stalenessLog, int(snapshotDatastore[rID]-snapshotQPU[rID]))
+					// fmt.Println("reading", snapshotDatastore[rID], snapshotCache[rID])
+					stalenessLog = append(stalenessLog, int(snapshotDatastore[rID]-snapshotCache[rID]))
 				}
 			}
 		}
