@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	lrucache "github.com/dvasilas/proteus/internal/qpu_classes/cache/lruCache"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
@@ -109,9 +110,19 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 		cacheEntrySize += len(e.GetAttributes())
 
 		if q.logTimestamps {
+			var t0, t1 time.Time
+			t1 = time.Now()
+
+			for _, v := range e.GetTimestamp() {
+				t0, err = ptypes.Timestamp(v)
+				if err != nil {
+					return nil, utils.Error(err)
+				}
+			}
 			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
 				RowID: e.GetRecordId(),
-				T1:    time.Now(),
+				T0:    t0,
+				T1:    t1,
 			})
 		}
 	}
