@@ -2,6 +2,7 @@ package cacheqpu
 
 import (
 	"context"
+	"io"
 	"sync"
 	"time"
 
@@ -103,37 +104,39 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 
 	cacheEntrySize := 0
 
-	if q.logTimestamps {
-		q.writeLog.Lock()
-	}
+	// if q.logTimestamps {
+	// 	q.writeLog.Lock()
+	// }
 	for _, e := range resp.GetRespRecord() {
 		cacheEntrySize += len(e.GetAttributes())
 
-		if q.logTimestamps {
-			var t0, t1 time.Time
+		// if q.logTimestamps {
+		// 	var t0, t1 time.Time
 
-			t1, err = ptypes.Timestamp(e.GetTimestampReceived())
-			if err != nil {
-				return nil, utils.Error(err)
-			}
+		// 	t1, err = ptypes.Timestamp(e.GetTimestampReceived())
+		// 	if err != nil {
+		// 		return nil, utils.Error(err)
+		// 	}
 
-			for _, v := range e.GetTimestamp() {
-				t0, err = ptypes.Timestamp(v)
-				if err != nil {
-					return nil, utils.Error(err)
-				}
-			}
-			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-				RowID: e.GetRecordId(),
-				T0:    t0,
-				T1:    t1,
-			})
+		// 	for _, v := range e.GetTimestamp() {
+		// 		t0, err = ptypes.Timestamp(v)
+		// 		if err != nil {
+		// 			return nil, utils.Error(err)
+		// 		}
+		// 	}
+		// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+		// 		RowID: e.GetRecordId(),
+		// 		T0:    t0,
+		// 		T1:    t1,
+		// 	})
 
-		}
+		// 	// fmt.Println(t0, t1)
+
+		// }
 	}
-	if q.logTimestamps {
-		q.writeLog.Unlock()
-	}
+	// if q.logTimestamps {
+	// 	q.writeLog.Unlock()
+	// }
 
 	if err := q.cache.Put(queryStr, resp, cacheEntrySize, q.adjacentQPUs[0].APIClient); err != nil {
 		return nil, utils.Error(err)
@@ -185,34 +188,34 @@ func (q *CacheQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq
 
 // GetMetrics ...
 func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	// stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
-	// if err != nil {
-	// 	return nil, utils.Error(err)
-	// }
+	stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
+	if err != nil {
+		return nil, utils.Error(err)
+	}
 
-	// for {
-	// 	respRecord, err := stream.Recv()
-	// 	if err == io.EOF {
-	// 		break
-	// 	}
-	// 	if err != nil {
-	// 		return nil, utils.Error(err)
-	// 	}
+	for {
+		respRecord, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, utils.Error(err)
+		}
 
-	// 	t1, err := ptypes.Timestamp(respRecord.GetT1())
-	// 	if err != nil {
-	// 		return nil, utils.Error(err)
-	// 	}
+		t1, err := ptypes.Timestamp(respRecord.GetT1())
+		if err != nil {
+			return nil, utils.Error(err)
+		}
 
-	// 	q.writeLog.Lock()
-	// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-	// 		RowID: respRecord.GetRowID(),
-	// 		T1:    t1,
-	// 	})
-	// 	q.writeLog.Unlock()
-	// }
+		q.writeLog.Lock()
+		q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+			RowID: respRecord.GetRowID(),
+			T1:    t1,
+		})
+		q.writeLog.Unlock()
+	}
 
-	var err error
+	// var err error
 
 	var FL50, FL90, FL95, FL99 float64
 	var FV0, FV1, FV2, FV4 float64
