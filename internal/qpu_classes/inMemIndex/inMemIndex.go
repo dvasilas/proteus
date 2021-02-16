@@ -43,6 +43,11 @@ type catchupQuery struct {
 	catchUpSeqID     map[int64]bool
 }
 
+type db struct {
+	sync.RWMutex
+	state map[string]int32
+}
+
 // InMemIndex represents a generic B-Tree index.
 // It can be used for indexing different types of attributes
 // by using different implementation of the indexImplementation interface.
@@ -77,6 +82,9 @@ type IndexQPU struct {
 	database                   *mongo.Database
 	catchUp                    catchUp
 	findOptions                *options.FindOptions
+	subscribeQueriesL          sync.RWMutex
+	subscribeQueries           map[int32][]chan libqpu.LogOperation
+	db                         db
 }
 
 type writeLog struct {
@@ -117,8 +125,11 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 			catchupQueries: make(map[int]*catchupQuery),
 			catchUpDoneCh:  catchUpDoneCh,
 		},
-		findOptions: options.Find(),
+		findOptions:      options.Find(),
+		subscribeQueries: make(map[int32][]chan libqpu.LogOperation),
 	}
+
+	jqpu.db.state = make(map[string]int32)
 
 	jqpu.index.index = newBTreeIndex()
 
@@ -401,13 +412,16 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 				return err
 			}
 
+			q.db.Lock()
+			q.db.state[respRecord.GetLogOp().GetObjectID()] = respRecord.GetLogOp().GetAttributes()["attribute0"].GetInt()
+			q.db.Unlock()
+
 			q.catchUp.Lock()
 			q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = true
 			q.catchUp.Unlock()
 
 		} else if respRecordType == libqpu.Delta {
 			if respRecord.GetLogOp().HasOldState() {
-
 				if err := q.index.index.update(respRecord.GetAttributesOld()["attribute0"], respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp()); err != nil {
 					return err
 				}
@@ -416,6 +430,25 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 					return err
 				}
 			}
+
+			q.db.RLock()
+			q.subscribeQueriesL.RLock()
+			if chs, ok := q.subscribeQueries[q.db.state[respRecord.GetLogOp().GetObjectID()]]; ok {
+				for _, ch := range chs {
+					ch <- respRecord.GetLogOp()
+				}
+
+				// err := v.Send(respRecord.Rec)
+				// if err != nil {
+				// 	return err
+				// }
+			}
+			q.db.RUnlock()
+			q.subscribeQueriesL.RUnlock()
+
+			q.db.Lock()
+			q.db.state[respRecord.GetLogOp().GetObjectID()] = respRecord.GetLogOp().GetAttributes()["attribute0"].GetInt()
+			q.db.Unlock()
 
 			if q.logTimestamps {
 				var t0, t1 time.Time
@@ -475,6 +508,37 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value) (string
 			RecordId:   dataItemID,
 			Attributes: attrs,
 		}, nil
+}
+
+// QuerySubscribe  ...
+func (q *IndexQPU) QuerySubscribe(query libqpu.ASTQuery, req *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+
+	logOpCh := make(chan libqpu.LogOperation)
+	errCh := make(chan error)
+	doneCh := make(chan bool)
+
+	q.subscribeQueriesL.Lock()
+	if _, ok := q.subscribeQueries[query.Q.GetPredicate()[0].GetLbound().GetInt()]; !ok {
+		q.subscribeQueries[query.Q.GetPredicate()[0].GetLbound().GetInt()] = make([]chan libqpu.LogOperation, 0)
+	}
+	q.subscribeQueries[query.Q.GetPredicate()[0].GetLbound().GetInt()] = append(
+		q.subscribeQueries[query.Q.GetPredicate()[0].GetLbound().GetInt()],
+		logOpCh,
+	)
+	q.subscribeQueriesL.Unlock()
+
+	go func() {
+		<-doneCh
+		q.subscribeQueriesL.Lock()
+		delete(q.subscribeQueries, query.Q.GetPredicate()[0].GetLbound().GetInt())
+		q.subscribeQueriesL.Unlock()
+
+		close(logOpCh)
+		close(doneCh)
+		close(errCh)
+	}()
+
+	return logOpCh, doneCh, errCh
 }
 
 // //------- indexImplementation interface ------------

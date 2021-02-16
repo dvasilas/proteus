@@ -117,6 +117,24 @@ func (s *Server) Query(stream qpuapi.QPUAPI_QueryServer) error {
 	}
 }
 
+// QuerySubscribe ...
+func (s *Server) QuerySubscribe(req *qpuextapi.QueryReq, stream qpuapi.QPUAPI_QuerySubscribeServer) error {
+	// requestRecord, err := stream.Recv()
+	// if err == io.EOF {
+	// 	return utils.Error(errors.New("Query:stream.Recv EOF"))
+	// }
+	// if err != nil {
+	// 	return err
+	// }
+
+	// switch requestRecord.GetRequest().(type) {
+	// case *qpuapi.RequestStreamRecord_QueryRequest:
+	return s.api.QuerySubscribe(req, stream)
+	// default:
+	// 	return utils.Error(errors.New("Query expects RequestStream_Request"))
+	// }
+}
+
 // // Job ...
 // type Job struct {
 // 	server *Server

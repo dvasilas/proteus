@@ -115,6 +115,11 @@ func (q *RouterQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuex
 	}
 }
 
+// QuerySubscribe  ...
+func (q *RouterQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
+	return nil, nil, nil
+}
+
 // ProcessQuerySubscribe ...
 func (q *RouterQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	return -1, nil, nil

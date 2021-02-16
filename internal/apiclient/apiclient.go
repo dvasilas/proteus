@@ -92,6 +92,15 @@ func (c QPUAPIClient) QueryUnary1(query string) (*qpuextapi.QueryResp1, error) {
 	})
 }
 
+// QuerySubscribe ...
+func (c QPUAPIClient) QuerySubscribe(query string) (qpuapi.QPUAPI_QuerySubscribeClient, context.CancelFunc, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.cli.QuerySubscribe(ctx, &qpuextapi.QueryReq{
+		QueryStr: query,
+	})
+	return stream, cancel, err
+}
+
 // GetConfig implements the QPU's API GetConfig method.
 func (c QPUAPIClient) GetConfig() (*qpuapi.ConfigResponse, error) {
 	ctx := context.TODO()

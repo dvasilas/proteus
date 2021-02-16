@@ -31,6 +31,7 @@ type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
 	QueryUnary(QueryRequest, opentracing.Span) (*qpuextapi.QueryResp, error)
 	QueryUnary1(string) (*qpuextapi.QueryResp1, error)
+	QuerySubscribe(*qpuextapi.QueryReq, qpuapi.QPUAPI_QuerySubscribeServer) error
 	GetConfig(context.Context, *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error)
 	GetMetrics(context.Context, *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
 	GetWriteLog(*qpuextapi.GetWriteLogReq, qpuapi.QPUAPI_GetWriteLogServer) error
@@ -43,6 +44,7 @@ type QPUClass interface {
 	ClientQuery1(ASTQuery, string) (*qpuextapi.QueryResp1, error)
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
+	QuerySubscribe(ASTQuery, *qpuextapi.QueryReq) (chan LogOperation, chan bool, chan error)
 	RemovePersistentQuery(string, int)
 	GetConfig() *qpuapi.ConfigResponse
 	GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
@@ -62,6 +64,7 @@ type APIClient interface {
 	QueryUnary(string) (*qpuextapi.QueryResp, error)
 	QueryUnary1(string) (*qpuextapi.QueryResp1, error)
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
+	QuerySubscribe(string) (qpuapi.QPUAPI_QuerySubscribeClient, context.CancelFunc, error)
 	CloseConnection() error
 	GetConfig() (*qpuapi.ConfigResponse, error)
 	GetWriteLog() (qpuapi.QPUAPI_GetWriteLogClient, error)
