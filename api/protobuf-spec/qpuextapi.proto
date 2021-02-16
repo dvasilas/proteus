@@ -50,6 +50,7 @@ message QueryRespRecord {
   string record_id = 1;
   map<string, string> attributes = 2;
   map<string, google.protobuf.Timestamp> timestamp = 3;
+  google.protobuf.Timestamp timestampReceived = 4;
 }
 
 message MetricsRequest {}

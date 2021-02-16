@@ -179,12 +179,18 @@ func (ds MongoDataStore) GetSnapshot(table string, projection, isNull, isNotNull
 				errCh <- utils.Error(err)
 				break
 			}
+
+			timestamp, err := ptypes.TimestampProto(time.Now())
+			if err != nil {
+				errCh <- utils.Error(err)
+				break
+			}
+
 			logOpCh <- libqpu.LogOperationState(
 				// 			*object.Key,
 				dataItemID,
 				table,
-				nil,
-				// 			libqpu.Vectorclock(map[string]*tspb.Timestamp{ds.subscriptionEndpoint: timestamp}),
+				libqpu.Vectorclock(map[string]*tspb.Timestamp{"mongo": timestamp}),
 				// 			attributes,
 				dataItemAttributes,
 			)
@@ -282,7 +288,7 @@ func (ds MongoDataStore) formatUpdateRecord(table string, record bson.Raw) (libq
 		}
 	}
 
-	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts*int64(time.Millisecond)))
+	timestamp, err := ptypes.TimestampProto(time.Unix(0, ts))
 	if err != nil {
 		return libqpu.LogOperation{}, err
 	}

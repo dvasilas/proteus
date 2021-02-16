@@ -111,7 +111,11 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 
 		if q.logTimestamps {
 			var t0, t1 time.Time
-			t1 = time.Now()
+
+			t1, err = ptypes.Timestamp(e.GetTimestampReceived())
+			if err != nil {
+				return nil, utils.Error(err)
+			}
 
 			for _, v := range e.GetTimestamp() {
 				t0, err = ptypes.Timestamp(v)
@@ -124,6 +128,7 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 				T0:    t0,
 				T1:    t1,
 			})
+
 		}
 	}
 	if q.logTimestamps {
