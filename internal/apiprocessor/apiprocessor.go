@@ -268,6 +268,11 @@ func (s *APIProcessor) QuerySubscribe(queryReq *qpuextapi.QueryReq, stream qpuap
 				}
 				if ok {
 					go func() {
+						defer func() {
+							if r := recover(); r != nil {
+								fmt.Println("Recovered in f", r)
+							}
+						}()
 						if err := stream.Send(&qpuapi.ResponseStreamRecord{
 							SequenceId: seqID,
 							LogOp:      logOp.Op,
