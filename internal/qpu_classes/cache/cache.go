@@ -2,7 +2,6 @@ package cacheqpu
 
 import (
 	"context"
-	"io"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	lrucache "github.com/dvasilas/proteus/internal/qpu_classes/cache/lruCache"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
@@ -103,8 +101,22 @@ func (q *CacheQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	}
 
 	cacheEntrySize := 0
+
+	if q.logTimestamps {
+		q.writeLog.Lock()
+	}
 	for _, e := range resp.GetRespRecord() {
 		cacheEntrySize += len(e.GetAttributes())
+
+		if q.logTimestamps {
+			q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+				RowID: e.GetRecordId(),
+				T1:    time.Now(),
+			})
+		}
+	}
+	if q.logTimestamps {
+		q.writeLog.Unlock()
 	}
 
 	if err := q.cache.Put(queryStr, resp, cacheEntrySize, q.adjacentQPUs[0].APIClient); err != nil {
@@ -157,32 +169,34 @@ func (q *CacheQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq
 
 // GetMetrics ...
 func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
-	if err != nil {
-		return nil, utils.Error(err)
-	}
+	// stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
+	// if err != nil {
+	// 	return nil, utils.Error(err)
+	// }
 
-	for {
-		respRecord, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, utils.Error(err)
-		}
+	// for {
+	// 	respRecord, err := stream.Recv()
+	// 	if err == io.EOF {
+	// 		break
+	// 	}
+	// 	if err != nil {
+	// 		return nil, utils.Error(err)
+	// 	}
 
-		t1, err := ptypes.Timestamp(respRecord.GetT1())
-		if err != nil {
-			return nil, utils.Error(err)
-		}
+	// 	t1, err := ptypes.Timestamp(respRecord.GetT1())
+	// 	if err != nil {
+	// 		return nil, utils.Error(err)
+	// 	}
 
-		q.writeLog.Lock()
-		q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-			RowID: respRecord.GetRowID(),
-			T1:    t1,
-		})
-		q.writeLog.Unlock()
-	}
+	// 	q.writeLog.Lock()
+	// 	q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
+	// 		RowID: respRecord.GetRowID(),
+	// 		T1:    t1,
+	// 	})
+	// 	q.writeLog.Unlock()
+	// }
+
+	var err error
 
 	var FL50, FL90, FL95, FL99 float64
 	var FV0, FV1, FV2, FV4 float64
