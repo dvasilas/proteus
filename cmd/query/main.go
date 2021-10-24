@@ -48,6 +48,13 @@ func main() {
 }
 
 func doQuery(c *proteusclient.Client, query string) {
+
+	resp, err := c.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Print(resp)
 	// respCh, errCh, err := c.Query(query)
 	// if err != nil {
 	// 	log.Fatal(err)

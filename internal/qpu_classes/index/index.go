@@ -143,6 +143,7 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 						[]string{},
 						[]string{},
 						nil,
+						nil,
 					)
 					responseStreamStories, err := qpugraph.SendQuery(libqpu.NewQuery(nil, querySnapshot.Q), qpu.AdjacentQPUs[i])
 					if err != nil {

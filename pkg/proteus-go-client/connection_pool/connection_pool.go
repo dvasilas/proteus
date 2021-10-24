@@ -2,11 +2,11 @@ package connpool
 
 import (
 	"errors"
+	"fmt"
+	grpcutils "github.com/dvasilas/proteus/internal/grpc"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
-"runtime/debug"
-"fmt"
-	grpcutils "github.com/dvasilas/proteus/internal/grpc"
 )
 
 // https://github.com/couchbase/go-couchbase/blob/master/conn_pool.go
@@ -52,8 +52,8 @@ var connPoolAvailWaitTime = time.Millisecond
 func makeConn(host string, tracing bool) (*grpcutils.GrpcClientConn, error) {
 	grpcConn, err := grpcutils.NewClientConn(host, tracing)
 	if err != nil {
-fmt.Println(err)
-	debug.PrintStack()
+		fmt.Println(err)
+		debug.PrintStack()
 		return nil, err
 	}
 	return grpcConn, err
@@ -158,7 +158,7 @@ func (cp *ConnectionPool) GetWithTimeout(d time.Duration) (rv *grpcutils.GrpcCli
 			cp.tracing = false
 			if err != nil {
 				fmt.Println(err)
-	debug.PrintStack()
+				debug.PrintStack()
 				// On error, release our create hold
 				<-cp.createsem
 			} else {

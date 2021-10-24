@@ -1,0 +1,20 @@
+operator = "router"
+state = "stateless"
+port = "50450"
+
+[ProcessingConfig]
+grpcServers = 1
+[ProcessingConfig.API]
+maxWorkers = 4
+maxJobQueue = 10000
+
+[Evaluation]
+tracing = false
+logTimestamps = false
+
+[[connections]]
+address = "127.0.0.1:50350"
+local = "local"
+[[connections]]
+address = "127.0.0.1:50351"
+local = "local"

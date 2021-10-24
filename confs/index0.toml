@@ -1,0 +1,30 @@
+operator = "inMemIndex"
+state = "stateless"
+port = "50350"
+
+[ProcessingConfig]
+grpcServers = 1
+[ProcessingConfig.API]
+maxWorkers = 4
+maxJobQueue = 10000
+
+[ProcessingConfig.Input]
+maxWorkers = 2
+maxJobQueue = 10000
+
+[IndexConfig]
+table = "ycsbbuck"
+attributeName = "attribute0"
+attributetype = "int"
+lbound = "0"
+ubound = "50"
+
+[Evaluation]
+tracing = false
+logTimestamps = false
+measureNotificationLatency = false
+measureDataTransfer = false
+
+[[connections]]
+address = "127.0.0.1:50150"
+local = "local"

@@ -11,7 +11,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/metrics"
-	"github.com/dvasilas/proteus/internal/proto/qpu"
+	qpuproto "github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	qpugraph "github.com/dvasilas/proteus/internal/qpuGraph"
 	"github.com/dvasilas/proteus/internal/queries"
@@ -58,8 +58,8 @@ type InMemIndex struct {
 
 // indexImplementation represents a B-Tree index implementation for a specific attribute type.
 type indexImplementation interface {
-	update(*qpu.Value, *qpu.Value, libqpu.LogOperation) (time.Time, error)
-	updateCatchUp(*qpu.Value, libqpu.LogOperation) (time.Time, error)
+	update(*qpuproto.Value, *qpuproto.Value, libqpu.LogOperation) (time.Time, error)
+	updateCatchUp(*qpuproto.Value, libqpu.LogOperation) (time.Time, error)
 	lookup(libqpu.ASTQuery) []*qpuextapi.QueryRespRecord
 	print()
 }
@@ -143,42 +143,36 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 		return nil, err
 	}
 
-	for tableName, table := range jqpu.inputSchema {
-		for i := 0; i < len(qpu.AdjacentQPUs); i++ {
-			for _, t := range qpu.AdjacentQPUs[i].OutputSchema {
-				if t == tableName {
-					projection := make([]string, len(table.Attributes))
-					j := 0
-					for attr := range table.Attributes {
-						projection[j] = attr
-						j++
-					}
-					querySnapshot := queries.NewQuerySnapshotAndSubscribe(
-						tableName,
-						projection,
-						[]string{},
-						[]string{},
-						nil,
-					)
-					responseStreamStories, err := qpugraph.SendQuery(libqpu.NewQuery(nil, querySnapshot.Q), qpu.AdjacentQPUs[i])
-					if err != nil {
-						return nil, err
-					}
-					queryID := rand.Int()
-					jqpu.catchUp.catchupQueries[queryID] = &catchupQuery{
-						catchUpSeqID:     make(map[int64]bool),
-						endOfStreamSeqID: -1,
-					}
-					go func() {
-						if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil, queryID); err != nil {
-							panic(err)
-						}
-					}()
-					break
-				}
-			}
-		}
+	projection := []string{qpu.Config.IndexConfig.AttributeName}
+	querySnapshot := queries.NewQuerySnapshotAndSubscribe(
+		qpu.Config.IndexConfig.Table,
+		projection,
+		[]string{},
+		[]string{},
+		[]*qpuproto.AttributePredicate{
+			&qpuproto.AttributePredicate{
+				Attr:   libqpu.Attribute(qpu.Config.IndexConfig.AttributeName, nil),
+				Type:   qpuproto.AttributePredicate_RANGE,
+				Lbound: qpu.Config.IndexConfig.LBound,
+				Ubound: qpu.Config.IndexConfig.UBound,
+			},
+		},
+		nil,
+	)
+	responseStreamStories, err := qpugraph.SendQuery(libqpu.NewQuery(nil, querySnapshot.Q), qpu.AdjacentQPUs[0])
+	if err != nil {
+		return nil, err
 	}
+	queryID := rand.Int()
+	jqpu.catchUp.catchupQueries[queryID] = &catchupQuery{
+		catchUpSeqID:     make(map[int64]bool),
+		endOfStreamSeqID: -1,
+	}
+	go func() {
+		if err = responsestream.StreamConsumer(responseStreamStories, qpu.Config.ProcessingConfig.Input.MaxWorkers, qpu.Config.ProcessingConfig.Input.MaxJobQueue, jqpu.processRespRecord, nil, nil, queryID); err != nil {
+			panic(err)
+		}
+	}()
 
 	go func() {
 		for {
@@ -196,7 +190,6 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 					break
 				} else if len(q.catchUpSeqID) < int(q.endOfStreamSeqID) {
 					done = false
-
 				} else {
 					for _, v := range q.catchUpSeqID {
 						if !v {
@@ -376,6 +369,7 @@ func (q *IndexQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUA
 
 func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
 	var t0, t1 time.Time
+	utils.Trace("index received", map[string]interface{}{"record": respRecord})
 
 	q.catchUp.Lock()
 	q.catchUp.catchupQueries[queryID].catchUpSeqID[respRecord.GetSequenceID()] = false
@@ -393,16 +387,6 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 		q.catchUp.Unlock()
 	} else {
 
-		inSchema := false
-		for tableName := range q.inputSchema {
-			if respRecord.GetLogOp().GetTable() == tableName {
-				inSchema = true
-			}
-		}
-		if !inSchema {
-			return nil
-		}
-
 		if q.catchUp.catchUpDone && q.measureNotificationLatency {
 			if err := q.notificationLatencyM.AddFromOp(respRecord.GetLogOp()); err != nil {
 				return err
@@ -410,6 +394,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 		}
 
 		if respRecordType == libqpu.State {
+
 			t1, err = q.index.index.updateCatchUp(respRecord.GetLogOp().GetAttributes()["attribute0"], respRecord.GetLogOp())
 			if err != nil {
 				return err
@@ -480,7 +465,7 @@ func (q *IndexQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 	return nil
 }
 
-func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qpu.Vectorclock) (string, *qpuextapi.QueryRespRecord, time.Time, error) {
+func encodeDataItem(dataItemID string, attributes map[string]*qpuproto.Value, vc0 *qpuproto.Vectorclock) (string, *qpuextapi.QueryRespRecord, time.Time, error) {
 	// di := make(map[string]*qpuextapi.Payload)
 	// di["id"] = &qpuextapi.Payload{
 	// 	Value: []byte(dataItemID),
@@ -490,10 +475,10 @@ func encodeDataItem(dataItemID string, attributes map[string]*qpu.Value, vc0 *qp
 	for k, v := range attributes {
 		switch v.GetVal().(type) {
 
-		case *qpu.Value_Str:
+		case *qpuproto.Value_Str:
 			attrs[k] = v.GetStr()
 
-		case *qpu.Value_Int:
+		case *qpuproto.Value_Int:
 			attrs[k] = strconv.Itoa(int(v.GetInt()))
 			// b := make([]byte, 8)
 			// binary.LittleEndian.PutUint64(b, uint64())
@@ -576,7 +561,7 @@ func newBTreeIndex() *bTreeIndex {
 	return index
 }
 
-func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOperation) (time.Time, error) {
+func (i *bTreeIndex) update(valueOld, valueNew *qpuproto.Value, logOp libqpu.LogOperation) (time.Time, error) {
 	dataItemID, dataItem, t1, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
 		return t1, err
@@ -609,7 +594,7 @@ func (i *bTreeIndex) update(valueOld, valueNew *qpu.Value, logOp libqpu.LogOpera
 	return t1, nil
 }
 
-func (i *bTreeIndex) updateCatchUp(value *qpu.Value, logOp libqpu.LogOperation) (time.Time, error) {
+func (i *bTreeIndex) updateCatchUp(value *qpuproto.Value, logOp libqpu.LogOperation) (time.Time, error) {
 	dataItemID, dataItem, t1, err := encodeDataItem(logOp.GetObjectID(), logOp.GetAttributes(), logOp.GetTimestamp())
 	if err != nil {
 		return t1, err
@@ -639,13 +624,21 @@ func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord 
 		}
 		return true
 	}
-	lb := query.GetPredicate()[0].GetLbound()
-	ub := query.GetPredicate()[0].GetUbound()
 
-	if comp, _ := utils.Compare(lb, ub); comp == 0 {
-		ub = libqpu.ValueInt(ub.GetInt() + 1)
+	var lbEntry, ubEntry btree.Item
+	if len(query.GetPredicate()) == 0 {
+		lbEntry = i.tree.Min()
+		ubEntry = i.tree.Max()
+	} else {
+
+		lb := query.GetPredicate()[0].GetLbound()
+		ub := query.GetPredicate()[0].GetUbound()
+
+		if comp, _ := utils.Compare(lb, ub); comp == 0 {
+			ub = libqpu.ValueInt(ub.GetInt() + 1)
+		}
+		lbEntry, ubEntry = i.entry.predicateToIndexEntries(lb, ub)
 	}
-	lbEntry, ubEntry := i.entry.predicateToIndexEntries(lb, ub)
 
 	i.mutex.RLock()
 	i.tree.AscendRange(lbEntry, ubEntry, it)
@@ -654,7 +647,7 @@ func (i *bTreeIndex) lookup(query libqpu.ASTQuery) []*qpuextapi.QueryRespRecord 
 	return res
 }
 
-func (i *bTreeIndex) newIndexEntry(value *qpu.Value, dataItemID string, dataItem *qpuextapi.QueryRespRecord) btree.Item {
+func (i *bTreeIndex) newIndexEntry(value *qpuproto.Value, dataItemID string, dataItem *qpuextapi.QueryRespRecord) btree.Item {
 	item := i.entry.newIndexEntry(value)
 
 	posting := Posting{
@@ -666,7 +659,7 @@ func (i *bTreeIndex) newIndexEntry(value *qpu.Value, dataItemID string, dataItem
 	return item
 }
 
-func (i *bTreeIndex) getIndexEntry(value *qpu.Value) (treeNode, bool) {
+func (i *bTreeIndex) getIndexEntry(value *qpuproto.Value) (treeNode, bool) {
 	indexEntry := i.entry.attrToIndexEntry(value)
 	if i.tree.Has(indexEntry) {
 		return i.tree.Get(indexEntry).(treeNode), true
@@ -697,9 +690,9 @@ func (i *bTreeIndex) print() {
 }
 
 type indexEntry interface {
-	newIndexEntry(*qpu.Value) treeNode
-	attrToIndexEntry(*qpu.Value) btree.Item
-	predicateToIndexEntries(lb, ub *qpu.Value) (btree.Item, btree.Item)
+	newIndexEntry(*qpuproto.Value) treeNode
+	attrToIndexEntry(*qpuproto.Value) btree.Item
+	predicateToIndexEntries(lb, ub *qpuproto.Value) (btree.Item, btree.Item)
 }
 
 // indexInt implements indexEntry
@@ -710,13 +703,13 @@ func newIndexInt() indexInt {
 	return indexInt{}
 }
 
-func (i indexInt) newIndexEntry(value *qpu.Value) treeNode {
+func (i indexInt) newIndexEntry(value *qpuproto.Value) treeNode {
 	return treeNode{Value: valueInt{Val: value.GetInt()}, Postings: list.New()}
 }
-func (i indexInt) attrToIndexEntry(value *qpu.Value) btree.Item {
+func (i indexInt) attrToIndexEntry(value *qpuproto.Value) btree.Item {
 	return treeNode{Value: valueInt{Val: value.GetInt()}}
 }
-func (i indexInt) predicateToIndexEntries(lb, ub *qpu.Value) (btree.Item, btree.Item) {
+func (i indexInt) predicateToIndexEntries(lb, ub *qpuproto.Value) (btree.Item, btree.Item) {
 	return treeNode{Value: valueInt{Val: lb.GetInt()}}, treeNode{Value: valueInt{Val: ub.GetInt()}}
 	// return treeNode{}, treeNode{}
 }

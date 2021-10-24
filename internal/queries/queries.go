@@ -78,7 +78,7 @@ func NewQuerySnapshot(table string, projection []string, isNull []string, isNotN
 }
 
 // NewQuerySnapshotAndSubscribe ...
-func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []string, isNotNull []string, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
+func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []string, isNotNull []string, attrPredicates []*qpu.AttributePredicate, snapshotPredicate *qpu.SnapshotTimePredicate) libqpu.ASTQuery {
 	predicate := make([]*qpu.AttributePredicate, 0)
 	for _, attributeKey := range isNull {
 		predicate = append(predicate,
@@ -95,6 +95,10 @@ func NewQuerySnapshotAndSubscribe(table string, projection []string, isNull []st
 				Type: qpu.AttributePredicate_ISNOTNULL,
 			},
 		)
+	}
+
+	for _, attrPred := range attrPredicates {
+		predicate = append(predicate, attrPred)
 	}
 
 	return libqpu.ASTQuery{
@@ -177,19 +181,33 @@ func SatisfiesPredicate(logOp libqpu.LogOperation, query libqpu.ASTQuery) (bool,
 				return false, nil
 			}
 		case qpu.AttributePredicate_RANGE:
-			// c, err := utils.Compare(pred.GetLbound(), pred.GetUbound())
-			// if err != nil {
-			// 	return false, err
-			// }
-			// if c == 0 {
-			// 	c, err := utils.Compare(pred.GetLbound(), val)
-			// 	if err != nil {
-			// 		return false, err
-			// 	}
-			// 	return c == 0, nil
-			panic(errors.New("RANGE check not implemented"))
+			c, err := utils.Compare(pred.GetLbound(), pred.GetUbound())
+			if err != nil {
+				return false, err
+			}
+			if c == 0 {
+				cl, err := utils.Compare(pred.GetLbound(), val)
+				if err != nil {
+					return false, err
+				}
+				return cl <= 0, nil
+			} else if c < 0 {
+				cl, err := utils.Compare(pred.GetLbound(), val)
+				if err != nil {
+					return false, err
+				}
+				cu, err := utils.Compare(pred.GetUbound(), val)
+				if err != nil {
+					return false, err
+				}
+				if cl <= 0 && cu > 0 {
+					return true, nil
+				}
+				return false, nil
+			} else {
+				return false, utils.Error(errors.New("invalid range bounds"))
+			}
 		}
-		// }
 	}
 	return true, nil
 }

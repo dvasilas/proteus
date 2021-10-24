@@ -90,11 +90,11 @@ func NewDatastore(conf *libqpu.QPUConfig, inputSchema libqpu.Schema) (MySQLDataS
 	}
 
 	s := MySQLDataStore{
-		subscriptionEndpoint: conf.DatastoreConfig.LogStreamEndpoint,
-		cli:                  mysql.NewPublishUpdatesClient(conn),
-		inputSchema:          inputSchema,
-		conn:                 conn,
-		db:                   db,
+		subscriptionEndpoint:       conf.DatastoreConfig.LogStreamEndpoint,
+		cli:                        mysql.NewPublishUpdatesClient(conn),
+		inputSchema:                inputSchema,
+		conn:                       conn,
+		db:                         db,
 		measureNotificationLatency: conf.Evaluation.MeasureNotificationLatency,
 	}
 

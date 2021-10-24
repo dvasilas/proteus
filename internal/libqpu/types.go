@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/dvasilas/proteus/internal/proto/qpu"
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
@@ -140,6 +141,13 @@ type QPUConfig struct {
 			SecretAccessKey string
 		}
 	}
+	IndexConfig struct {
+		Table         string
+		AttributeName string
+		AttributeType DatastoreAttributeType
+		LBound        *qpu.Value
+		UBound        *qpu.Value
+	}
 	AggregationConfig struct {
 		AggregationFunc      AggregationType
 		GroupBy              string
@@ -189,6 +197,8 @@ const (
 	S3 DatastoreType = iota
 	// MONGO is the enum value for a MongoDB storage tier
 	MONGO DatastoreType = iota
+	// MOCK is the enum value for a mocked storage tier
+	MOCK DatastoreType = iota
 )
 
 // AggregationType ...

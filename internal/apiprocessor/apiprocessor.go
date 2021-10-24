@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +26,7 @@ import (
 	"github.com/dvasilas/proteus/internal/sqlparser"
 	"github.com/golang/protobuf/proto"
 	"github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 )
 
 // This package is responsible for implementing the libqpu.APIProcessor.
@@ -230,6 +230,8 @@ func (s *APIProcessor) QueryUnary(req libqpu.QueryRequest, parentSpan opentracin
 		s.sqlCache.put(req.GetSQLStr(), astQuery)
 	}
 
+	utils.Trace("parsed query", map[string]interface{}{"ast": astQuery})
+
 	resp, err := s.qpuClass.ClientQuery(astQuery, req.GetSQLStr(), parentSpan)
 
 	if s.measureDataTransfer {
@@ -413,7 +415,8 @@ func (c *sqlToASTCache) put(sqlStmt string, ast libqpu.ASTQuery) {
 		queryStr := strings.Split(sqlStmt, "=")
 		cacheKey = fmt.Sprintf("%s = ", queryStr[0])
 	} else {
-		log.Fatal("sql caching implementation only supports point queries")
+		utils.Warn(errors.New("sql caching implementation only supports point queries"))
+		return
 	}
 
 	c.Lock()
@@ -446,7 +449,8 @@ func (c *sqlToASTCache) get(sqlStmt string) (libqpu.ASTQuery, bool, error) {
 
 		return ast, found, nil
 	}
-	return libqpu.ASTQuery{}, false, utils.Error(errors.New("sql caching implementation only supports point queries"))
+	utils.Warn(errors.New("sql caching implementation only supports point queries"))
+	return libqpu.ASTQuery{}, false, nil
 
 	// return libqpu.ASTQuery{}, false, utils.Error(errors.New("should not have reached here"))
 }

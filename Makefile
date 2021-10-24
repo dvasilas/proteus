@@ -31,11 +31,11 @@ qpu:
 	@echo "Building..."
 	@go build -o ${BIN_DIR}/qpu cmd/qpu/main.go
 
-.PHONY: bench
+.PHONY: query
 ## query: build the qpu application
-bench:
+query:
 	@echo "Building..."
-	@go build -o ${BIN_DIR}/benchmark cmd/benchmark/main.go
+	@go build -o ${BIN_DIR}/query cmd/query/main.go
 
 .PHONY: fmt
 ## fmt: runs gofmt on all source files

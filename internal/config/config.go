@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
@@ -63,18 +64,11 @@ type inputQPUConfig struct {
 		}
 	}
 	IndexConfig struct {
-		Bucket        string
+		Table         string
 		AttributeName string
 		AttributeType string
 		LBound        string
 		UBound        string
-		ConsLevel     string
-		IndexStore    struct {
-			Store          string
-			Endpoint       string
-			Bucket         string
-			Implementation string
-		}
 	}
 	CacheConfig struct {
 		Size int
@@ -161,6 +155,10 @@ func GetQPUConfig(configFile string, qpu *libqpu.QPU) error {
 		}
 	case libqpu.Cache:
 		if err := getCacheConfig(inputConfig, config); err != nil {
+			return err
+		}
+	case libqpu.Index, libqpu.InMemIndex:
+		if err := getIndexConfig(inputConfig, config); err != nil {
 			return err
 		}
 	}
@@ -286,6 +284,8 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 		config.DatastoreConfig.Type = libqpu.S3
 	case "mongo":
 		config.DatastoreConfig.Type = libqpu.MONGO
+	case "mock":
+		config.DatastoreConfig.Type = libqpu.MOCK
 	default:
 		return utils.Error(errors.New("unknown datastore type"))
 	}
@@ -327,6 +327,47 @@ func getJoinConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 func getCacheConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
 	config.CacheConfig.Size = inputConf.CacheConfig.Size
 	config.CacheConfig.TTL = inputConf.CacheConfig.Ttl
+
+	return nil
+}
+
+func getIndexConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) error {
+	config.IndexConfig.Table = inputConf.IndexConfig.Table
+	config.IndexConfig.AttributeName = inputConf.IndexConfig.AttributeName
+	switch inputConf.IndexConfig.AttributeType {
+	case "int":
+		config.IndexConfig.AttributeType = libqpu.INT
+		lbval, err := strconv.ParseInt(inputConf.IndexConfig.LBound, 10, 32)
+		if err != nil {
+			return err
+		}
+		config.IndexConfig.LBound = libqpu.ValueInt(int32(lbval))
+
+		ubval, err := strconv.ParseInt(inputConf.IndexConfig.UBound, 10, 32)
+		if err != nil {
+			return err
+		}
+		config.IndexConfig.UBound = libqpu.ValueInt(int32(ubval))
+	case "string":
+		config.IndexConfig.AttributeType = libqpu.STR
+		config.IndexConfig.LBound = libqpu.ValueStr(inputConf.IndexConfig.LBound)
+		config.IndexConfig.UBound = libqpu.ValueStr(inputConf.IndexConfig.UBound)
+	case "float":
+		config.IndexConfig.AttributeType = libqpu.FLT
+		lbval, err := strconv.ParseFloat(inputConf.IndexConfig.LBound, 64)
+		if err != nil {
+			return err
+		}
+		config.IndexConfig.LBound = libqpu.ValueFlt(lbval)
+
+		ubval, err := strconv.ParseFloat(inputConf.IndexConfig.UBound, 64)
+		if err != nil {
+			return err
+		}
+		config.IndexConfig.UBound = libqpu.ValueFlt(ubval)
+	default:
+		return utils.Error(fmt.Errorf("invalid attribute type %s in schema", inputConf.IndexConfig.AttributeType))
+	}
 
 	return nil
 }

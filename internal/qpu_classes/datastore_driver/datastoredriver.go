@@ -10,6 +10,7 @@ import (
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
+	mockdriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mock"
 	mongodriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mongo"
 	mysqldriver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/mysql"
 	s3driver "github.com/dvasilas/proteus/internal/qpu_classes/datastore_driver/s3"
@@ -61,6 +62,11 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 		if err != nil {
 			return &DsDriverQPU{}, err
 		}
+	case libqpu.MOCK:
+		ds, err = mockdriver.NewDatastore(qpu.Config, qpu.InputSchema)
+		if err != nil {
+			return &DsDriverQPU{}, err
+		}
 	default:
 		return &DsDriverQPU{}, utils.Error(errors.New("unknown datastore type"))
 	}
@@ -79,6 +85,8 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*DsDriverQPU, error) {
 
 // ProcessQuerySnapshot ...
 func (q *DsDriverQPU) ProcessQuerySnapshot(query libqpu.ASTQuery, md map[string]string, sync bool, parentSpan opentracing.Span) (<-chan libqpu.LogOperation, <-chan error) {
+	utils.Trace("datastore driver received", map[string]interface{}{"query": query})
+
 	isNull, isNotNull := query.GetPredicateContains()
 	return q.datastore.GetSnapshot(query.GetTable(), query.GetProjection(), isNull, isNotNull)
 }

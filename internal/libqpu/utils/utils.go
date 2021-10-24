@@ -30,8 +30,7 @@ func Error(err error) error {
 
 // Warn ...
 func Warn(err error) {
-	log.Error(err)
-	debug.PrintStack()
+	log.Warn(err)
 }
 
 // Trace is a wrapper for printing trace messaging

@@ -1,0 +1,41 @@
+operator = "db_driver"
+state = "stateless"
+port = "50150"
+
+[ProcessingConfig]
+grpcServers = 1
+[ProcessingConfig.API]
+maxWorkers = 4
+maxJobQueue = 10000
+
+[ProcessingConfig.Input]
+maxWorkers = 2
+maxJobQueue = 10000
+
+
+[[InputSchema]]
+table = "ycsbbuck"
+[[InputSchema.Attributes]]
+key = "attribute0"
+type = "int"
+
+[Evaluation]
+tracing = false
+logTimestamps = false
+measureNotificationLatency = false
+
+[DatastoreConfig]
+type = "mock"
+endpoint = "127.0.0.1:3307"
+logStreamEndpoint = "127.0.0.1:50000"
+DBName = "proteus_lobsters_db"
+[DatastoreConfig.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecretPwd"
+
+[StateBackend]
+endpoint = "127.0.0.1:3308"
+
+[StateBackend.Credentials]
+accessKeyID = "root"
+secretAccessKey = "verySecrectQPUPwd"

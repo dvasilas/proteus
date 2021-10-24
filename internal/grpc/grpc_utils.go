@@ -67,7 +67,7 @@ func NewClientConn(address string, tracing bool) (*GrpcClientConn, error) {
 	clientConn := GrpcClientConn{}
 	if tracing {
 		if tracer := opentracing.GlobalTracer(); tracer != nil {
-			maxMsgSize := 1024*1024*256
+			maxMsgSize := 1024 * 1024 * 256
 			c, err := grpc.Dial(
 				address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),

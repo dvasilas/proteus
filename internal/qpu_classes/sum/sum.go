@@ -141,6 +141,7 @@ func (q *SumQPU) prepareDownstreamQuery() libqpu.ASTQuery {
 		inputSchemaTable.DownstreamQuery.IsNull,
 		inputSchemaTable.DownstreamQuery.IsNotNull,
 		nil,
+		nil,
 	)
 }
 
