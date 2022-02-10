@@ -19,7 +19,6 @@ import (
 	inmemindexqpu "github.com/dvasilas/proteus/internal/qpu_classes/inMemIndex"
 	indexqpu "github.com/dvasilas/proteus/internal/qpu_classes/index"
 	joinqpu "github.com/dvasilas/proteus/internal/qpu_classes/join"
-	lobsters "github.com/dvasilas/proteus/internal/qpu_classes/lobsters"
 	router "github.com/dvasilas/proteus/internal/qpu_classes/router"
 	sumqpu "github.com/dvasilas/proteus/internal/qpu_classes/sum"
 	"github.com/dvasilas/proteus/internal/queries"
@@ -391,8 +390,6 @@ func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, erro
 		return cacheqpu.InitClass(qpu, catchUpDoneCh)
 	case libqpu.Router:
 		return router.InitClass(qpu, catchUpDoneCh)
-	case libqpu.Lobsters:
-		return lobsters.InitClass(qpu, catchUpDoneCh)
 	default:
 		return nil, utils.Error(errors.New("Unknown QPU class"))
 	}

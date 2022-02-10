@@ -33,10 +33,6 @@ service QPUAPI {
   rpc GetMetrics(qpuextapi.MetricsRequest) returns (qpuextapi.MetricsResponse) {}
 
   rpc GetWriteLog(qpuextapi.GetWriteLogReq) returns (stream qpuextapi.WriteLogOp) {}
-
-  rpc LobstersFrontpage(qpuextapi.LobFrontpageReq) returns (qpuextapi.LobFrontpageResp) {}
-  rpc LobstersStoryVote(qpuextapi.LobStoryVoteReq) returns (qpuextapi.LobStoryVoteResp) {}
-  rpc LobstersStoryVoteInsert(qpuextapi.LobStoryVoteReq) returns (qpuextapi.LobStoryVoteResp) {}
 }
 
 message NoOpReq {

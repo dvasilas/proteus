@@ -25,9 +25,6 @@ type QPUAPIClient interface {
 	QueryUnary(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp, error)
 	QueryUnary1(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp1, error)
 	GetMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*MetricsResponse, error)
-	LobstersFrontpage(ctx context.Context, in *LobFrontpageReq, opts ...grpc.CallOption) (*LobFrontpageResp, error)
-	LobstersStoryVote(ctx context.Context, in *LobStoryVoteReq, opts ...grpc.CallOption) (*LobStoryVoteResp, error)
-	LobstersStoryVoteInsert(ctx context.Context, in *LobStoryVoteReq, opts ...grpc.CallOption) (*LobStoryVoteResp, error)
 }
 
 type qPUAPIClient struct {
@@ -65,33 +62,6 @@ func (c *qPUAPIClient) GetMetrics(ctx context.Context, in *MetricsRequest, opts 
 	return out, nil
 }
 
-func (c *qPUAPIClient) LobstersFrontpage(ctx context.Context, in *LobFrontpageReq, opts ...grpc.CallOption) (*LobFrontpageResp, error) {
-	out := new(LobFrontpageResp)
-	err := c.cc.Invoke(ctx, "/qpuextapi.QPUAPI/LobstersFrontpage", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *qPUAPIClient) LobstersStoryVote(ctx context.Context, in *LobStoryVoteReq, opts ...grpc.CallOption) (*LobStoryVoteResp, error) {
-	out := new(LobStoryVoteResp)
-	err := c.cc.Invoke(ctx, "/qpuextapi.QPUAPI/LobstersStoryVote", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *qPUAPIClient) LobstersStoryVoteInsert(ctx context.Context, in *LobStoryVoteReq, opts ...grpc.CallOption) (*LobStoryVoteResp, error) {
-	out := new(LobStoryVoteResp)
-	err := c.cc.Invoke(ctx, "/qpuextapi.QPUAPI/LobstersStoryVoteInsert", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QPUAPIServer is the server API for QPUAPI service.
 // All implementations must embed UnimplementedQPUAPIServer
 // for forward compatibility
@@ -99,9 +69,6 @@ type QPUAPIServer interface {
 	QueryUnary(context.Context, *QueryReq) (*QueryResp, error)
 	QueryUnary1(context.Context, *QueryReq) (*QueryResp1, error)
 	GetMetrics(context.Context, *MetricsRequest) (*MetricsResponse, error)
-	LobstersFrontpage(context.Context, *LobFrontpageReq) (*LobFrontpageResp, error)
-	LobstersStoryVote(context.Context, *LobStoryVoteReq) (*LobStoryVoteResp, error)
-	LobstersStoryVoteInsert(context.Context, *LobStoryVoteReq) (*LobStoryVoteResp, error)
 	mustEmbedUnimplementedQPUAPIServer()
 }
 
@@ -117,15 +84,6 @@ func (UnimplementedQPUAPIServer) QueryUnary1(context.Context, *QueryReq) (*Query
 }
 func (UnimplementedQPUAPIServer) GetMetrics(context.Context, *MetricsRequest) (*MetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
-}
-func (UnimplementedQPUAPIServer) LobstersFrontpage(context.Context, *LobFrontpageReq) (*LobFrontpageResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LobstersFrontpage not implemented")
-}
-func (UnimplementedQPUAPIServer) LobstersStoryVote(context.Context, *LobStoryVoteReq) (*LobStoryVoteResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LobstersStoryVote not implemented")
-}
-func (UnimplementedQPUAPIServer) LobstersStoryVoteInsert(context.Context, *LobStoryVoteReq) (*LobStoryVoteResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LobstersStoryVoteInsert not implemented")
 }
 func (UnimplementedQPUAPIServer) mustEmbedUnimplementedQPUAPIServer() {}
 
@@ -194,60 +152,6 @@ func _QPUAPI_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_LobstersFrontpage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LobFrontpageReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).LobstersFrontpage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuextapi.QPUAPI/LobstersFrontpage",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).LobstersFrontpage(ctx, req.(*LobFrontpageReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QPUAPI_LobstersStoryVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LobStoryVoteReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).LobstersStoryVote(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuextapi.QPUAPI/LobstersStoryVote",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).LobstersStoryVote(ctx, req.(*LobStoryVoteReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QPUAPI_LobstersStoryVoteInsert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LobStoryVoteReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).LobstersStoryVoteInsert(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuextapi.QPUAPI/LobstersStoryVoteInsert",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).LobstersStoryVoteInsert(ctx, req.(*LobStoryVoteReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // QPUAPI_ServiceDesc is the grpc.ServiceDesc for QPUAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,18 +170,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMetrics",
 			Handler:    _QPUAPI_GetMetrics_Handler,
-		},
-		{
-			MethodName: "LobstersFrontpage",
-			Handler:    _QPUAPI_LobstersFrontpage_Handler,
-		},
-		{
-			MethodName: "LobstersStoryVote",
-			Handler:    _QPUAPI_LobstersStoryVote_Handler,
-		},
-		{
-			MethodName: "LobstersStoryVoteInsert",
-			Handler:    _QPUAPI_LobstersStoryVoteInsert_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -79,9 +79,6 @@ type QPUState interface {
 	Get(string, []string, []string, string, int64, opentracing.Span) (<-chan map[string]interface{}, error)
 	GetRow(string, []string, []string, opentracing.Span) *sql.Row
 	Cleanup()
-	LobstersFrontpage() (*qpuextapi.LobFrontpageResp, error)
-	LobstersStoryVote(*qpuextapi.LobStoryVoteReq) error
-	LobstersStoryVoteInsert(*qpuextapi.LobStoryVoteReq) error
 }
 
 // OperatorType ...
@@ -102,8 +99,6 @@ const (
 	Cache OperatorType = iota
 	// Router ...
 	Router OperatorType = iota
-	// Lobsters ...
-	Lobsters OperatorType = iota
 )
 
 // StateType ...
