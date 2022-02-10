@@ -248,19 +248,3 @@ func (q *DsDriverQPU) GetConfig() *qpuapi.ConfigResponse {
 		Schema: schemaTables,
 	}
 }
-
-// GetMetrics ...
-func (q *DsDriverQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	p50, p90, p95, p99 := q.datastore.GetNotificationLanency()
-	return &qpuextapi.MetricsResponse{
-		NotificationLatencyP50: p50,
-		NotificationLatencyP90: p90,
-		NotificationLatencyP95: p95,
-		NotificationLatencyP99: p99,
-	}, nil
-}
-
-// GetWriteLog ...
-func (q *DsDriverQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
-	return nil
-}

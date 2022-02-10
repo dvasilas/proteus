@@ -341,37 +341,6 @@ func (s *APIProcessor) GetConfig(ctx context.Context, in *qpuapi.ConfigRequest) 
 	return s.qpuClass.GetConfig(), nil
 }
 
-// GetMetrics ...
-func (s *APIProcessor) GetMetrics(ctx context.Context, req *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	resp, err := s.qpuClass.GetMetrics(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var p50, p90, p95, p99 float64
-	p50, p90, p95, p99 = -1, -1, -1, -1
-
-	if s.measureNotificationLatency {
-		p50, p90, p95, p99 = s.processingLatencyM.GetMetrics()
-
-		resp.ProcessingLatencyP50 = p50
-		resp.ProcessingLatencyP90 = p90
-		resp.ProcessingLatencyP95 = p95
-		resp.ProcessingLatencyP99 = p99
-	}
-
-	if s.measureDataTransfer {
-		resp.KBytesSent = float64(s.dataTransfer.count) / float64(1024)
-	}
-
-	return resp, nil
-}
-
-// GetWriteLog ...
-func (s *APIProcessor) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
-	return s.qpuClass.GetWriteLog(req, stream)
-}
-
 // ---------------- Internal Functions --------------
 
 func getQPUClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (libqpu.QPUClass, error) {

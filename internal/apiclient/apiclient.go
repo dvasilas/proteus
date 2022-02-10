@@ -108,19 +108,6 @@ func (c QPUAPIClient) GetConfig() (*qpuapi.ConfigResponse, error) {
 	return resp, err
 }
 
-// GetWriteLog ...
-func (c QPUAPIClient) GetWriteLog() (qpuapi.QPUAPI_GetWriteLogClient, error) {
-	ctx, _ := context.WithCancel(context.Background())
-	return c.cli.GetWriteLog(ctx, &qpuextapi.GetWriteLogReq{})
-}
-
-// GetDataTransfer implements the QPU's API GetDataTransfer method.
-// func (c QPUAPIClient) GetDataTransfer() (*qpuapi.DataTransferResponse, error) {
-// 	ctx := context.TODO()
-// 	resp, err := c.cli.GetDataTransfer(ctx, &qpuapi.GetDataRequest{})
-// 	return resp, err
-// }
-
 // Forward implements the QPU's API Forward method.
 func (c *QPUAPIClient) Forward() (qpuapi.QPUAPI_QueryClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())

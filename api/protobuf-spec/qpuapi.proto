@@ -23,16 +23,6 @@ service QPUAPI {
   // Used by a 'parent' QPU to request the configuration and query processing
   // capabilities of a 'child` QPU.
   rpc GetConfig(ConfigRequest) returns (ConfigResponse) {}
-  // QPUs implemement a mechanism for measuring the traffic between them
-  // (each QPU measuring the total size of outbound messages)
-  // GetDataTransfer was used for getting this measuremrents.
-  // Disabled for now.
-  // rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
-  // rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
-  // rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
-  rpc GetMetrics(qpuextapi.MetricsRequest) returns (qpuextapi.MetricsResponse) {}
-
-  rpc GetWriteLog(qpuextapi.GetWriteLogReq) returns (stream qpuextapi.WriteLogOp) {}
 }
 
 message NoOpReq {
@@ -158,14 +148,3 @@ message ConfigResponse {
 message AckMsg {
   int64 sequence_id = 1;
 }
-
-// message PingMsg {
-//   int64 sequence_id = 1;
-// }
-
-// message GetDataRequest{
-// }
-
-// message DataTransferResponse {
-//   float kBytesTranferred = 1;
-// }

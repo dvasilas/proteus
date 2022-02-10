@@ -217,27 +217,6 @@ func (q *SumQPU) RemovePersistentQuery(table string, queryID int) {
 	delete(q.subscribeQueries, queryID)
 }
 
-// GetMetrics ...
-func (q *SumQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	var p50, p90, p95, p99 float64
-	p50, p90, p95, p99 = -1, -1, -1, -1
-
-	if q.measureNotificationLatency {
-		p50, p90, p95, p99 = q.notificationLatencyM.GetMetrics()
-	}
-	return &qpuextapi.MetricsResponse{
-		NotificationLatencyP50: p50,
-		NotificationLatencyP90: p90,
-		NotificationLatencyP95: p95,
-		NotificationLatencyP99: p99,
-	}, nil
-}
-
-// GetWriteLog ...
-func (q *SumQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
-	return nil
-}
-
 // ---------------- Internal Functions --------------
 
 func (q *SumQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {

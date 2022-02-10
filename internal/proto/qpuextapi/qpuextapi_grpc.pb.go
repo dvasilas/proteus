@@ -24,7 +24,6 @@ const _ = grpc.SupportPackageIsVersion7
 type QPUAPIClient interface {
 	QueryUnary(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp, error)
 	QueryUnary1(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp1, error)
-	GetMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*MetricsResponse, error)
 }
 
 type qPUAPIClient struct {
@@ -53,22 +52,12 @@ func (c *qPUAPIClient) QueryUnary1(ctx context.Context, in *QueryReq, opts ...gr
 	return out, nil
 }
 
-func (c *qPUAPIClient) GetMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*MetricsResponse, error) {
-	out := new(MetricsResponse)
-	err := c.cc.Invoke(ctx, "/qpuextapi.QPUAPI/GetMetrics", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QPUAPIServer is the server API for QPUAPI service.
 // All implementations must embed UnimplementedQPUAPIServer
 // for forward compatibility
 type QPUAPIServer interface {
 	QueryUnary(context.Context, *QueryReq) (*QueryResp, error)
 	QueryUnary1(context.Context, *QueryReq) (*QueryResp1, error)
-	GetMetrics(context.Context, *MetricsRequest) (*MetricsResponse, error)
 	mustEmbedUnimplementedQPUAPIServer()
 }
 
@@ -81,9 +70,6 @@ func (UnimplementedQPUAPIServer) QueryUnary(context.Context, *QueryReq) (*QueryR
 }
 func (UnimplementedQPUAPIServer) QueryUnary1(context.Context, *QueryReq) (*QueryResp1, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnary1 not implemented")
-}
-func (UnimplementedQPUAPIServer) GetMetrics(context.Context, *MetricsRequest) (*MetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
 func (UnimplementedQPUAPIServer) mustEmbedUnimplementedQPUAPIServer() {}
 
@@ -134,24 +120,6 @@ func _QPUAPI_QueryUnary1_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MetricsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).GetMetrics(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuextapi.QPUAPI/GetMetrics",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).GetMetrics(ctx, req.(*MetricsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // QPUAPI_ServiceDesc is the grpc.ServiceDesc for QPUAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,10 +134,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryUnary1",
 			Handler:    _QPUAPI_QueryUnary1_Handler,
-		},
-		{
-			MethodName: "GetMetrics",
-			Handler:    _QPUAPI_GetMetrics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

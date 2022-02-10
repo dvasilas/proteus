@@ -207,28 +207,3 @@ func (s *Server) QueryUnary1(ctx context.Context, req *qpuextapi.QueryReq) (*qpu
 func (s *Server) GetConfig(ctx context.Context, req *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error) {
 	return s.api.GetConfig(ctx, req)
 }
-
-// GetDataTransfer implements the QPU's low level GetDataTransfer API.
-// func (s *Server) GetDataTransfer(ctx context.Context, in *qpuapi.GetDataRequest) (*qpuapi.DataTransferResponse, error) {
-// 	return s.api.GetDataTransfer(ctx, in)
-// }
-
-// GetMetrics ...
-func (s *Server) GetMetrics(ctx context.Context, req *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	metrics, err := s.api.GetMetrics(ctx, req)
-
-	// var RT50, RT90, RT95, RT99 float64
-	// RT50, RT90, RT95, RT99 = s.responseTimeM.GetMetrics()
-
-	// metrics.ResponseTimeP50 = RT50
-	// metrics.ResponseTimeP90 = RT90
-	// metrics.ResponseTimeP95 = RT95
-	// metrics.ResponseTimeP99 = RT99
-
-	return metrics, err
-}
-
-// GetWriteLog ...
-func (s *Server) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
-	return s.api.GetWriteLog(req, stream)
-}

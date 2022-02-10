@@ -37,15 +37,6 @@ type QPUAPIClient interface {
 	// Used by a 'parent' QPU to request the configuration and query processing
 	// capabilities of a 'child` QPU.
 	GetConfig(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
-	// QPUs implemement a mechanism for measuring the traffic between them
-	// (each QPU measuring the total size of outbound messages)
-	// GetDataTransfer was used for getting this measuremrents.
-	// Disabled for now.
-	// rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
-	// rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
-	// rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
-	GetMetrics(ctx context.Context, in *qpuextapi.MetricsRequest, opts ...grpc.CallOption) (*qpuextapi.MetricsResponse, error)
-	GetWriteLog(ctx context.Context, in *qpuextapi.GetWriteLogReq, opts ...grpc.CallOption) (QPUAPI_GetWriteLogClient, error)
 }
 
 type qPUAPIClient struct {
@@ -146,47 +137,6 @@ func (c *qPUAPIClient) GetConfig(ctx context.Context, in *ConfigRequest, opts ..
 	return out, nil
 }
 
-func (c *qPUAPIClient) GetMetrics(ctx context.Context, in *qpuextapi.MetricsRequest, opts ...grpc.CallOption) (*qpuextapi.MetricsResponse, error) {
-	out := new(qpuextapi.MetricsResponse)
-	err := c.cc.Invoke(ctx, "/qpuapi.QPUAPI/GetMetrics", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *qPUAPIClient) GetWriteLog(ctx context.Context, in *qpuextapi.GetWriteLogReq, opts ...grpc.CallOption) (QPUAPI_GetWriteLogClient, error) {
-	stream, err := c.cc.NewStream(ctx, &QPUAPI_ServiceDesc.Streams[2], "/qpuapi.QPUAPI/GetWriteLog", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &qPUAPIGetWriteLogClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type QPUAPI_GetWriteLogClient interface {
-	Recv() (*qpuextapi.WriteLogOp, error)
-	grpc.ClientStream
-}
-
-type qPUAPIGetWriteLogClient struct {
-	grpc.ClientStream
-}
-
-func (x *qPUAPIGetWriteLogClient) Recv() (*qpuextapi.WriteLogOp, error) {
-	m := new(qpuextapi.WriteLogOp)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // QPUAPIServer is the server API for QPUAPI service.
 // All implementations must embed UnimplementedQPUAPIServer
 // for forward compatibility
@@ -205,15 +155,6 @@ type QPUAPIServer interface {
 	// Used by a 'parent' QPU to request the configuration and query processing
 	// capabilities of a 'child` QPU.
 	GetConfig(context.Context, *ConfigRequest) (*ConfigResponse, error)
-	// QPUs implemement a mechanism for measuring the traffic between them
-	// (each QPU measuring the total size of outbound messages)
-	// GetDataTransfer was used for getting this measuremrents.
-	// Disabled for now.
-	// rpc GetDataTransfer(GetDataRequest) returns (DataTransferResponse) {}
-	// rpc QueryNoOp(NoOpReq) returns (NoOpResp) {}
-	// rpc QueryArgs(QueryRequest) returns (QueryResponse) {}
-	GetMetrics(context.Context, *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error)
-	GetWriteLog(*qpuextapi.GetWriteLogReq, QPUAPI_GetWriteLogServer) error
 	mustEmbedUnimplementedQPUAPIServer()
 }
 
@@ -235,12 +176,6 @@ func (UnimplementedQPUAPIServer) QuerySubscribe(*qpuextapi.QueryReq, QPUAPI_Quer
 }
 func (UnimplementedQPUAPIServer) GetConfig(context.Context, *ConfigRequest) (*ConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
-}
-func (UnimplementedQPUAPIServer) GetMetrics(context.Context, *qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
-}
-func (UnimplementedQPUAPIServer) GetWriteLog(*qpuextapi.GetWriteLogReq, QPUAPI_GetWriteLogServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetWriteLog not implemented")
 }
 func (UnimplementedQPUAPIServer) mustEmbedUnimplementedQPUAPIServer() {}
 
@@ -356,45 +291,6 @@ func _QPUAPI_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(qpuextapi.MetricsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).GetMetrics(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuapi.QPUAPI/GetMetrics",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).GetMetrics(ctx, req.(*qpuextapi.MetricsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QPUAPI_GetWriteLog_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(qpuextapi.GetWriteLogReq)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(QPUAPIServer).GetWriteLog(m, &qPUAPIGetWriteLogServer{stream})
-}
-
-type QPUAPI_GetWriteLogServer interface {
-	Send(*qpuextapi.WriteLogOp) error
-	grpc.ServerStream
-}
-
-type qPUAPIGetWriteLogServer struct {
-	grpc.ServerStream
-}
-
-func (x *qPUAPIGetWriteLogServer) Send(m *qpuextapi.WriteLogOp) error {
-	return x.ServerStream.SendMsg(m)
-}
-
 // QPUAPI_ServiceDesc is the grpc.ServiceDesc for QPUAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -414,10 +310,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetConfig",
 			Handler:    _QPUAPI_GetConfig_Handler,
 		},
-		{
-			MethodName: "GetMetrics",
-			Handler:    _QPUAPI_GetMetrics_Handler,
-		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -429,11 +321,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "QuerySubscribe",
 			Handler:       _QPUAPI_QuerySubscribe_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "GetWriteLog",
-			Handler:       _QPUAPI_GetWriteLog_Handler,
 			ServerStreams: true,
 		},
 	},

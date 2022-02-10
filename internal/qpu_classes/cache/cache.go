@@ -2,17 +2,13 @@ package cacheqpu
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	"github.com/dvasilas/proteus/internal/libqpu"
 	"github.com/dvasilas/proteus/internal/libqpu/utils"
-	"github.com/dvasilas/proteus/internal/metrics"
 	"github.com/dvasilas/proteus/internal/proto/qpuextapi"
 	lrucache "github.com/dvasilas/proteus/internal/qpu_classes/cache/lruCache"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dvasilas/proteus/internal/proto/qpuapi"
@@ -175,65 +171,6 @@ func (q *CacheQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq
 	return nil, nil, nil
 }
 
-// GetMetrics ...
-func (q *CacheQPU) GetMetrics(*qpuextapi.MetricsRequest) (*qpuextapi.MetricsResponse, error) {
-	stream, err := q.adjacentQPUs[0].APIClient.GetWriteLog()
-	if err != nil {
-		return nil, utils.Error(err)
-	}
-
-	for {
-		respRecord, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, utils.Error(err)
-		}
-
-		t1, err := ptypes.Timestamp(respRecord.GetT1())
-		if err != nil {
-			return nil, utils.Error(err)
-		}
-
-		q.writeLog.Lock()
-		q.writeLog.entries = append(q.writeLog.entries, libqpu.WriteLogEntry{
-			RowID: respRecord.GetRowID(),
-			T1:    t1,
-		})
-		q.writeLog.Unlock()
-	}
-
-	// var err error
-
-	var FL50, FL90, FL95, FL99 float64
-	var FV0, FV1, FV2, FV4 float64
-
-	if q.logTimestamps {
-		FL50, FL90, FL95, FL99 = metrics.FreshnessLatency(q.writeLog.entries)
-
-		for _, e := range q.putInCacheLog.entries {
-			fmt.Println(e)
-		}
-
-		FV0, FV1, FV2, FV4, err = metrics.FreshnessVersions(q.queryLog.entries, q.writeLog.entries, q.putInCacheLog.entries)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &qpuextapi.MetricsResponse{
-		FreshnessLatencyP50: FL50,
-		FreshnessLatencyP90: FL90,
-		FreshnessLatencyP95: FL95,
-		FreshnessLatencyP99: FL99,
-		FreshnessVersions0:  FV0,
-		FreshnessVersions1:  FV1,
-		FreshnessVersions2:  FV2,
-		FreshnessVersions4:  FV4,
-	}, nil
-}
-
 // ---------------- Internal Functions --------------
 
 func (q *CacheQPU) processRespRecord(respRecord libqpu.ResponseRecord, data interface{}, recordCh chan libqpu.ResponseRecord, queryID int) error {
@@ -254,9 +191,4 @@ func (q *CacheQPU) processRespRecord(respRecord libqpu.ResponseRecord, data inte
 // GetConfig ...
 func (q CacheQPU) GetConfig() *qpuapi.ConfigResponse {
 	return &qpuapi.ConfigResponse{}
-}
-
-// GetWriteLog ...
-func (q CacheQPU) GetWriteLog(req *qpuextapi.GetWriteLogReq, stream qpuapi.QPUAPI_GetWriteLogServer) error {
-	return nil
 }
