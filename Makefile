@@ -50,12 +50,26 @@ test: fmt ; $(info $(M) running $(NAME:%=% )tests…)
 .PHONY: proto
 ## proto: Compiles the protobuf files
 proto: $(PROTOC_CMD)
-	# go get ./vendor/github.com/golang/protobuf/protoc-gen-go
-	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
-	protoc api/protobuf-spec/qpuextapi.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	protoc api/protobuf-spec/qpuapi.proto --go_out=plugins=grpc:${GOPATH}/src/
-	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
-	protoc api/protobuf-spec/s3.proto --go_out=plugins=grpc:$(GOPATH)/src/
+	go get -u google.golang.org/protobuf/cmd/protoc-gen-go
+	go install google.golang.org/protobuf/cmd/protoc-gen-go
+	go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	protoc --go_out=paths=source_relative:./internal/proto/qpu -I api/protobuf-spec qpu.proto
+	protoc --go-grpc_out=paths=source_relative:./internal/proto/qpu -I api/protobuf-spec qpu.proto
+	protoc --go_out=paths=source_relative:./internal/proto/qpuextapi -I api/protobuf-spec qpuextapi.proto
+	protoc --go-grpc_out=paths=source_relative:./internal/proto/qpuextapi -I api/protobuf-spec qpuextapi.proto
+	protoc --go_out=paths=source_relative:./internal/proto/qpuapi -I api/protobuf-spec qpuapi.proto
+	protoc --go-grpc_out=paths=source_relative:./internal/proto/qpuapi -I api/protobuf-spec qpuapi.proto
+	protoc --go_out=paths=source_relative:./internal/proto/mysql -I api/protobuf-spec mysql.proto
+	protoc --go-grpc_out=paths=source_relative:./internal/proto/mysql -I api/protobuf-spec mysql.proto
+	protoc --go_out=paths=source_relative:./internal/proto/s3 -I api/protobuf-spec s3.proto
+	protoc --go-grpc_out=paths=source_relative:./internal/proto/s3 -I api/protobuf-spec s3.proto
+
+#	protoc api/protobuf-spec/qpu.proto --go_out=plugins=grpc:${GOPATH}/src/
+#	protoc api/protobuf-spec/qpuextapi.proto --go_out=plugins=grpc:$(GOPATH)/src/
+#	protoc api/protobuf-spec/qpuapi.proto --go_out=plugins=grpc:${GOPATH}/src/
+#	protoc api/protobuf-spec/mysql.proto --go_out=plugins=grpc:$(GOPATH)/src/
+#	protoc api/protobuf-spec/s3.proto --go_out=plugins=grpc:$(GOPATH)/src/
 
 .PHONY: image-build
 ## image-build:

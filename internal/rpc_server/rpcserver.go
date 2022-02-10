@@ -33,6 +33,7 @@ type Server struct {
 	state         libqpu.QPUState
 	dispatcher    *workerpool.Dispatcher
 	responseTimeM metrics.LatencyM
+	qpuapi.UnimplementedQPUAPIServer
 }
 
 // NewServer initializes a grpc server.
@@ -264,6 +265,7 @@ func (s *Server) LobstersStoryVote(ctx context.Context, req *qpuextapi.LobStoryV
 
 	return &qpuextapi.LobStoryVoteResp{}, work.result.err
 }
+
 
 // LobstersStoryVoteInsert ...
 func (s *Server) LobstersStoryVoteInsert(ctx context.Context, req *qpuextapi.LobStoryVoteReq) (*qpuextapi.LobStoryVoteResp, error) {

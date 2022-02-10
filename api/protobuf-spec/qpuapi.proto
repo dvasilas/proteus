@@ -3,8 +3,8 @@ syntax = "proto3";
 package qpuapi;
 option go_package = "github.com/dvasilas/proteus/internal/proto/qpuapi";
 
-import "api/protobuf-spec/qpu.proto";
-import "api/protobuf-spec/qpuextapi.proto";
+import "qpu.proto";
+import "qpuextapi.proto";
 
 service QPUAPI {
   // The QPU Query API.
