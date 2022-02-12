@@ -280,8 +280,6 @@ func getDatastoreConfig(inputConf inputQPUConfig, config *libqpu.QPUConfig) erro
 		config.DatastoreConfig.Type = libqpu.MYSQL
 	case "s3":
 		config.DatastoreConfig.Type = libqpu.S3
-	case "mongo":
-		config.DatastoreConfig.Type = libqpu.MONGO
 	case "mock":
 		config.DatastoreConfig.Type = libqpu.MOCK
 	default:

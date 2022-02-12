@@ -26,8 +26,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	log "github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type catchUp struct {
@@ -78,10 +76,7 @@ type IndexQPU struct {
 	stateUpdateM               metrics.LatencyM
 	writeLog                   writeLog
 	queryLog                   queryLog
-	collections                map[string]*mongo.Collection
-	database                   *mongo.Database
 	catchUp                    catchUp
-	findOptions                *options.FindOptions
 	subscribeQueriesL          sync.RWMutex
 	subscribeQueries           map[int32][]chan libqpu.LogOperation
 	db                         db
@@ -120,12 +115,10 @@ func InitClass(qpu *libqpu.QPU, catchUpDoneCh chan int) (*IndexQPU, error) {
 		queryLog: queryLog{
 			entries: make([]libqpu.QueryLogEntry, 0),
 		},
-		collections: make(map[string]*mongo.Collection),
 		catchUp: catchUp{
 			catchupQueries: make(map[int]*catchupQuery),
 			catchUpDoneCh:  catchUpDoneCh,
 		},
-		findOptions:      options.Find(),
 		subscribeQueries: make(map[int32][]chan libqpu.LogOperation),
 	}
 
