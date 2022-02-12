@@ -2,7 +2,6 @@ package indexqpu
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -342,72 +341,6 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 // QuerySubscribe  ...
 func (q *IndexQPU) QuerySubscribe(query libqpu.ASTQuery, req *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
 	return nil, nil, nil
-}
-
-// ClientQuery1 ...
-func (q *IndexQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
-	col, err := q.collection(query.GetTable())
-	if err != nil {
-		return nil, utils.Error(err)
-	}
-
-	var results []*map[string]interface{}
-
-	filter := bson.M{query.GetPredicate()[0].GetAttr().GetAttrKey(): query.GetPredicate()[0].GetLbound().GetInt()}
-
-	cur, err := col.Find(context.Background(), filter, q.findOptions)
-	if err != nil {
-		return nil, utils.Error(err)
-	}
-	if err = cur.All(context.Background(), &results); err != nil {
-		return nil, utils.Error(err)
-	}
-
-	respRecords := make([]*qpuextapi.QueryRespRecord1, len(results))
-	for i, result := range results {
-		response := make(map[string]*qpuextapi.Payload)
-		response["id"] = &qpuextapi.Payload{
-			Value: []byte((*result)["id"].(string)),
-		}
-		// 	id := (*result)["id"].(string)
-		// 	vc := (*result)["ts"].(map[string]interface{})
-		// 	ts := vc["ts"].(primitive.DateTime).Time()
-
-		// 	delete(*result, "_id")
-		// 	delete(*result, "id")
-		// 	delete(*result, "ts")
-
-		// 	timestamp, err := ptypes.TimestampProto(ts)
-		// 	if err != nil {
-		// 		return nil, utils.Error(err)
-		// 	}
-
-		// 	attributes := make(map[string]string)
-		for k, v := range *result {
-			if k != "_id" && k != "id" && k != "ts" {
-				switch v.(type) {
-				case int64:
-					b := make([]byte, 8)
-					binary.LittleEndian.PutUint64(b, uint64(v.(int64)))
-					response[k] = &qpuextapi.Payload{
-						Value: b,
-					}
-				}
-			}
-		}
-
-		respRecords[i] = &qpuextapi.QueryRespRecord1{
-			Response: response,
-		}
-		// 		RecordId:   id,
-		// 		Attributes: attributes,
-		// 		Timestamp:  map[string]*tspb.Timestamp{vc["key"].(string): timestamp},
-		// 	}
-	}
-
-	return &qpuextapi.QueryResp1{
-		RespRecord: respRecords,
-	}, nil
 }
 
 // ProcessQuerySubscribe ...

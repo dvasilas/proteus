@@ -304,38 +304,6 @@ func (s *APIProcessor) QuerySubscribe(queryReq *qpuextapi.QueryReq, stream qpuap
 	}
 }
 
-// QueryUnary1 ...
-func (s *APIProcessor) QueryUnary1(req string) (*qpuextapi.QueryResp1, error) {
-	switch s.config.Operator {
-	case libqpu.Router:
-		return s.qpuClass.ClientQuery1(libqpu.ASTQuery{}, req)
-	default:
-		astQuery, found, err := s.sqlCache.get(req)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			var err error
-			astQuery, err = sqlparser.Parse(req)
-			if err != nil {
-				return nil, err
-			}
-			s.sqlCache.put(req, astQuery)
-		}
-
-		return s.qpuClass.ClientQuery1(astQuery, req)
-	}
-
-	// if s.measureDataTransfer {
-	// 	respSize, err := getQueryRespSize(resp)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	s.dataTransferCh <- respSize
-	// }
-
-}
-
 // GetConfig is responsible for the top-level processing of invocation of the GetConfig API.
 func (s *APIProcessor) GetConfig(ctx context.Context, in *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error) {
 	return s.qpuClass.GetConfig(), nil

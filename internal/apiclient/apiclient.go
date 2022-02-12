@@ -85,13 +85,6 @@ func (c QPUAPIClient) QueryUnary(query string) (*qpuextapi.QueryResp, error) {
 	})
 }
 
-// QueryUnary1 ...
-func (c QPUAPIClient) QueryUnary1(query string) (*qpuextapi.QueryResp1, error) {
-	return c.cli.QueryUnary1(context.Background(), &qpuextapi.QueryReq{
-		QueryStr: query,
-	})
-}
-
 // QuerySubscribe ...
 func (c QPUAPIClient) QuerySubscribe(query string) (qpuapi.QPUAPI_QuerySubscribeClient, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(context.Background())

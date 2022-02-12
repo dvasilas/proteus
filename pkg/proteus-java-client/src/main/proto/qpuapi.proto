@@ -10,7 +10,6 @@ import "google/protobuf/timestamp.proto";
 
 service QPUAPI {
   rpc QueryUnary(QueryReq) returns (QueryResp) {}
-  rpc QueryUnary1(QueryReq) returns (QueryResp1) {}
 }
 
 message QueryReq {
@@ -21,19 +20,10 @@ message QueryResp {
   repeated QueryRespRecord respRecord = 1;
 }
 
-message QueryResp1 {
-  repeated QueryRespRecord1 respRecord = 1;
-}
-
 message QueryRespRecord {
   string record_id = 1;
   map<string, string> attributes = 2;
   map<string, google.protobuf.Timestamp> timestamp = 3;
-}
-
-message QueryRespRecord1 {
-  map<string, Payload> response = 1;
-  map<string, google.protobuf.Timestamp> timestamp = 2;
 }
 
 message Payload {

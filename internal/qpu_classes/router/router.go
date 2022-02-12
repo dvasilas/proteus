@@ -77,44 +77,6 @@ func (q *RouterQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSp
 	}
 }
 
-// ClientQuery1 ...
-func (q *RouterQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
-	queryRespCh := make(chan qpuextapi.QueryResp1)
-	errorCh := make(chan error)
-
-	respRecords := make([]*qpuextapi.QueryRespRecord1, 0)
-	subQueryCount := len(q.adjacentQPUs)
-
-	for _, adjQPU := range q.adjacentQPUs {
-		go func(to *libqpu.AdjacentQPU) {
-			resp, err := to.APIClient.QueryUnary1(queryStr)
-			if err != nil {
-				errorCh <- err
-				return
-			}
-			queryRespCh <- *resp
-		}(adjQPU)
-	}
-
-	returnedCount := 0
-	for {
-		select {
-		case resp := <-queryRespCh:
-			respRecords = append(respRecords, resp.GetRespRecord()...)
-			returnedCount++
-			if returnedCount == subQueryCount {
-				close(queryRespCh)
-				close(errorCh)
-				return &qpuextapi.QueryResp1{
-					RespRecord: respRecords,
-				}, nil
-			}
-		case err := <-errorCh:
-			return nil, err
-		}
-	}
-}
-
 // QuerySubscribe  ...
 func (q *RouterQPU) QuerySubscribe(query libqpu.ASTQuery, res *qpuextapi.QueryReq) (chan libqpu.LogOperation, chan bool, chan error) {
 	return nil, nil, nil

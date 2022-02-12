@@ -216,11 +216,6 @@ func (q *DsDriverQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parent
 	}, nil
 }
 
-// ClientQuery1 ...
-func (q *DsDriverQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
-	return nil, nil
-}
-
 // RemovePersistentQuery ...
 func (q *DsDriverQPU) RemovePersistentQuery(table string, queryID int) {
 	if _, found := q.persistentQueries[table][queryID]; found {

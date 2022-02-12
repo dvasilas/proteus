@@ -23,7 +23,6 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type QPUAPIClient interface {
 	QueryUnary(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp, error)
-	QueryUnary1(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp1, error)
 }
 
 type qPUAPIClient struct {
@@ -43,21 +42,11 @@ func (c *qPUAPIClient) QueryUnary(ctx context.Context, in *QueryReq, opts ...grp
 	return out, nil
 }
 
-func (c *qPUAPIClient) QueryUnary1(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp1, error) {
-	out := new(QueryResp1)
-	err := c.cc.Invoke(ctx, "/qpuextapi.QPUAPI/QueryUnary1", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QPUAPIServer is the server API for QPUAPI service.
 // All implementations must embed UnimplementedQPUAPIServer
 // for forward compatibility
 type QPUAPIServer interface {
 	QueryUnary(context.Context, *QueryReq) (*QueryResp, error)
-	QueryUnary1(context.Context, *QueryReq) (*QueryResp1, error)
 	mustEmbedUnimplementedQPUAPIServer()
 }
 
@@ -67,9 +56,6 @@ type UnimplementedQPUAPIServer struct {
 
 func (UnimplementedQPUAPIServer) QueryUnary(context.Context, *QueryReq) (*QueryResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnary not implemented")
-}
-func (UnimplementedQPUAPIServer) QueryUnary1(context.Context, *QueryReq) (*QueryResp1, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryUnary1 not implemented")
 }
 func (UnimplementedQPUAPIServer) mustEmbedUnimplementedQPUAPIServer() {}
 
@@ -102,24 +88,6 @@ func _QPUAPI_QueryUnary_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_QueryUnary1_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).QueryUnary1(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuextapi.QPUAPI/QueryUnary1",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).QueryUnary1(ctx, req.(*QueryReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // QPUAPI_ServiceDesc is the grpc.ServiceDesc for QPUAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -130,10 +98,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryUnary",
 			Handler:    _QPUAPI_QueryUnary_Handler,
-		},
-		{
-			MethodName: "QueryUnary1",
-			Handler:    _QPUAPI_QueryUnary1_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

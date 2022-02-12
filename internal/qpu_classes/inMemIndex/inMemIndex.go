@@ -251,16 +251,6 @@ func (q *IndexQPU) ClientQuery(query libqpu.ASTQuery, queryStr string, parentSpa
 	}, nil
 }
 
-// ClientQuery1 ...
-func (q *IndexQPU) ClientQuery1(query libqpu.ASTQuery, queryStr string) (*qpuextapi.QueryResp1, error) {
-	return &qpuextapi.QueryResp1{}, nil
-	// result := q.index.index.lookup(query)
-
-	// return &qpuextapi.QueryResp1{
-	// 	RespRecord: result,
-	// }, nil
-}
-
 // ProcessQuerySubscribe ...
 func (q *IndexQPU) ProcessQuerySubscribe(query libqpu.ASTQuery, md map[string]string, sync bool) (int, <-chan libqpu.LogOperation, <-chan error) {
 	return -1, nil, nil

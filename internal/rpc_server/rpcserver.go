@@ -198,11 +198,6 @@ func (s *Server) QueryUnary(ctx context.Context, req *qpuextapi.QueryReq) (*qpue
 	//	return resp, err
 }
 
-// QueryUnary1 ...
-func (s *Server) QueryUnary1(ctx context.Context, req *qpuextapi.QueryReq) (*qpuextapi.QueryResp1, error) {
-	return s.api.QueryUnary1(req.GetQueryStr())
-}
-
 // GetConfig implements the QPU's low level GetConfig API.
 func (s *Server) GetConfig(ctx context.Context, req *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error) {
 	return s.api.GetConfig(ctx, req)

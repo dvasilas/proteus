@@ -78,27 +78,6 @@ func (c *Client) Query(queryStmt string) (*qpuextapi.QueryResp, error) {
 	return resp, err
 }
 
-// Query1 ...
-func (c *Client) Query1(queryStmt string) (*qpuextapi.QueryResp1, error) {
-	client, err := c.pool.Get()
-	if err != nil {
-		return nil, err
-	}
-
-	r := &qpuextapi.QueryReq{
-		QueryStr: queryStmt,
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	resp, err := client.Cli.QueryUnary1(ctx, r)
-
-	c.pool.Return(client)
-
-	return resp, err
-}
-
 // GetMetrics ...
 func (c *Client) GetMetrics() (*qpuextapi.MetricsResponse, error) {
 	client, err := c.pool.Get()

@@ -31,7 +31,6 @@ type QPUAPIClient interface {
 	// that look like SELECT .. FROM .. WHERE .. LIMIT N
 	// and so do not care about streaming anyways.
 	QueryUnary(ctx context.Context, in *qpuextapi.QueryReq, opts ...grpc.CallOption) (*qpuextapi.QueryResp, error)
-	QueryUnary1(ctx context.Context, in *qpuextapi.QueryReq, opts ...grpc.CallOption) (*qpuextapi.QueryResp1, error)
 	QuerySubscribe(ctx context.Context, in *qpuextapi.QueryReq, opts ...grpc.CallOption) (QPUAPI_QuerySubscribeClient, error)
 	// The QPU GetConfig API.
 	// Used by a 'parent' QPU to request the configuration and query processing
@@ -81,15 +80,6 @@ func (x *qPUAPIQueryClient) Recv() (*ResponseStreamRecord, error) {
 func (c *qPUAPIClient) QueryUnary(ctx context.Context, in *qpuextapi.QueryReq, opts ...grpc.CallOption) (*qpuextapi.QueryResp, error) {
 	out := new(qpuextapi.QueryResp)
 	err := c.cc.Invoke(ctx, "/qpuapi.QPUAPI/QueryUnary", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *qPUAPIClient) QueryUnary1(ctx context.Context, in *qpuextapi.QueryReq, opts ...grpc.CallOption) (*qpuextapi.QueryResp1, error) {
-	out := new(qpuextapi.QueryResp1)
-	err := c.cc.Invoke(ctx, "/qpuapi.QPUAPI/QueryUnary1", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +139,6 @@ type QPUAPIServer interface {
 	// that look like SELECT .. FROM .. WHERE .. LIMIT N
 	// and so do not care about streaming anyways.
 	QueryUnary(context.Context, *qpuextapi.QueryReq) (*qpuextapi.QueryResp, error)
-	QueryUnary1(context.Context, *qpuextapi.QueryReq) (*qpuextapi.QueryResp1, error)
 	QuerySubscribe(*qpuextapi.QueryReq, QPUAPI_QuerySubscribeServer) error
 	// The QPU GetConfig API.
 	// Used by a 'parent' QPU to request the configuration and query processing
@@ -167,9 +156,6 @@ func (UnimplementedQPUAPIServer) Query(QPUAPI_QueryServer) error {
 }
 func (UnimplementedQPUAPIServer) QueryUnary(context.Context, *qpuextapi.QueryReq) (*qpuextapi.QueryResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnary not implemented")
-}
-func (UnimplementedQPUAPIServer) QueryUnary1(context.Context, *qpuextapi.QueryReq) (*qpuextapi.QueryResp1, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryUnary1 not implemented")
 }
 func (UnimplementedQPUAPIServer) QuerySubscribe(*qpuextapi.QueryReq, QPUAPI_QuerySubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method QuerySubscribe not implemented")
@@ -234,24 +220,6 @@ func _QPUAPI_QueryUnary_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QPUAPI_QueryUnary1_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(qpuextapi.QueryReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QPUAPIServer).QueryUnary1(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/qpuapi.QPUAPI/QueryUnary1",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QPUAPIServer).QueryUnary1(ctx, req.(*qpuextapi.QueryReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _QPUAPI_QuerySubscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(qpuextapi.QueryReq)
 	if err := stream.RecvMsg(m); err != nil {
@@ -301,10 +269,6 @@ var QPUAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryUnary",
 			Handler:    _QPUAPI_QueryUnary_Handler,
-		},
-		{
-			MethodName: "QueryUnary1",
-			Handler:    _QPUAPI_QueryUnary1_Handler,
 		},
 		{
 			MethodName: "GetConfig",

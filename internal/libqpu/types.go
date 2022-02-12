@@ -31,7 +31,6 @@ type QPU struct {
 type APIProcessor interface {
 	Query(QueryRequest, RequestStream) error
 	QueryUnary(QueryRequest, opentracing.Span) (*qpuextapi.QueryResp, error)
-	QueryUnary1(string) (*qpuextapi.QueryResp1, error)
 	QuerySubscribe(*qpuextapi.QueryReq, qpuapi.QPUAPI_QuerySubscribeServer) error
 	GetConfig(context.Context, *qpuapi.ConfigRequest) (*qpuapi.ConfigResponse, error)
 }
@@ -39,7 +38,6 @@ type APIProcessor interface {
 // QPUClass ...
 type QPUClass interface {
 	ClientQuery(ASTQuery, string, opentracing.Span) (*qpuextapi.QueryResp, error)
-	ClientQuery1(ASTQuery, string) (*qpuextapi.QueryResp1, error)
 	ProcessQuerySnapshot(ASTQuery, map[string]string, bool, opentracing.Span) (<-chan LogOperation, <-chan error)
 	ProcessQuerySubscribe(ASTQuery, map[string]string, bool) (int, <-chan LogOperation, <-chan error)
 	QuerySubscribe(ASTQuery, *qpuextapi.QueryReq) (chan LogOperation, chan bool, chan error)
@@ -58,7 +56,6 @@ type AdjacentQPU struct {
 type APIClient interface {
 	Query(QueryRequest) (ResponseStream, error)
 	QueryUnary(string) (*qpuextapi.QueryResp, error)
-	QueryUnary1(string) (*qpuextapi.QueryResp1, error)
 	QuerySQL(string, map[string]string, bool) (ResponseStream, error)
 	QuerySubscribe(string) (qpuapi.QPUAPI_QuerySubscribeClient, context.CancelFunc, error)
 	CloseConnection() error

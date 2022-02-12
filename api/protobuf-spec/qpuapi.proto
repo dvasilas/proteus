@@ -16,8 +16,6 @@ service QPUAPI {
   // and so do not care about streaming anyways.
   rpc QueryUnary(qpuextapi.QueryReq) returns (qpuextapi.QueryResp) {}
 
-  rpc QueryUnary1(qpuextapi.QueryReq) returns (qpuextapi.QueryResp1) {}
-
   rpc QuerySubscribe(qpuextapi.QueryReq) returns (stream ResponseStreamRecord) {}
   // The QPU GetConfig API.
   // Used by a 'parent' QPU to request the configuration and query processing
