@@ -44,7 +44,7 @@ fmt: ; $(info $(M) running gofmt…)
 
 .PHONY: test
 ## test: run tests
-test: fmt ; $(info $(M) running $(NAME:%=% )tests…)
+test: $(info $(M) running $(NAME:%=% )tests…)
 	@go test $(TESTPKGS)
 
 .PHONY: proto
